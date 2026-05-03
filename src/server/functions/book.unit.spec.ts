@@ -1,16 +1,12 @@
-import { call } from '@orpc/server';
-import { omit } from 'remeda';
 import { describe, expect, it } from 'vitest';
 
-import { Book } from '@/features/book/schema';
-import { Book as BookFromDb, Prisma } from '@/server/db/generated/client';
-import bookRouter from '@/server/routers/book';
+import { handlers } from '@/server/functions/book.handlers.server';
 import {
+  createAuthenticatedContext,
   mockDb,
-  mockGetSession,
   mockUser,
   mockUserHasPermission,
-} from '@/server/routers/test-utils';
+} from '@/server/functions/test-utils';
 
 const now = new Date();
 
@@ -34,18 +30,21 @@ const mockBookFromDb = {
   updatedAt: now,
 };
 
-const toExpectedBook = (mock: BookFromDb): Book => omit(mock, ['genreId']);
+const defaultGetAllInput = { limit: 20, searchTerm: '' };
 
-describe('book router', () => {
+describe('book handlers', () => {
   describe('getAll', () => {
     it('should return paginated books with total count', async () => {
       mockDb.book.count.mockResolvedValue(1);
       mockDb.book.findMany.mockResolvedValue([mockBookFromDb]);
 
-      const result = await call(bookRouter.getAll, {});
+      const result = await handlers.getAll(
+        createAuthenticatedContext(),
+        defaultGetAllInput
+      );
 
       expect(result).toEqual({
-        items: [toExpectedBook(mockBookFromDb)],
+        items: [mockBookFromDb],
         nextCursor: undefined,
         total: 1,
       });
@@ -59,7 +58,10 @@ describe('book router', () => {
       mockDb.book.count.mockResolvedValue(10);
       mockDb.book.findMany.mockResolvedValue(booksFromDb);
 
-      const result = await call(bookRouter.getAll, { limit: 3 });
+      const result = await handlers.getAll(createAuthenticatedContext(), {
+        ...defaultGetAllInput,
+        limit: 3,
+      });
 
       expect(result.items).toHaveLength(3);
       expect(result.nextCursor).toBe('book-4');
@@ -70,24 +72,19 @@ describe('book router', () => {
       mockDb.book.count.mockResolvedValue(1);
       mockDb.book.findMany.mockResolvedValue([mockBookFromDb]);
 
-      const result = await call(bookRouter.getAll, { limit: 5 });
+      const result = await handlers.getAll(createAuthenticatedContext(), {
+        ...defaultGetAllInput,
+        limit: 5,
+      });
 
       expect(result.nextCursor).toBeUndefined();
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(call(bookRouter.getAll, {})).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
     });
 
     it('should require book read permission', async () => {
       mockDb.book.count.mockResolvedValue(0);
       mockDb.book.findMany.mockResolvedValue([]);
 
-      await call(bookRouter.getAll, {});
+      await handlers.getAll(createAuthenticatedContext(), defaultGetAllInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -103,7 +100,9 @@ describe('book router', () => {
         error: false,
       });
 
-      await expect(call(bookRouter.getAll, {})).rejects.toMatchObject({
+      await expect(
+        handlers.getAll(createAuthenticatedContext(), defaultGetAllInput)
+      ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     });
@@ -113,35 +112,27 @@ describe('book router', () => {
     it('should return a book when found', async () => {
       mockDb.book.findUnique.mockResolvedValue(mockBookFromDb);
 
-      const result = await call(bookRouter.getById, { id: 'book-1' });
+      const result = await handlers.getById(createAuthenticatedContext(), {
+        id: 'book-1',
+      });
 
-      expect(result).toEqual(toExpectedBook(mockBookFromDb));
+      expect(result).toEqual(mockBookFromDb);
     });
 
     it('should throw NOT_FOUND when book does not exist', async () => {
       mockDb.book.findUnique.mockResolvedValue(null);
 
       await expect(
-        call(bookRouter.getById, { id: 'nonexistent' })
+        handlers.getById(createAuthenticatedContext(), { id: 'nonexistent' })
       ).rejects.toMatchObject({
         code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(bookRouter.getById, { id: 'book-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
       });
     });
 
     it('should require book read permission', async () => {
       mockDb.book.findUnique.mockResolvedValue(mockBookFromDb);
 
-      await call(bookRouter.getById, { id: 'book-1' });
+      await handlers.getById(createAuthenticatedContext(), { id: 'book-1' });
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -158,7 +149,7 @@ describe('book router', () => {
       });
 
       await expect(
-        call(bookRouter.getById, { id: 'book-1' })
+        handlers.getById(createAuthenticatedContext(), { id: 'book-1' })
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -182,40 +173,12 @@ describe('book router', () => {
       };
       mockDb.book.create.mockResolvedValue(createdBookFromDb);
 
-      const result = await call(bookRouter.create, createInput);
-
-      expect(result).toEqual(toExpectedBook(createdBookFromDb));
-    });
-
-    it('should throw CONFLICT on unique constraint violation (P2002)', async () => {
-      mockDb.book.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '0.0.0',
-          meta: { target: ['title', 'author'] },
-        })
+      const result = await handlers.create(
+        createAuthenticatedContext(),
+        createInput
       );
 
-      await expect(call(bookRouter.create, createInput)).rejects.toMatchObject({
-        code: 'CONFLICT',
-        data: { target: ['title', 'author'] },
-      });
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR on unexpected errors', async () => {
-      mockDb.book.create.mockRejectedValue(new Error('DB connection lost'));
-
-      await expect(call(bookRouter.create, createInput)).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(call(bookRouter.create, createInput)).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      expect(result).toEqual(createdBookFromDb);
     });
 
     it('should require book create permission', async () => {
@@ -224,7 +187,7 @@ describe('book router', () => {
         ...createInput,
       });
 
-      await call(bookRouter.create, createInput);
+      await handlers.create(createAuthenticatedContext(), createInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -240,7 +203,9 @@ describe('book router', () => {
         error: false,
       });
 
-      await expect(call(bookRouter.create, createInput)).rejects.toMatchObject({
+      await expect(
+        handlers.create(createAuthenticatedContext(), createInput)
+      ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     });
@@ -260,63 +225,12 @@ describe('book router', () => {
       const updatedBookFromDb = { ...mockBookFromDb, ...updateInput };
       mockDb.book.update.mockResolvedValue(updatedBookFromDb);
 
-      const result = await call(bookRouter.updateById, updateInput);
-
-      expect(result).toEqual(toExpectedBook(updatedBookFromDb));
-    });
-
-    it('should throw CONFLICT on unique constraint violation (P2002)', async () => {
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '0.0.0',
-          meta: { target: ['title', 'author'] },
-        }
-      );
-      mockDb.book.update.mockRejectedValue(prismaError);
-
-      await expect(
-        call(bookRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'CONFLICT',
-        data: { target: ['title', 'author'] },
-      });
-    });
-
-    it('should throw NOT_FOUND when book does not exist (P2025)', async () => {
-      mockDb.book.update.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
+      const result = await handlers.updateById(
+        createAuthenticatedContext(),
+        updateInput
       );
 
-      await expect(
-        call(bookRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR on unexpected errors', async () => {
-      mockDb.book.update.mockRejectedValue(new Error('DB connection lost'));
-
-      await expect(
-        call(bookRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(bookRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      expect(result).toEqual(updatedBookFromDb);
     });
 
     it('should require book update permission', async () => {
@@ -325,7 +239,7 @@ describe('book router', () => {
         ...updateInput,
       });
 
-      await call(bookRouter.updateById, updateInput);
+      await handlers.updateById(createAuthenticatedContext(), updateInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -342,7 +256,7 @@ describe('book router', () => {
       });
 
       await expect(
-        call(bookRouter.updateById, updateInput)
+        handlers.updateById(createAuthenticatedContext(), updateInput)
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -354,49 +268,14 @@ describe('book router', () => {
       mockDb.book.delete.mockResolvedValue(mockBookFromDb);
 
       await expect(
-        call(bookRouter.deleteById, { id: 'book-1' })
+        handlers.deleteById(createAuthenticatedContext(), { id: 'book-1' })
       ).resolves.toBeUndefined();
-    });
-
-    it('should throw NOT_FOUND when book does not exist (P2025)', async () => {
-      mockDb.book.delete.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Record not found', {
-          code: 'P2025',
-          clientVersion: '0.0.0',
-        })
-      );
-
-      await expect(
-        call(bookRouter.deleteById, { id: 'nonexistent' })
-      ).rejects.toMatchObject({
-        code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR on unexpected errors', async () => {
-      mockDb.book.delete.mockRejectedValue(new Error('DB connection lost'));
-
-      await expect(
-        call(bookRouter.deleteById, { id: 'book-1' })
-      ).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(bookRouter.deleteById, { id: 'book-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
     });
 
     it('should require book delete permission', async () => {
       mockDb.book.delete.mockResolvedValue(mockBookFromDb);
 
-      await call(bookRouter.deleteById, { id: 'book-1' });
+      await handlers.deleteById(createAuthenticatedContext(), { id: 'book-1' });
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -413,7 +292,7 @@ describe('book router', () => {
       });
 
       await expect(
-        call(bookRouter.deleteById, { id: 'book-1' })
+        handlers.deleteById(createAuthenticatedContext(), { id: 'book-1' })
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });

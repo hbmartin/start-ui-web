@@ -1,15 +1,14 @@
-import { call } from '@orpc/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Prisma } from '@/server/db/generated/client';
 import {
+  createAuthenticatedContext,
   mockDb,
   mockGetSession,
   mockSession,
   mockUser,
   mockUserHasPermission,
-} from '@/server/routers/test-utils';
-import userRouter from '@/server/routers/user';
+} from '@/server/functions/test-utils';
+import { handlers } from '@/server/functions/user.handlers.server';
 
 const { mockRemoveUser, mockRevokeUserSessions, mockRevokeUserSession } =
   vi.hoisted(() => ({
@@ -53,13 +52,22 @@ const mockSessionFromDb = {
   expiresAt: new Date(Date.now() + 86400000),
 };
 
-describe('user router', () => {
+const defaultGetAllInput = { limit: 20, searchTerm: '' };
+const defaultGetUserSessionsInput = (userId: string) => ({
+  userId,
+  limit: 20,
+});
+
+describe('user handlers', () => {
   describe('getAll', () => {
     it('should return paginated users with total count', async () => {
       mockDb.user.count.mockResolvedValue(1);
       mockDb.user.findMany.mockResolvedValue([mockUserFromDb]);
 
-      const result = await call(userRouter.getAll, {});
+      const result = await handlers.getAll(
+        createAuthenticatedContext(),
+        defaultGetAllInput
+      );
 
       expect(result).toEqual({
         items: [mockUserFromDb],
@@ -76,7 +84,10 @@ describe('user router', () => {
       mockDb.user.count.mockResolvedValue(10);
       mockDb.user.findMany.mockResolvedValue(usersFromDb);
 
-      const result = await call(userRouter.getAll, { limit: 3 });
+      const result = await handlers.getAll(createAuthenticatedContext(), {
+        ...defaultGetAllInput,
+        limit: 3,
+      });
 
       expect(result.items).toHaveLength(3);
       expect(result.nextCursor).toBe('user-4');
@@ -87,24 +98,19 @@ describe('user router', () => {
       mockDb.user.count.mockResolvedValue(1);
       mockDb.user.findMany.mockResolvedValue([mockUserFromDb]);
 
-      const result = await call(userRouter.getAll, { limit: 5 });
+      const result = await handlers.getAll(createAuthenticatedContext(), {
+        ...defaultGetAllInput,
+        limit: 5,
+      });
 
       expect(result.nextCursor).toBeUndefined();
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(call(userRouter.getAll, {})).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
     });
 
     it('should require user list permission', async () => {
       mockDb.user.count.mockResolvedValue(0);
       mockDb.user.findMany.mockResolvedValue([]);
 
-      await call(userRouter.getAll, {});
+      await handlers.getAll(createAuthenticatedContext(), defaultGetAllInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -120,7 +126,9 @@ describe('user router', () => {
         error: false,
       });
 
-      await expect(call(userRouter.getAll, {})).rejects.toMatchObject({
+      await expect(
+        handlers.getAll(createAuthenticatedContext(), defaultGetAllInput)
+      ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     });
@@ -130,7 +138,9 @@ describe('user router', () => {
     it('should return a user when found', async () => {
       mockDb.user.findUnique.mockResolvedValue(mockUserFromDb);
 
-      const result = await call(userRouter.getById, { id: 'target-user-1' });
+      const result = await handlers.getById(createAuthenticatedContext(), {
+        id: 'target-user-1',
+      });
 
       expect(result).toEqual(mockUserFromDb);
     });
@@ -139,26 +149,18 @@ describe('user router', () => {
       mockDb.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        call(userRouter.getById, { id: 'nonexistent' })
+        handlers.getById(createAuthenticatedContext(), { id: 'nonexistent' })
       ).rejects.toMatchObject({
         code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.getById, { id: 'target-user-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
       });
     });
 
     it('should require user list permission', async () => {
       mockDb.user.findUnique.mockResolvedValue(mockUserFromDb);
 
-      await call(userRouter.getById, { id: 'target-user-1' });
+      await handlers.getById(createAuthenticatedContext(), {
+        id: 'target-user-1',
+      });
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -175,7 +177,7 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.getById, { id: 'target-user-1' })
+        handlers.getById(createAuthenticatedContext(), { id: 'target-user-1' })
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -193,40 +195,12 @@ describe('user router', () => {
       const createdUser = { ...mockUserFromDb, ...createInput, id: 'new-1' };
       mockDb.user.create.mockResolvedValue(createdUser);
 
-      const result = await call(userRouter.create, createInput);
-
-      expect(result).toEqual(createdUser);
-    });
-
-    it('should throw CONFLICT on unique constraint violation (P2002)', async () => {
-      mockDb.user.create.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '0.0.0',
-          meta: { target: ['email'] },
-        })
+      const result = await handlers.create(
+        createAuthenticatedContext(),
+        createInput
       );
 
-      await expect(call(userRouter.create, createInput)).rejects.toMatchObject({
-        code: 'CONFLICT',
-        data: { target: ['email'] },
-      });
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR on unexpected errors', async () => {
-      mockDb.user.create.mockRejectedValue(new Error('DB connection lost'));
-
-      await expect(call(userRouter.create, createInput)).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(call(userRouter.create, createInput)).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      expect(result).toEqual(createdUser);
     });
 
     it('should require user create permission', async () => {
@@ -235,7 +209,7 @@ describe('user router', () => {
         ...createInput,
       });
 
-      await call(userRouter.create, createInput);
+      await handlers.create(createAuthenticatedContext(), createInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -251,7 +225,9 @@ describe('user router', () => {
         error: false,
       });
 
-      await expect(call(userRouter.create, createInput)).rejects.toMatchObject({
+      await expect(
+        handlers.create(createAuthenticatedContext(), createInput)
+      ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
     });
@@ -272,7 +248,10 @@ describe('user router', () => {
       const updatedUser = { ...mockUserFromDb, ...updateInput };
       mockDb.user.update.mockResolvedValue(updatedUser);
 
-      const result = await call(userRouter.updateById, updateInput);
+      const result = await handlers.updateById(
+        createAuthenticatedContext(),
+        updateInput
+      );
 
       expect(result).toEqual(updatedUser);
     });
@@ -296,7 +275,10 @@ describe('user router', () => {
       };
       mockDb.user.update.mockResolvedValue(returnedUser);
 
-      const result = await call(userRouter.updateById, selfUpdateInput);
+      const result = await handlers.updateById(
+        createAuthenticatedContext(),
+        selfUpdateInput
+      );
 
       expect(result.role).toBe('user');
     });
@@ -305,52 +287,9 @@ describe('user router', () => {
       mockDb.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        call(userRouter.updateById, updateInput)
+        handlers.updateById(createAuthenticatedContext(), updateInput)
       ).rejects.toMatchObject({
         code: 'NOT_FOUND',
-      });
-    });
-
-    it('should throw CONFLICT on unique constraint violation (P2002)', async () => {
-      mockDb.user.findUnique.mockResolvedValue({
-        email: 'target@example.com',
-      });
-      mockDb.user.update.mockRejectedValue(
-        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-          code: 'P2002',
-          clientVersion: '0.0.0',
-          meta: { target: ['email'] },
-        })
-      );
-
-      await expect(
-        call(userRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'CONFLICT',
-        data: { target: ['email'] },
-      });
-    });
-
-    it('should throw INTERNAL_SERVER_ERROR on unexpected errors', async () => {
-      mockDb.user.findUnique.mockResolvedValue({
-        email: 'target@example.com',
-      });
-      mockDb.user.update.mockRejectedValue(new Error('DB connection lost'));
-
-      await expect(
-        call(userRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.updateById, updateInput)
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
       });
     });
 
@@ -363,7 +302,7 @@ describe('user router', () => {
         ...updateInput,
       });
 
-      await call(userRouter.updateById, updateInput);
+      await handlers.updateById(createAuthenticatedContext(), updateInput);
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -380,7 +319,7 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.updateById, updateInput)
+        handlers.updateById(createAuthenticatedContext(), updateInput)
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -392,13 +331,15 @@ describe('user router', () => {
       mockRemoveUser.mockResolvedValue({ success: true });
 
       await expect(
-        call(userRouter.deleteById, { id: 'target-user-1' })
+        handlers.deleteById(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).resolves.toBeUndefined();
     });
 
     it('should prevent deleting yourself', async () => {
       await expect(
-        call(userRouter.deleteById, { id: mockUser.id })
+        handlers.deleteById(createAuthenticatedContext(), { id: mockUser.id })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
@@ -408,26 +349,20 @@ describe('user router', () => {
       mockRemoveUser.mockResolvedValue({ success: false });
 
       await expect(
-        call(userRouter.deleteById, { id: 'target-user-1' })
+        handlers.deleteById(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).rejects.toMatchObject({
         code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.deleteById, { id: 'target-user-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
       });
     });
 
     it('should require user delete permission', async () => {
       mockRemoveUser.mockResolvedValue({ success: true });
 
-      await call(userRouter.deleteById, { id: 'target-user-1' });
+      await handlers.deleteById(createAuthenticatedContext(), {
+        id: 'target-user-1',
+      });
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -444,7 +379,9 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.deleteById, { id: 'target-user-1' })
+        handlers.deleteById(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -456,9 +393,10 @@ describe('user router', () => {
       mockDb.session.count.mockResolvedValue(1);
       mockDb.session.findMany.mockResolvedValue([mockSessionFromDb]);
 
-      const result = await call(userRouter.getUserSessions, {
-        userId: 'target-user-1',
-      });
+      const result = await handlers.getUserSessions(
+        createAuthenticatedContext(),
+        defaultGetUserSessionsInput('target-user-1')
+      );
 
       expect(result).toEqual({
         items: [mockSessionFromDb],
@@ -475,31 +413,24 @@ describe('user router', () => {
       mockDb.session.count.mockResolvedValue(10);
       mockDb.session.findMany.mockResolvedValue(sessions);
 
-      const result = await call(userRouter.getUserSessions, {
-        userId: 'target-user-1',
-        limit: 3,
-      });
+      const result = await handlers.getUserSessions(
+        createAuthenticatedContext(),
+        { userId: 'target-user-1', limit: 3 }
+      );
 
       expect(result.items).toHaveLength(3);
       expect(result.nextCursor).toBe('session-4');
       expect(result.total).toBe(10);
     });
 
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.getUserSessions, { userId: 'target-user-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
-    });
-
     it('should require session list permission', async () => {
       mockDb.session.count.mockResolvedValue(0);
       mockDb.session.findMany.mockResolvedValue([]);
 
-      await call(userRouter.getUserSessions, { userId: 'target-user-1' });
+      await handlers.getUserSessions(
+        createAuthenticatedContext(),
+        defaultGetUserSessionsInput('target-user-1')
+      );
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -516,7 +447,10 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.getUserSessions, { userId: 'target-user-1' })
+        handlers.getUserSessions(
+          createAuthenticatedContext(),
+          defaultGetUserSessionsInput('target-user-1')
+        )
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -528,13 +462,17 @@ describe('user router', () => {
       mockRevokeUserSessions.mockResolvedValue({ success: true });
 
       await expect(
-        call(userRouter.revokeUserSessions, { id: 'target-user-1' })
+        handlers.revokeUserSessions(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).resolves.toBeUndefined();
     });
 
     it('should prevent revoking own sessions', async () => {
       await expect(
-        call(userRouter.revokeUserSessions, { id: mockUser.id })
+        handlers.revokeUserSessions(createAuthenticatedContext(), {
+          id: mockUser.id,
+        })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
@@ -544,26 +482,20 @@ describe('user router', () => {
       mockRevokeUserSessions.mockResolvedValue({ success: false });
 
       await expect(
-        call(userRouter.revokeUserSessions, { id: 'target-user-1' })
+        handlers.revokeUserSessions(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).rejects.toMatchObject({
         code: 'INTERNAL_SERVER_ERROR',
-      });
-    });
-
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.revokeUserSessions, { id: 'target-user-1' })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
       });
     });
 
     it('should require session revoke permission', async () => {
       mockRevokeUserSessions.mockResolvedValue({ success: true });
 
-      await call(userRouter.revokeUserSessions, { id: 'target-user-1' });
+      await handlers.revokeUserSessions(createAuthenticatedContext(), {
+        id: 'target-user-1',
+      });
 
       expect(mockUserHasPermission).toHaveBeenCalledWith({
         body: {
@@ -580,7 +512,9 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.revokeUserSessions, { id: 'target-user-1' })
+        handlers.revokeUserSessions(createAuthenticatedContext(), {
+          id: 'target-user-1',
+        })
       ).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
@@ -592,7 +526,7 @@ describe('user router', () => {
       mockRevokeUserSession.mockResolvedValue({ success: true });
 
       await expect(
-        call(userRouter.revokeUserSession, {
+        handlers.revokeUserSession(createAuthenticatedContext(), {
           id: 'target-user-1',
           sessionToken: 'other-token',
         })
@@ -600,16 +534,13 @@ describe('user router', () => {
     });
 
     it('should prevent revoking own current session', async () => {
-      mockGetSession.mockResolvedValue({
-        user: mockUser,
-        session: { ...mockSession, token: 'my-token' },
-      });
-
       await expect(
-        call(userRouter.revokeUserSession, {
-          id: mockUser.id,
-          sessionToken: 'my-token',
-        })
+        handlers.revokeUserSession(
+          createAuthenticatedContext({
+            session: { ...mockSession, token: 'my-token' } as ExplicitAny,
+          }),
+          { id: mockUser.id, sessionToken: 'my-token' }
+        )
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
@@ -619,7 +550,7 @@ describe('user router', () => {
       mockRevokeUserSession.mockResolvedValue({ success: false });
 
       await expect(
-        call(userRouter.revokeUserSession, {
+        handlers.revokeUserSession(createAuthenticatedContext(), {
           id: 'target-user-1',
           sessionToken: 'other-token',
         })
@@ -628,23 +559,10 @@ describe('user router', () => {
       });
     });
 
-    it('should throw UNAUTHORIZED when user is not authenticated', async () => {
-      mockGetSession.mockResolvedValue(null);
-
-      await expect(
-        call(userRouter.revokeUserSession, {
-          id: 'target-user-1',
-          sessionToken: 'other-token',
-        })
-      ).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
-    });
-
     it('should require session revoke permission', async () => {
       mockRevokeUserSession.mockResolvedValue({ success: true });
 
-      await call(userRouter.revokeUserSession, {
+      await handlers.revokeUserSession(createAuthenticatedContext(), {
         id: 'target-user-1',
         sessionToken: 'other-token',
       });
@@ -664,7 +582,7 @@ describe('user router', () => {
       });
 
       await expect(
-        call(userRouter.revokeUserSession, {
+        handlers.revokeUserSession(createAuthenticatedContext(), {
           id: 'target-user-1',
           sessionToken: 'other-token',
         })

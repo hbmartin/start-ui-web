@@ -49,3 +49,20 @@ export function setupAuthenticatedUser() {
   });
   mockUserHasPermission.mockResolvedValue({ success: true, error: false });
 }
+
+export const mockLogger = {
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
+
+export const createAuthenticatedContext = (overrides?: {
+  user?: typeof mockUser;
+  session?: typeof mockSession;
+}) =>
+  ({
+    user: overrides?.user ?? mockUser,
+    session: overrides?.session ?? mockSession,
+    db: mockDb,
+    logger: mockLogger,
+  }) as ExplicitAny;

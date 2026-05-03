@@ -5,7 +5,7 @@ import {
   mockGetSession,
   mockUserHasPermission,
   setupAuthenticatedUser,
-} from '@/server/routers/test-utils';
+} from '@/server/functions/test-utils';
 
 vi.mock('@/server/auth', () => ({
   auth: {
@@ -18,6 +18,7 @@ vi.mock('@/server/auth', () => ({
 
 vi.mock('@tanstack/react-start/server', () => ({
   getRequestHeaders: () => new Headers(),
+  setResponseHeader: vi.fn(),
 }));
 
 vi.mock('@/env/client', () => ({

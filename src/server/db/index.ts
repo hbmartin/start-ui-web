@@ -1,5 +1,5 @@
 import { envServer } from '@/env/server';
-import { timingStore } from '@/server/timing-store';
+import { timingStore } from '@/server/timing-store.server';
 
 import { PrismaClient } from './generated/client';
 
