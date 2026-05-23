@@ -1,10 +1,11 @@
 import { getRequestHeaders } from '@tanstack/react-start/server';
 
-import { auth } from '@/modules/auth/server';
 import type { CacheGateway } from '@/modules/kernel/application/ports/cache-gateway';
 import type { Logger } from '@/modules/kernel/application/ports/logger';
 import type { PermissionChecker } from '@/modules/kernel/application/ports/permission-checker';
 import type { UserId } from '@/modules/kernel/domain/ids';
+
+import { getAuthUseCases } from './auth';
 import { systemClock } from '@/modules/kernel/infrastructure/clock/system-clock';
 import {
   type Database,
@@ -55,12 +56,11 @@ const productionLogger: Logger = {
 
 const productionPermissionChecker: PermissionChecker = {
   async hasPermission(userId: UserId, permissions) {
-    const result = await auth.api.userHasPermission({
-      body: { userId, permissions },
+    return getAuthUseCases().checkPermission({
+      userId,
+      permissions,
       headers: getRequestHeaders(),
     });
-    if (result.error) return false;
-    return result.success;
   },
 };
 

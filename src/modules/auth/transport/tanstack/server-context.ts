@@ -5,9 +5,13 @@ import {
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 
-import { auth } from '@/composition/auth';
+import { getAuthUseCases } from '@/composition/auth';
 import { envClient } from '@/env/client';
 import type { Permission } from '@/modules/auth';
+import type {
+  AuthenticatedSession,
+  AuthenticatedUser,
+} from '@/modules/auth/domain/session';
 import { logger } from '@/modules/kernel/infrastructure/logger/pino';
 import { ServerFnError } from '@/modules/kernel/server';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
@@ -20,13 +24,7 @@ export type ProcedureLogger = {
   info: (...args: ExplicitAny[]) => void;
 };
 
-export type AuthenticatedUser = NonNullable<
-  Awaited<ReturnType<typeof auth.api.getSession>>
->['user'];
-
-export type AuthenticatedSession = NonNullable<
-  Awaited<ReturnType<typeof auth.api.getSession>>
->['session'];
+export type { AuthenticatedSession, AuthenticatedUser };
 
 export type ProtectedContext = {
   user: AuthenticatedUser;
@@ -49,7 +47,7 @@ const appendServerTiming = (entries: ServerTimingEntry[]) => {
 
 const getSession = async (timings: ServerTimingEntry[]) => {
   const authStart = performance.now();
-  const session = await auth.api.getSession({
+  const session = await getAuthUseCases().getCurrentSession({
     headers: getRequestHeaders(),
   });
   timings.push({ name: 'auth', durationMs: performance.now() - authStart });
@@ -179,16 +177,13 @@ export async function assertPermission(
   userId: string,
   permissions: Permission
 ) {
-  const result = await auth.api.userHasPermission({
-    body: { userId, permissions },
+  const allowed = await getAuthUseCases().checkPermission({
+    userId,
+    permissions,
     headers: getRequestHeaders(),
   });
 
-  if (result.error) {
-    throw new ServerFnError('INTERNAL_SERVER_ERROR');
-  }
-
-  if (!result.success) {
+  if (!allowed) {
     throw new ServerFnError('FORBIDDEN');
   }
 }

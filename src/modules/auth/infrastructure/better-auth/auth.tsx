@@ -3,9 +3,6 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, emailOTP, openAPI } from 'better-auth/plugins';
 import { match } from 'ts-pattern';
 
-import i18n from '@/lib/i18n';
-
-import TemplateLoginCode from '@/emails/templates/login-code';
 import { envClient } from '@/env/client';
 import { envServer } from '@/env/server';
 import {
@@ -16,8 +13,11 @@ import {
 import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/client';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { db } from '@/modules/kernel/infrastructure/db/client';
-import { sendEmail } from '@/modules/kernel/infrastructure/email/resend';
 import { getUserLanguage } from '@/modules/kernel/transport/tanstack/user-language';
+
+import { AuthEmailPortResend } from './auth-email-port-resend';
+
+const authEmailPort = new AuthEmailPortResend();
 
 export type Auth = typeof auth;
 export const auth = betterAuth({
@@ -72,14 +72,10 @@ export const auth = betterAuth({
       async sendVerificationOTP({ email, otp, type }) {
         await match(type)
           .with('sign-in', async () => {
-            await sendEmail({
-              to: email,
-              subject: i18n.t('emails:loginCode.subject', {
-                lng: getUserLanguage(),
-              }),
-              template: (
-                <TemplateLoginCode language={getUserLanguage()} code={otp} />
-              ),
+            await authEmailPort.sendSignInOtp({
+              email,
+              otp,
+              language: getUserLanguage(),
             });
           })
           .with('email-verification', async () => {

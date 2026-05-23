@@ -4,7 +4,13 @@ import { type CreateEmailOptions, Resend } from 'resend';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { env } from '@/modules/kernel/infrastructure/config/env';
 
-const resend = new Resend(env.RESEND_API_KEY);
+let resendInstance: Resend | undefined;
+const getResend = () => {
+  if (!resendInstance) {
+    resendInstance = new Resend(env.RESEND_API_KEY);
+  }
+  return resendInstance;
+};
 
 type SendEmailOptions = {
   to: CreateEmailOptions['to'];
@@ -23,7 +29,7 @@ export const sendEmail = async ({ template, ...options }: SendEmailOptions) => {
     return;
   }
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: env.EMAIL_FROM,
     react: template,
     ...options,

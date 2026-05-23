@@ -1,37 +1,28 @@
 import { getRequestHeaders } from '@tanstack/react-start/server';
 
-import { auth } from '@/modules/auth/server';
 import type { UserAuthGateway } from '@/modules/user/application/ports/user-auth-gateway';
 import type { UserRepository } from '@/modules/user/application/ports/user-repository';
 import { createUserUseCases } from '@/modules/user/factory';
 import { UserRepositoryDrizzle } from '@/modules/user/infrastructure/drizzle/user-repository-drizzle';
 
+import { getAuthUseCases } from './auth';
 import { getKernel, type KernelOverrides } from './kernel';
 import { hasDefinedOverrides } from './shared/overrides';
 import { createCachedFactory } from './shared/singleton';
 
 const productionUserAuthGateway: UserAuthGateway = {
-  async removeUser(userId) {
-    const response = await auth.api.removeUser({
-      body: { userId },
+  removeUser: (userId) =>
+    getAuthUseCases().removeUser({ userId, headers: getRequestHeaders() }),
+  revokeUserSessions: (userId) =>
+    getAuthUseCases().revokeUserSessions({
+      userId,
       headers: getRequestHeaders(),
-    });
-    return response.success;
-  },
-  async revokeUserSessions(userId) {
-    const response = await auth.api.revokeUserSessions({
-      body: { userId },
+    }),
+  revokeUserSession: (sessionToken) =>
+    getAuthUseCases().revokeUserSession({
+      sessionToken,
       headers: getRequestHeaders(),
-    });
-    return response.success;
-  },
-  async revokeUserSession(sessionToken) {
-    const response = await auth.api.revokeUserSession({
-      body: { sessionToken },
-      headers: getRequestHeaders(),
-    });
-    return response.success;
-  },
+    }),
 };
 
 export type UserCompositionOverrides = KernelOverrides & {
