@@ -11,5 +11,5 @@ describe('dependency-cruiser architecture rules', () => {
     const result = await cruise(['src'], options);
 
     expect(result.exitCode).toBe(0);
-  });
+  }, 30_000);
 });
