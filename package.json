@@ -134,7 +134,6 @@
     "@faker-js/faker": "10.4.0",
     "@playwright/test": "1.60.0",
     "@rolldown/plugin-babel": "^0.2.3",
-    "@softarc/sheriff-core": "^0.19.6",
     "@svgr/cli": "8.1.0",
     "@tailwindcss/postcss": "4.3.0",
     "@tailwindcss/typography": "^0.5.19",

@@ -1,4 +1,3 @@
-import { t } from 'i18next';
 import { z } from 'zod';
 
 import { zu } from '@/lib/zod/zod-utils';
@@ -14,8 +13,8 @@ export const zUser = () =>
       z.email({
         error: (issue) =>
           issue.input
-            ? t('user:common.email.invalid')
-            : t('user:common.email.required'),
+            ? 'user:common.email.invalid'
+            : 'user:common.email.required',
       })
     ),
     emailVerified: z.boolean(),
