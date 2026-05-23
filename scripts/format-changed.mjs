@@ -29,7 +29,11 @@ if (changedFiles.length === 0) {
   process.exit(0);
 }
 
-const result = spawnSync('oxfmt', changedFiles, { stdio: 'inherit' });
+const result = spawnSync(
+  'oxfmt',
+  ['--no-error-on-unmatched-pattern', ...changedFiles],
+  { stdio: 'inherit' }
+);
 
 if (result.error) {
   console.error(result.error.message);
