@@ -15,7 +15,7 @@ import {
   ResponsiveDrawerTrigger,
 } from '@/components/ui/responsive-drawer';
 
-import { BuildInfoVersion } from '@/features/build-info/build-info-version';
+import { BuildInfoVersion } from './build-info-version';
 
 import buildInfo from './build-info.gen.json';
 

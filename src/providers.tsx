@@ -12,7 +12,7 @@ import { envClient } from '@/env/client';
 import {
   DemoModeDrawer,
   useIsDemoModeDrawerVisible,
-} from '@/features/demo/demo-mode-drawer';
+} from '@/modules/demo/presentation';
 
 export const Providers = (props: {
   children: ReactNode;

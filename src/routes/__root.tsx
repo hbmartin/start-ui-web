@@ -19,7 +19,7 @@ import { AVAILABLE_LANGUAGES } from '@/lib/i18n/constants';
 
 import { PageError } from '@/components/errors/page-error';
 
-import { EnvHint } from '@/features/devtools/env-hint';
+import { EnvHint } from '@/modules/devtools/presentation';
 import { getUserLanguage } from '@/modules/kernel/server';
 import { Providers } from '@/providers';
 import appCss from '@/styles/app.css?url';

@@ -1,4 +1,4 @@
-import { getEnvHintTitlePrefix } from '@/features/devtools/env-hint';
+import { getEnvHintTitlePrefix } from '@/modules/devtools/presentation';
 
 export const getPageTitle = (pageTitle?: string) =>
   pageTitle

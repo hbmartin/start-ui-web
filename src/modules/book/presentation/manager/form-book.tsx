@@ -12,7 +12,7 @@ import {
 } from '@/components/form';
 
 import { envClient } from '@/env/client';
-import { openDemoModeDrawer } from '@/features/demo/demo-mode-drawer';
+import { openDemoModeDrawer } from '@/modules/demo/presentation';
 import {
   bookCoverAcceptedFileTypes,
   FormFieldsBook,

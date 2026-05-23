@@ -46,7 +46,7 @@
     "depcruise": "depcruise --config .dependency-cruiser.cjs src",
     "semgrep": "semgrep scan --config .semgrep.yml --error --quiet",
     "security:audit": "pnpm audit --audit-level=high",
-    "gen:build-info": "dotenv -- node ./run-jiti ./src/features/build-info/script-to-generate-json.ts",
+    "gen:build-info": "dotenv -- node ./run-jiti ./tools/gen-build-info.ts",
     "gen:icons": "svgr --config-file src/components/icons/svgr.config.cjs src/components/icons/svg-sources && oxfmt src/components/icons/generated",
     "test": "vitest run",
     "test:affected": "node scripts/run-affected-tests.mjs",

@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
-import { openDemoModeDrawer } from '@/features/demo/demo-mode-drawer';
+import { openDemoModeDrawer } from '@/modules/demo/presentation';
 import { isServerFnError } from '@/modules/kernel/client';
 
 const networkMode = import.meta.env.DEV ? 'always' : undefined;

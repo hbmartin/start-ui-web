@@ -2,8 +2,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 
-import { BuildInfoDrawer } from '@/features/build-info/build-info-drawer';
-import { BuildInfoVersion } from '@/features/build-info/build-info-version';
+import {
+  BuildInfoDrawer,
+  BuildInfoVersion,
+} from '@/modules/build-info/presentation';
 import {
   PageLayout,
   PageLayoutContent,

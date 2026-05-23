@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 import { envClient } from '@/env/client';
-import { LoginEmailHint } from '@/features/devtools/login-hint';
+import { LoginEmailHint } from '@/modules/devtools/presentation';
 import { authClient } from '@/modules/auth/presentation/client';
 import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/presentation/config';
 import { useMascot } from '@/modules/auth/presentation/mascot';

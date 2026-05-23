@@ -72,13 +72,21 @@ module.exports = {
     {
       name: 'routes-no-direct-infrastructure',
       severity: 'error',
-      from: { path: '^src/(routes|components|hooks|lib|features)' },
+      from: { path: '^src/(routes|components|hooks|lib)' },
       to: { path: '^src/modules/(?!kernel)[^/]+/infrastructure' },
+    },
+    {
+      name: 'no-src-features',
+      severity: 'error',
+      comment:
+        'src/features/ was retired in favor of modules. Add new code under src/modules/<feature>/ following the hex layout.',
+      from: {},
+      to: { path: '^src/features' },
     },
     {
       name: 'routes-use-module-public-api',
       severity: 'error',
-      from: { path: '^src/(routes|components|hooks|lib|layout|devtools)' },
+      from: { path: '^src/(routes|components|hooks|lib|layout)' },
       to: {
         path: '^src/modules/(?!kernel)[^/]+/(?!index\\.|presentation\\.|server\\.|client\\.)',
       },

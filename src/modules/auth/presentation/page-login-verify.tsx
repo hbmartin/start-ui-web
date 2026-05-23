@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button-link';
 
-import { LoginEmailOtpHint } from '@/features/devtools/login-hint';
+import { LoginEmailOtpHint } from '@/modules/devtools/presentation';
 import { authClient } from '@/modules/auth/presentation/client';
 import {
   AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES,

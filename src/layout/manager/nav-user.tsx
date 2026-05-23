@@ -32,8 +32,10 @@ import {
 } from '@/components/ui/sidebar';
 import { themes } from '@/components/ui/theme-switcher';
 
-import { BuildInfoDrawer } from '@/features/build-info/build-info-drawer';
-import { BuildInfoVersion } from '@/features/build-info/build-info-version';
+import {
+  BuildInfoDrawer,
+  BuildInfoVersion,
+} from '@/modules/build-info/presentation';
 import { authClient } from '@/modules/auth/client';
 import { ConfirmSignOut } from '@/modules/auth/client';
 import { WithPermissions } from '@/modules/auth/client';
