@@ -12,7 +12,7 @@ export type AccountOverrides = {
   accountRepository?: AccountRepository;
 };
 
-const buildAccountUseCases = (overrides?: AccountOverrides) => {
+const factory = createCachedFactory((overrides?: AccountOverrides) => {
   const kernel = overrides?.kernel ?? getKernel();
   return createAccountUseCases({
     accountRepository:
@@ -20,12 +20,9 @@ const buildAccountUseCases = (overrides?: AccountOverrides) => {
     clock: kernel.clock,
     logger: kernel.logger,
   });
-};
+});
 
-const factory = createCachedFactory(buildAccountUseCases);
-
-export const getAccountUseCases = (overrides?: AccountOverrides) =>
-  factory.get(overrides);
+export const getAccountUseCases = factory.get;
 
 /** Test-only. */
-export const __resetAccountComposition = () => factory.reset();
+export const __resetAccountComposition = factory.reset;

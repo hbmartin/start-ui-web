@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AccountRepository } from '../ports/account-repository';
-import { createAccountUseCases } from '../../factory';
+import { createAccountUseCases } from '../use-cases';
 
 const logger = {
   info: () => {},

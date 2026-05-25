@@ -1,29 +1,23 @@
 import { createServerOnlyFn } from '@tanstack/react-start';
 
-import { createAccountHandlers } from './transport/http/account-handlers';
-import { createAccountServerFunctions } from './transport/tanstack/account-server-functions';
+import type { ProtectedContext } from '@/modules/auth/server';
+
+import { createAccountServerFunctions } from './transport/server-functions';
 
 const getDeps = createServerOnlyFn(async () => {
-  const [{ getAccountUseCases }, { getKernel }, { withProtectedMutation }] =
-    await Promise.all([
-      import('@/composition/account'),
-      import('@/composition/kernel'),
-      import('@/modules/auth/server'),
-    ]);
+  const [
+    { getAccountUseCases },
+    { getKernelForCtx },
+    { withProtectedMutation },
+  ] = await Promise.all([
+    import('@/composition/account'),
+    import('@/composition/shared/server-deps'),
+    import('@/modules/auth/server'),
+  ]);
 
   return {
-    handlers: createAccountHandlers({
-      getUseCases: (ctx) =>
-        getAccountUseCases({
-          kernel: getKernel({
-            logger: {
-              info: (event, fields) => ctx.logger.info(fields ?? {}, event),
-              warn: (event, fields) => ctx.logger.warn(fields ?? {}, event),
-              error: (event, fields) => ctx.logger.error(fields ?? {}, event),
-            },
-          }),
-        }),
-    }),
+    useCases: (ctx: ProtectedContext) =>
+      getAccountUseCases({ kernel: getKernelForCtx(ctx) }),
     withProtectedMutation,
   };
 });
@@ -32,4 +26,4 @@ const serverFunctions = createAccountServerFunctions({ getDeps });
 
 export const accountSubmitOnboarding = serverFunctions.accountSubmitOnboarding;
 export const accountUpdateInfo = serverFunctions.accountUpdateInfo;
-export type { AccountServerFunctions } from './transport/tanstack/account-server-functions';
+export type { AccountServerFunctions } from './transport/server-functions';
