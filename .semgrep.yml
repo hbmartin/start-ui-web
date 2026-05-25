@@ -182,6 +182,16 @@ rules:
       include:
         - src/modules/*/presentation/schema.ts
 
+  - id: no-react-hook-form-imports
+    message: Use the platform TanStack Form API instead of React Hook Form.
+    languages: [typescript]
+    severity: ERROR
+    pattern-regex: 'from\s+["''](?:react-hook-form|@hookform/resolvers(?:/[^"'']*)?)["'']'
+    paths:
+      include:
+        - src/**/*.ts
+        - src/**/*.tsx
+
   - id: no-direct-import-meta-env-dev
     message: Read the dev-mode flag through platform/env/config.ts instead of import.meta.env.DEV.
     languages: [typescript]

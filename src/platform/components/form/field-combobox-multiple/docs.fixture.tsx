@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import {
@@ -7,6 +5,7 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Avatar, AvatarFallback } from '@/platform/components/ui/avatar';
@@ -52,12 +51,11 @@ const options = [
 }[];
 
 const formOptions = {
-  mode: 'onBlur',
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
 } as const;
 
 const Default = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -84,7 +82,7 @@ const Default = () => {
 };
 
 const DefaultValue = () => {
-  const form = useForm<z.infer<ReturnType<typeof zFormSchema>>>({
+  const form = useAppForm<z.infer<ReturnType<typeof zFormSchema>>>({
     ...formOptions,
     defaultValues: {
       bear: ['1'],
@@ -117,7 +115,7 @@ const DefaultValue = () => {
 };
 
 const Disabled = () => {
-  const form = useForm<z.infer<ReturnType<typeof zFormSchema>>>({
+  const form = useAppForm<z.infer<ReturnType<typeof zFormSchema>>>({
     ...formOptions,
     defaultValues: {
       bear: ['1'],
@@ -150,7 +148,7 @@ const Disabled = () => {
 };
 
 const CustomOptions = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>

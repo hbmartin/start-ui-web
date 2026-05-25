@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { useDisclosure } from 'react-use-disclosure';
 import { z } from 'zod';
 
@@ -11,6 +9,7 @@ import {
   FormFieldController,
   FormFieldHelper,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
@@ -59,9 +58,8 @@ const zFormSchema = () =>
   });
 
 const WithForm = () => {
-  const form = useForm({
-    mode: 'onSubmit',
-    resolver: zodResolver(zFormSchema()),
+  const form = useAppForm({
+    validators: { onSubmit: zFormSchema() },
     defaultValues: {
       name: '',
     },

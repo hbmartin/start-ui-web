@@ -8,6 +8,11 @@ export {
   useAuthSession,
 } from './presentation/client';
 export {
+  authQueries,
+  useCurrentScopeKey,
+  useCurrentSessionQuery,
+} from './presentation/queries';
+export {
   AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES,
   AUTH_EMAIL_OTP_MOCKED,
   AUTH_SIGNUP_ENABLED,

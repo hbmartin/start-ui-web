@@ -31,6 +31,8 @@ const session = {
   userAgent: null,
 };
 
+const scope = { userId: 'admin-1', role: 'admin', tenantId: null } as const;
+
 const makeUserRepository = (
   overrides: Partial<UserRepository> = {}
 ): UserRepository => ({
@@ -93,7 +95,7 @@ describe('user composition', () => {
 
     await expect(
       useCases.list({
-        currentUserId: toUserId('admin-1'),
+        scope,
         limit: 20,
         searchTerm: 'user',
       })

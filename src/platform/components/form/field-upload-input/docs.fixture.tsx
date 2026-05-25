@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -8,6 +6,7 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
@@ -18,14 +17,14 @@ const zFormSchema = () =>
 
 const formOptions = {
   mode: 'onBlur' as const,
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
   defaultValues: {
     file: null!,
   },
 };
 
 const Default = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -47,7 +46,7 @@ const Default = () => {
 };
 
 const DefaultValue = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       file: 'https://picsum.photos/seed/cosmos/200/200',
@@ -74,7 +73,7 @@ const DefaultValue = () => {
 };
 
 const Disabled = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       file: 'https://picsum.photos/seed/cosmos/200/200',

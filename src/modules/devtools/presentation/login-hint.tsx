@@ -1,6 +1,6 @@
 import { TerminalIcon } from 'lucide-react';
-import { useFormContext } from 'react-hook-form';
 
+import { useAppFormContext } from '@/platform/components/form';
 import {
   Alert,
   AlertDescription,
@@ -15,19 +15,19 @@ const LoginEmailButton = ({
   form,
 }: {
   email: string;
-  form: ReturnType<typeof useFormContext>;
+  form: ReturnType<typeof useAppFormContext>;
 }) => (
   <button
     type="button"
     className="cursor-pointer font-medium text-neutral-900 underline underline-offset-4 hover:no-underline dark:text-white"
-    onClick={() => form.setValue('email', email, { shouldValidate: true })}
+    onClick={() => form.setFieldValue('email' as never, email)}
   >
     {email.split('@')[0]}
   </button>
 );
 
 export const LoginEmailHint = () => {
-  const form = useFormContext();
+  const form = useAppFormContext();
 
   if (import.meta.env.PROD && !envClient.VITE_IS_DEMO) {
     return null;
@@ -50,7 +50,7 @@ export const LoginEmailHint = () => {
 };
 
 export const LoginEmailOtpHint = () => {
-  const form = useFormContext();
+  const form = useAppFormContext();
 
   if (import.meta.env.PROD && !envClient.VITE_IS_DEMO) {
     return null;
@@ -68,9 +68,7 @@ export const LoginEmailOtpHint = () => {
           type="button"
           className="cursor-pointer font-medium text-neutral-900 underline underline-offset-4 hover:no-underline dark:text-white"
           onClick={() =>
-            form.setValue('otp', AUTH_EMAIL_OTP_MOCKED, {
-              shouldValidate: true,
-            })
+            form.setFieldValue('otp' as never, AUTH_EMAIL_OTP_MOCKED)
           }
         >
           {AUTH_EMAIL_OTP_MOCKED}

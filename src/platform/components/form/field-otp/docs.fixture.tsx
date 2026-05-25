@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { zu } from '@/platform/lib/zod/zod-utils';
@@ -9,6 +7,7 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
@@ -27,12 +26,11 @@ const zFormSchema = (options: { length?: number } = {}) => {
 };
 
 const formOptions = {
-  mode: 'onBlur',
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
 } as const;
 
 const Default = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -55,7 +53,7 @@ const Default = () => {
 };
 
 const DefaultValue = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       code: '927342',
@@ -83,7 +81,7 @@ const DefaultValue = () => {
 };
 
 const Disabled = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -107,9 +105,12 @@ const Disabled = () => {
 };
 
 const CustomLength = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
-    resolver: zodResolver(zFormSchema({ length: 4 })),
+    validators: {
+      onSubmit: zFormSchema({ length: 4 }),
+      onBlur: zFormSchema({ length: 4 }),
+    },
   });
 
   return (
@@ -133,7 +134,7 @@ const CustomLength = () => {
 };
 
 const AutoSubmit = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>

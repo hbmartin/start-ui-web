@@ -30,6 +30,14 @@ const zOptionalWithReplaceMe = () =>
     })
     .transform((value) => (value === 'REPLACE ME' ? undefined : value));
 
+const zOptionalUrl = () =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value && value !== 'REPLACE ME' ? value : undefined))
+    .pipe(z.url().optional());
+
 const getBaseUrl = (env: RuntimeEnv) => {
   const vercelUrlPreviewUrl =
     env.VITE_VERCEL_ENV === 'preview' ? env.VITE_VERCEL_BRANCH_URL : null;
@@ -80,6 +88,9 @@ const serverSchema = () =>
       .enum(['true', 'false'])
       .prefault(isProd() ? 'false' : 'true')
       .transform((value) => value === 'true'),
+    SENTRY_ORG: zOptionalWithReplaceMe(),
+    SENTRY_PROJECT: zOptionalWithReplaceMe(),
+    SENTRY_AUTH_TOKEN: zOptionalWithReplaceMe(),
     S3_ACCESS_KEY_ID: zNonEmptyString(),
     S3_SECRET_ACCESS_KEY: zNonEmptyString(),
     S3_BUCKET_NAME: zNonEmptyString().default('default'),
@@ -114,6 +125,8 @@ const clientSchema = () =>
       .optional()
       .transform((value) => value ?? (isDev() ? 'gold' : 'plum')),
     VITE_S3_BUCKET_PUBLIC_URL: z.url(),
+    VITE_SENTRY_DSN: zOptionalUrl(),
+    VITE_SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
   });
 
 export type EnvServer = z.infer<ReturnType<typeof serverSchema>>;

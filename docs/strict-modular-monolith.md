@@ -1,5 +1,8 @@
 # Strict Modular Monolith Organization
 
+This is the quick reference. See the root `AGENTS.md` and `ARCHITECTURE.md`
+for the complete rules and rationale.
+
 This app uses a strict modular monolith shape:
 
 ```text
@@ -44,17 +47,25 @@ icons, and generic upload UI.
 module infrastructure adapters, and platform utilities. Use cases and pure HTTP
 handlers receive dependencies explicitly instead of importing composition.
 
-Auth provider details are isolated behind auth ports. Better Auth is the current
-adapter; a future WorkOS/AuthKit adapter should implement the same auth gateway
-and client facade before changing routes or feature modules.
+Auth provider details are isolated behind focused auth ports. Better Auth is the
+current adapter; a future WorkOS/AuthKit adapter should implement the same
+`SessionGateway`, `AuthorizationGateway`, `AuthEmailPort`, and
+`UserAdminGateway` contracts before changing routes or feature modules.
 
 The auth module exposes provider-neutral contracts from
 `src/modules/auth/application/ports`. Do not pass Better Auth client/server
 objects across module boundaries. User/session management should depend on
-`AuthGateway` and neutral identifiers such as `sessionId`; provider-specific
-values, including Better Auth session tokens, stay inside the Better Auth
-adapter. A WorkOS adapter should live under `auth/infrastructure/workos` and be
-selected from `src/composition/auth.ts`.
+neutral identifiers such as `sessionId`; provider-specific values, including
+Better Auth session tokens, stay server-side and behind auth adapters. A WorkOS
+adapter should live under `auth/infrastructure/workos` and be selected from
+`src/composition/auth.ts`.
+
+## Schema/i18n Contract
+
+`src/modules/*/presentation/schema.ts` emits stable translation keys only. It
+must not import `i18next` or `react-i18next`. Form error rendering translates
+those keys in `src/platform/components/form/form-field-error.tsx` and preserves
+literal fallback messages.
 
 ## Route Contract
 

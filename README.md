@@ -8,7 +8,7 @@ It represents our team's up-to-date stack that we use when creating web apps for
 
 <div align="center" style="margin: 0 0 16px 0"><img src=".github/assets/tech-logos.png" alt="Technologies logos of the starter" /></div>
 
-[⚙️ Node.js](https://nodejs.org), [🟦 TypeScript](https://www.typescriptlang.org/), [⚛️ React](https://react.dev/), [📦 TanStack Start](https://tanstack.com/start), [💨 Tailwind CSS](https://tailwindcss.com/), [🧩 shadcn/ui](https://ui.shadcn.com/), [📋 React Hook Form](https://react-hook-form.com/), [🔌 oRPC](https://orpc.unnoq.com/), [🛠 Drizzle ORM](https://orm.drizzle.team/), [🔐 Better Auth](https://www.better-auth.com/), [🪐 React Cosmos](https://reactcosmos.org/), [🧪 Vitest](https://vitest.dev/), [🎭 Playwright](https://playwright.dev/)
+[⚙️ Node.js](https://nodejs.org), [🟦 TypeScript](https://www.typescriptlang.org/), [⚛️ React](https://react.dev/), [📦 TanStack Start](https://tanstack.com/start), [📋 TanStack Form](https://tanstack.com/form), [💨 Tailwind CSS](https://tailwindcss.com/), [🧩 shadcn/ui](https://ui.shadcn.com/), [🛠 Drizzle ORM](https://orm.drizzle.team/), [🔐 Better Auth](https://www.better-auth.com/), [🪐 React Cosmos](https://reactcosmos.org/), [🧪 Vitest](https://vitest.dev/), [🎭 Playwright](https://playwright.dev/), [Sentry](https://sentry.io/)
 
 ## Documentation
 
@@ -16,7 +16,7 @@ For detailed information on how to use this project, please refer to the [docume
 
 ## Requirements
 
-* [Node.js](https://nodejs.org) >= 22
+* [Node.js](https://nodejs.org) >= 24
 * [pnpm](https://pnpm.io/)
 * [Docker](https://www.docker.com/) (or a [PostgreSQL](https://www.postgresql.org/) database)
 
@@ -99,19 +99,14 @@ Add the language in the preview url like `http://localhost:3000/api/dev/email/{t
 You can add search params to the preview url to pass as props to the template.
 `http://localhost:3000/api/dev/email/{template}/?{propsName}={propsValue}`
 
-### OpenAPI Documentation for the API
+### Application Boundary
 
-You can access the API documentation via the OpenAPI interface at:
+This application currently uses TanStack Start server functions as an internal,
+same-origin BFF RPC boundary for the browser app. These functions are not a
+public API contract and are not advertised through OpenAPI.
 
-`http://localhost:3000/api/openapi/app`
-
-This interface allows you to:
-
-* View complete and up-to-date documentation of all backend endpoints exposed by the API.
-
-* Understand request and response formats for each route.
-
-* Facilitate development and debugging by testing endpoints directly from the interface, without needing the frontend.
+Future public APIs should be introduced as explicit server routes with stable
+request/response contracts and documentation.
 
 ### Generate custom icons components from svg files
 

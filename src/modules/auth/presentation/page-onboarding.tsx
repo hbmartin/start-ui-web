@@ -1,7 +1,5 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { LogOutIcon } from 'lucide-react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -10,6 +8,8 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
+  useAppFormState,
 } from '@/platform/components/form';
 import { Button } from '@/platform/components/ui/button';
 
@@ -18,7 +18,10 @@ import { useAuthSession } from '@/modules/auth/client';
 import { ConfirmSignOut } from '@/modules/auth/presentation/confirm-signout';
 import { LayoutLogin } from '@/modules/auth/presentation/layout-login';
 import { useMascot } from '@/modules/auth/presentation/mascot';
-import { zFormFieldsOnboarding } from '@/modules/auth/presentation/schema';
+import {
+  FormFieldsOnboarding,
+  zFormFieldsOnboarding,
+} from '@/modules/auth/presentation/schema';
 
 export const PageOnboarding = () => {
   const { t } = useTranslation(['auth']);
@@ -37,15 +40,22 @@ export const PageOnboarding = () => {
     },
   });
 
-  const form = useForm({
-    mode: 'onSubmit',
-    resolver: zodResolver(zFormFieldsOnboarding()),
-    values: {
+  const form = useAppForm<FormFieldsOnboarding>({
+    defaultValues: {
       name: session.data?.user.name ?? '',
+    } satisfies FormFieldsOnboarding,
+    validators: {
+      onSubmit: zFormFieldsOnboarding(),
+    },
+    onSubmit: async ({ value }) => {
+      submitOnboarding.mutate(value);
     },
   });
 
-  const { isValid, isSubmitted } = form.formState;
+  const { isValid, isSubmitted } = useAppFormState(form, (state) => ({
+    isValid: state.isValid,
+    isSubmitted: state.submissionAttempts > 0 || state.isSubmitted,
+  }));
   useMascot({ isError: !isValid && isSubmitted });
 
   return (
@@ -66,13 +76,7 @@ export const PageOnboarding = () => {
         </div>
       }
     >
-      <Form
-        {...form}
-        onSubmit={(values) => {
-          submitOnboarding.mutate(values);
-        }}
-        className="flex flex-col gap-4 pb-12"
-      >
+      <Form form={form} className="flex flex-col gap-4 pb-12">
         <div className="flex flex-col gap-1">
           <h1 className="text-lg font-bold text-balance">
             {t('auth:pageOnboarding.title')}
@@ -86,12 +90,7 @@ export const PageOnboarding = () => {
           <FormFieldLabel>
             {t('auth:common.name.onboardingLabel')}
           </FormFieldLabel>
-          <FormFieldController
-            type="text"
-            control={form.control}
-            name="name"
-            size="lg"
-          />
+          <FormFieldController type="text" name="name" size="lg" />
         </FormField>
         <Button
           type="submit"

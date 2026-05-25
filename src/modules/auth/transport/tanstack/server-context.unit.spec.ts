@@ -2,6 +2,7 @@ import { setResponseHeader } from '@tanstack/react-start/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  setPublicResponseCacheHeaders,
   withProtectedMutation,
   withPublicContext,
 } from '@/modules/auth/server';
@@ -22,6 +23,37 @@ describe('server function middleware', () => {
     expect(setResponseHeader).toHaveBeenCalledWith(
       'Server-Timing',
       expect.stringContaining('global;dur=')
+    );
+  });
+
+  it('sets protected cache headers and request scope for authenticated server functions', async () => {
+    await expect(
+      withPublicContext(async (ctx) => ({
+        scope: ctx.scope,
+        userId: ctx.user?.id,
+      }))
+    ).resolves.toEqual({
+      scope: {
+        userId: 'user-1',
+        role: 'user',
+        tenantId: null,
+      },
+      userId: 'user-1',
+    });
+
+    expect(setResponseHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+    expect(setResponseHeader).toHaveBeenCalledWith(
+      'Vary',
+      'Cookie, Authorization'
+    );
+  });
+
+  it('sets explicit public cache headers through the public helper', () => {
+    setPublicResponseCacheHeaders({ maxAgeSeconds: 60 });
+
+    expect(setResponseHeader).toHaveBeenCalledWith(
+      'Cache-Control',
+      'public, max-age=60, s-maxage=60'
     );
   });
 

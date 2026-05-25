@@ -1,21 +1,31 @@
 import { createContext, use } from 'react';
-import {
-  ControllerFieldState,
-  ControllerRenderProps,
-  FieldValues,
-} from 'react-hook-form';
+import type { AnyFieldApi } from '@tanstack/react-form';
 
 import { FieldType } from '@/platform/components/form/_fields';
 
-export type NonGenericFormFieldControllerContextValue =
-  FormFieldControllerContextValue<FieldValues>;
+export type AppControllerField = {
+  name: string;
+  value: ExplicitAny;
+  onChange: (...args: Array<ExplicitAny>) => void;
+  onBlur: (...args: Array<ExplicitAny>) => void;
+  disabled?: boolean;
+  ref: (node: unknown) => void;
+};
 
-export type FormFieldControllerContextValue<
-  TFieldValues extends FieldValues = FieldValues,
-> = {
+export type AppControllerFieldState = {
+  invalid: boolean;
+  error?: { message?: string };
+  errors: Array<unknown>;
+};
+
+export type NonGenericFormFieldControllerContextValue =
+  FormFieldControllerContextValue;
+
+export type FormFieldControllerContextValue = {
   type: FieldType;
-  field: ControllerRenderProps<TFieldValues>;
-  fieldState: ControllerFieldState;
+  field: AppControllerField;
+  fieldState: AppControllerFieldState;
+  fieldApi: AnyFieldApi;
   displayError?: boolean;
 };
 

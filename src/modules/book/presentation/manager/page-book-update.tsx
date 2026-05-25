@@ -1,21 +1,28 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { useNavigateBack } from '@/platform/hooks/use-navigate-back';
 
 import { BackButton } from '@/platform/components/back-button';
-import { Form } from '@/platform/components/form';
+import {
+  Form,
+  setAppFormFieldError,
+  useAppForm,
+  useAppFormState,
+} from '@/platform/components/form';
 import { PreventNavigation } from '@/platform/components/prevent-navigation';
 import { Button } from '@/platform/components/ui/button';
 import { Card, CardContent } from '@/platform/components/ui/card';
 import { useIsUploadingFiles } from '@/platform/components/upload/utils';
 
+import { useCurrentScopeKey } from '@/modules/auth/client';
 import { FormBook } from '@/modules/book/presentation/manager/form-book';
 import { FormBookCover } from '@/modules/book/presentation/manager/form-book-cover';
-import { zFormFieldsBook } from '@/modules/book/presentation/schema';
+import {
+  FormFieldsBook,
+  zFormFieldsBook,
+} from '@/modules/book/presentation/schema';
 import { isServerFnError } from '@/modules/kernel/client';
 import {
   ManagerPageLayout as PageLayout,
@@ -30,66 +37,69 @@ export const PageBookUpdate = (props: { params: { id: string } }) => {
   const { t } = useTranslation(['book']);
   const { navigateBack } = useNavigateBack();
   const queryClient = useQueryClient();
-  const bookQuery = useQuery(bookQueries.getById({ id: props.params.id }));
-  const form = useForm({
-    resolver: zodResolver(zFormFieldsBook()),
-    values: {
+  const scopeKey = useCurrentScopeKey();
+  const bookQuery = useQuery(
+    bookQueries.getById({ id: props.params.id, scopeKey })
+  );
+  const bookUpdate = useMutation(bookQueries.updateById());
+  const form = useAppForm<FormFieldsBook>({
+    defaultValues: {
       title: bookQuery.data?.title ?? '',
       author: bookQuery.data?.author ?? '',
       genreId: bookQuery.data?.genre?.id ?? null!,
       publisher: bookQuery.data?.publisher ?? '',
       coverId: bookQuery.data?.coverId ?? '',
+    } satisfies FormFieldsBook,
+    validators: {
+      onSubmit: zFormFieldsBook(),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      try {
+        await bookUpdate.mutateAsync({ id: props.params.id, ...value });
+        await Promise.all([
+          // Invalidate book entry
+          queryClient.invalidateQueries({
+            queryKey: bookQueries.getById({ id: props.params.id, scopeKey })
+              .queryKey,
+          }),
+          // Invalidate books list
+          queryClient.invalidateQueries({
+            queryKey: bookQueries.getAll(scopeKey),
+            type: 'all',
+          }),
+        ]);
+
+        // Redirect
+        navigateBack({ ignoreBlocker: true });
+      } catch (error) {
+        if (isServerFnError(error) && error.code === 'CONFLICT') {
+          const target = error.data?.target;
+          const isTitleConflict =
+            target === 'title' ||
+            (Array.isArray(target) && target.includes('title'));
+
+          if (isTitleConflict) {
+            setAppFormFieldError(
+              formApi,
+              'title',
+              t('book:manager.form.titleAlreadyExist')
+            );
+            return;
+          }
+        }
+
+        toast.error(t('book:manager.update.updateError'));
+      }
     },
   });
+  const isDirty = useAppFormState(form, (state) => state.isDirty);
 
   const isUploadingFiles = useIsUploadingFiles('bookCover');
 
-  const bookUpdate = useMutation({
-    ...bookQueries.updateById(),
-    onSuccess: async () => {
-      await Promise.all([
-        // Invalidate book entry
-        queryClient.invalidateQueries({
-          queryKey: bookQueries.getById({ id: props.params.id }).queryKey,
-        }),
-        // Invalidate books list
-        queryClient.invalidateQueries({
-          queryKey: bookQueries.getAll(),
-          type: 'all',
-        }),
-      ]);
-
-      // Redirect
-      navigateBack({ ignoreBlocker: true });
-    },
-    onError: (error) => {
-      if (isServerFnError(error) && error.code === 'CONFLICT') {
-        const target = error.data?.target;
-        const isTitleConflict =
-          target === 'title' ||
-          (Array.isArray(target) && target.includes('title'));
-
-        if (isTitleConflict) {
-          form.setError('title', {
-            message: t('book:manager.form.titleAlreadyExist'),
-          });
-          return;
-        }
-      }
-
-      toast.error(t('book:manager.update.updateError'));
-    },
-  });
-
   return (
     <>
-      <PreventNavigation shouldBlock={form.formState.isDirty} />
-      <Form
-        {...form}
-        onSubmit={async (values) => {
-          bookUpdate.mutate({ id: props.params.id, ...values });
-        }}
-      >
+      <PreventNavigation shouldBlock={isDirty} />
+      <Form form={form}>
         <PageLayout>
           <PageLayoutTopBar
             startActions={<BackButton />}

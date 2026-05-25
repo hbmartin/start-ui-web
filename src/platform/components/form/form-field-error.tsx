@@ -1,66 +1,56 @@
 import { AlertCircleIcon } from 'lucide-react';
 import { ComponentProps, ReactNode, use } from 'react';
-import {
-  ControllerProps,
-  FieldError,
-  FieldErrors,
-  FieldPath,
-  FieldValues,
-  get,
-  useFormState,
-} from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/platform/lib/tailwind/utils';
 
+import {
+  useAppFormContext,
+  useMaybeAppFormContext,
+} from '@/platform/components/form/app-form-context';
 import { useFormFieldUnsafe } from '@/platform/components/form/form-field';
 
 import {
+  AppControllerFieldState,
   FormFieldControllerContext,
-  FormFieldControllerContextValue,
 } from './form-field-controller/context';
 
-type FormFieldErrorProps<
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
-> = Omit<ComponentProps<'div'>, 'children'> & {
-  children?: (params: { error?: FieldError }) => ReactNode;
-} & (
-    | Required<Pick<ControllerProps<TFieldValues, TName>, 'control' | 'name'>>
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    | {}
-  );
+type FormFieldErrorProps = Omit<ComponentProps<'div'>, 'children'> & {
+  children?: (params: {
+    error?: AppControllerFieldState['error'];
+  }) => ReactNode;
+  control?: unknown;
+  name?: string;
+};
 
-export const FormFieldError = <
-  TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
->({
+export const FormFieldError = ({
   className,
   children,
 
   ...props
-}: FormFieldErrorProps<TFieldValues, TName>) => {
+}: FormFieldErrorProps) => {
   const fieldCtx = useFormFieldUnsafe();
   const { t } = useTranslation();
-  const controllerCtx =
-    use<FormFieldControllerContextValue<TFieldValues> | null>(
-      FormFieldControllerContext as ExplicitAny
-    );
-  const { errors } = useFormState<TFieldValues>();
-  const control = 'control' in props ? props.control : null;
-  const name = 'name' in props ? props.name : null;
-  const controlled = !!(control && name);
+  const controllerCtx = use(FormFieldControllerContext);
+  const form = useMaybeAppFormContext();
+  const name = props.name;
 
-  if (!controlled && !controllerCtx) {
+  if (!name && !controllerCtx) {
     throw new Error(
-      'Missing <FormFieldController /> parent component or "control" and "name" props on <FormFieldError />'
+      'Missing <FormFieldController /> parent component or "name" prop on <FormFieldError />'
     );
   }
 
-  const error = controlled
-    ? get<FieldErrors<TFieldValues>>(errors, name)
-    : controllerCtx?.fieldState.error;
-  const rawMessage = error?.root?.message ?? error?.message;
+  if (name && !controllerCtx && form) {
+    return (
+      <StandaloneFormFieldError {...props} className={className} name={name}>
+        {children}
+      </StandaloneFormFieldError>
+    );
+  }
+
+  const error = controllerCtx?.fieldState.error;
+  const rawMessage = error?.message;
   const errorMessage = rawMessage
     ? t(rawMessage, { defaultValue: rawMessage })
     : undefined;
@@ -77,13 +67,7 @@ export const FormFieldError = <
     return children({ error });
   }
 
-  const {
-    control: _,
-    name: __,
-    ...rest
-  } = 'control' in props
-    ? props
-    : { ...props, control: undefined, name: undefined };
+  const { control: _, name: __, ...rest } = props;
 
   return (
     <div
@@ -100,3 +84,62 @@ export const FormFieldError = <
     </div>
   );
 };
+
+function StandaloneFormFieldError({
+  name,
+  ...props
+}: FormFieldErrorProps & { name: string }) {
+  const form = useAppFormContext();
+  return (
+    <form.Field name={name}>
+      {(fieldApi: ExplicitAny) => (
+        <FormFieldControllerContext
+          value={{
+            type: 'text',
+            displayError: true,
+            fieldApi,
+            field: {
+              name,
+              value: fieldApi.state.value,
+              disabled: undefined,
+              ref: () => undefined,
+              onChange: (value) => fieldApi.handleChange(value),
+              onBlur: () => fieldApi.handleBlur(),
+            },
+            fieldState: {
+              invalid: !fieldApi.state.meta.isValid,
+              error: getFirstErrorMessage(fieldApi.state.meta.errors),
+              errors: fieldApi.state.meta.errors,
+            },
+          }}
+        >
+          <FormFieldError {...props} />
+        </FormFieldControllerContext>
+      )}
+    </form.Field>
+  );
+}
+
+function getFirstErrorMessage(errors: Array<unknown>) {
+  for (const error of errors) {
+    const message = getErrorMessage(error);
+    if (message) return { message };
+  }
+  return undefined;
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (typeof error === 'string') return error;
+  if (Array.isArray(error)) {
+    for (const item of error) {
+      const message = getErrorMessage(item);
+      if (message) return message;
+    }
+  }
+  if (typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === 'string' ? message : undefined;
+  }
+  return undefined;
+}

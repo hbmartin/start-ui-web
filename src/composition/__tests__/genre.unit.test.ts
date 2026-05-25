@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GenreRepository } from '@/modules/genre';
-import { toGenreId, toUserId } from '@/modules/kernel/domain/ids';
+import { toGenreId } from '@/modules/kernel/domain/ids';
 
 import { makeTestKernel, now } from './helpers';
 import { __resetGenreComposition, getGenreUseCases } from '../genre';
@@ -13,6 +13,8 @@ const genre = {
   createdAt: now,
   updatedAt: now,
 };
+
+const scope = { userId: 'user-1', role: 'user', tenantId: null } as const;
 
 const makeGenreRepository = (
   overrides: Partial<GenreRepository> = {}
@@ -53,7 +55,7 @@ describe('genre composition', () => {
 
     await expect(
       useCases.list({
-        currentUserId: toUserId('user-1'),
+        scope,
         limit: 20,
         searchTerm: 'fic',
       })

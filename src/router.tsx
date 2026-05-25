@@ -1,11 +1,13 @@
 import { createRouter } from '@tanstack/react-router';
 
-import { queryClient } from '@/composition/client-query';
+import { createClientQueryClient } from '@/composition/client-query';
+import { initSentryForRouter } from '@/composition/sentry';
 
 import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
-  return createRouter({
+  const queryClient = createClientQueryClient();
+  const router = createRouter({
     context: {
       queryClient,
     },
@@ -16,4 +18,8 @@ export function getRouter() {
     scrollRestoration: true,
     routeTree,
   });
+
+  initSentryForRouter(router);
+
+  return router;
 }

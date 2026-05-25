@@ -1,11 +1,13 @@
-import { ReactElement } from 'react';
+import { ReactElement, useMemo } from 'react';
 import { userEvent } from 'vitest/browser';
 import { ComponentRenderOptions, render } from 'vitest-browser-react';
 
 import { Providers } from '@/composition/providers';
+import { createAppQueryClient } from '@/platform/lib/tanstack-query/query-client';
 
 const WithProviders = ({ children }: { children: React.ReactNode }) => {
-  return <Providers>{children}</Providers>;
+  const queryClient = useMemo(() => createAppQueryClient(), []);
+  return <Providers client={queryClient}>{children}</Providers>;
 };
 
 const customRender = (

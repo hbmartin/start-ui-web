@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StrictMode, useEffect } from 'react';
+import { StrictMode, useEffect, useMemo } from 'react';
 
 import type { LanguageKey } from '@/platform/lib/i18n/constants';
 import {
@@ -7,6 +7,7 @@ import {
   DEFAULT_LANGUAGE_KEY,
 } from '@/platform/lib/i18n/constants';
 import i18nGlobal from '@/platform/lib/i18n/index';
+import { createAppQueryClient } from '@/platform/lib/tanstack-query/query-client';
 
 import { Providers } from '@/composition/providers';
 
@@ -25,6 +26,7 @@ export default function CosmosDecorator({
   options,
 }: CosmosDecoratorProps) {
   const locale = options?.locale ?? DEFAULT_LANGUAGE_KEY;
+  const queryClient = useMemo(() => createAppQueryClient(), []);
 
   useEffect(() => {
     void i18nGlobal.changeLanguage(locale);
@@ -41,7 +43,7 @@ export default function CosmosDecorator({
   }, [locale]);
 
   return (
-    <Providers forcedTheme={options?.theme ?? 'light'}>
+    <Providers client={queryClient} forcedTheme={options?.theme ?? 'light'}>
       <StrictMode>
         <div id="preview-container">{children}</div>
       </StrictMode>

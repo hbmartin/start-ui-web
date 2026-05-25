@@ -1,54 +1,57 @@
-import {
-  FieldValues,
-  FormProvider,
-  FormProviderProps,
-  SubmitHandler,
-} from 'react-hook-form';
+import type { AnyFormApi } from '@tanstack/react-form';
+import type { ComponentType, PropsWithChildren } from 'react';
 
+import { getAppFormSubmitValues } from '@/platform/components/form/app-form-context';
 import { cn } from '@/platform/lib/tailwind/utils';
 
-type FormProps<
-  TFieldValues extends FieldValues = FieldValues,
-  TContext = ExplicitAny,
-  TTransformedValues = TFieldValues,
-> = StrictUnion<
-  | (FormProviderProps<TFieldValues, TContext, TTransformedValues> & {
-      noHtmlForm?: false;
-      onSubmit?: SubmitHandler<TTransformedValues>;
-      className?: string;
-    })
-  | (FormProviderProps<TFieldValues, TContext, TTransformedValues> & {
-      noHtmlForm: true;
-    })
+type AppFormApi = AnyFormApi & {
+  AppForm?: ComponentType<PropsWithChildren>;
+};
+
+type FormProps = PropsWithChildren<
+  {
+    form?: AppFormApi;
+    noHtmlForm?: boolean;
+    className?: string;
+    onSubmit?: (values: ExplicitAny) => void | Promise<void>;
+  } & Record<string, ExplicitAny>
 >;
 
-export const Form = <TFieldValues extends FieldValues>({
+export const Form = ({
+  form: explicitForm,
   noHtmlForm = false,
   className,
+  onSubmit,
   ...props
-}: FormProps<TFieldValues>) => {
+}: FormProps) => {
+  const form = explicitForm ?? (props as unknown as AppFormApi);
+  const htmlProps = explicitForm ? props : {};
+  const Provider =
+    form.AppForm ?? (({ children }: PropsWithChildren) => children);
+
   if (noHtmlForm) {
-    return <FormProvider {...props} />;
+    return <Provider>{props.children}</Provider>;
   }
 
   return (
-    <FormProvider {...props}>
+    <Provider>
       <form
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          if (props.onSubmit) {
-            props.handleSubmit(props.onSubmit)(e);
-          } else {
-            console.warn('Missing onSubmit method on <Form>');
-          }
+          void (async () => {
+            await form.handleSubmit();
+            if (onSubmit && form.state.isValid) {
+              await onSubmit(getAppFormSubmitValues(form, form.state.values));
+            }
+          })();
         }}
         className={cn('flex flex-1 flex-col', className)}
+        {...htmlProps}
       >
         {props.children}
       </form>
-    </FormProvider>
+    </Provider>
   );
 };

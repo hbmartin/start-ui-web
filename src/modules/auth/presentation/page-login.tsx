@@ -1,7 +1,5 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
-import { SubmitHandler, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -10,6 +8,8 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
+  useAppFormState,
 } from '@/platform/components/form';
 import { Button } from '@/platform/components/ui/button';
 
@@ -66,52 +66,60 @@ export default function PageLogin({
     },
   });
 
-  const form = useForm({
-    mode: 'onSubmit',
-    resolver: zodResolver(zFormFieldsLogin()),
+  const form = useAppForm<FormFieldsLogin>({
     defaultValues: {
       email: '',
+    } satisfies FormFieldsLogin,
+    validators: {
+      onSubmit: zFormFieldsLogin(),
+    },
+    onSubmit: async ({ value: { email } }) => {
+      let result;
+      try {
+        result = await sendEmailOtp({
+          email,
+          type: 'sign-in',
+        });
+      } catch {
+        toast.error(t('auth:errorCode.UNKNOWN_ERROR'));
+        return;
+      }
+
+      if (result.error) {
+        const errorMessage = result.error.code
+          ? t(
+              `auth:errorCode.${result.error.code as unknown as keyof typeof authErrorCodes}`
+            )
+          : (typeof result.error.message === 'string' &&
+              result.error.message) ||
+            t('auth:errorCode.UNKNOWN_ERROR');
+        toast.error(errorMessage);
+        return;
+      }
+
+      router.navigate({
+        replace: true,
+        to: '/login/verify',
+        search: {
+          redirect: search.redirect,
+          email,
+        },
+      });
     },
   });
 
-  const { isValid, isSubmitted } = form.formState;
+  const { isValid, isSubmitted, isSubmitting } = useAppFormState(
+    form.store,
+    (state) => ({
+      isValid: state.isValid,
+      isSubmitted: state.submissionAttempts > 0 || state.isSubmitted,
+      isSubmitting: state.isSubmitting,
+    })
+  );
   useMascot({ isError: !isValid && isSubmitted });
 
-  const submitHandler: SubmitHandler<FormFieldsLogin> = async ({ email }) => {
-    let result;
-    try {
-      result = await sendEmailOtp({
-        email,
-        type: 'sign-in',
-      });
-    } catch {
-      toast.error(t('auth:errorCode.UNKNOWN_ERROR'));
-      return;
-    }
-
-    if (result.error) {
-      const errorMessage = result.error.code
-        ? t(
-            `auth:errorCode.${result.error.code as unknown as keyof typeof authErrorCodes}`
-          )
-        : (typeof result.error.message === 'string' && result.error.message) ||
-          t('auth:errorCode.UNKNOWN_ERROR');
-      toast.error(errorMessage);
-      return;
-    }
-
-    router.navigate({
-      replace: true,
-      to: '/login/verify',
-      search: {
-        redirect: search.redirect,
-        email,
-      },
-    });
-  };
-
   return (
-    <Form {...form} onSubmit={submitHandler} className="flex flex-col gap-6">
+    <Form form={form} className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">
           {t(`${I18N_KEY_PAGE_PREFIX}.title`)}
@@ -128,14 +136,13 @@ export default function PageLogin({
             </FormFieldLabel>
             <FormFieldController
               type="email"
-              control={form.control}
               name="email"
               size="lg"
               placeholder={t('auth:common.email.label')}
             />
           </FormField>
           <Button
-            loading={form.formState.isSubmitting}
+            loading={isSubmitting}
             type="submit"
             size="lg"
             className="w-full"

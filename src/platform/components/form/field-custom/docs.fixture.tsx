@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { zu } from '@/platform/lib/zod/zod-utils';
@@ -11,6 +9,7 @@ import {
   FormFieldError,
   FormFieldHelper,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
@@ -26,15 +25,14 @@ const zFormSchema = () =>
   });
 
 const formOptions = {
-  mode: 'onBlur',
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
   defaultValues: {
     url: '',
   },
 } as const;
 
 const Default = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -73,7 +71,7 @@ const Default = () => {
 };
 
 const DefaultValue = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       url: 'example.com',
@@ -117,7 +115,7 @@ const DefaultValue = () => {
 };
 
 const Disabled = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       url: 'example.com',
@@ -163,7 +161,7 @@ const Disabled = () => {
 };
 
 const ReadOnly = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       url: 'example.com',

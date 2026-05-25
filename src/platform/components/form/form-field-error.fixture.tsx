@@ -1,5 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { zu } from '@/platform/lib/zod/zod-utils';
@@ -10,6 +8,7 @@ import {
   FormFieldController,
   FormFieldError,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
@@ -25,8 +24,7 @@ const zFormSchema = () =>
   });
 
 const formOptions = {
-  mode: 'onBlur',
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
   defaultValues: {
     website: '',
   },
@@ -37,7 +35,7 @@ const formOptions = {
  * FormFieldError automatically accesses the FormFieldController context.
  */
 const CustomField = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -78,7 +76,7 @@ const CustomField = () => {
  * Pass `control` and `name` props directly to FormFieldError.
  */
 const Standalone = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>

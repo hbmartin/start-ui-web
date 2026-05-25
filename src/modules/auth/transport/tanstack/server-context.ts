@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/tanstackstart-react';
 import {
   getRequestHeaders,
   setResponseHeader,
@@ -10,7 +11,9 @@ import type {
   AuthenticatedUser,
   AuthUseCases,
   Permission,
+  RequestScope,
 } from '@/modules/auth';
+import { scopeFromUser } from '@/modules/auth';
 import { logger } from '@/modules/kernel/infrastructure/logger/pino';
 import { DEMO_MODE_ERROR, ServerFnError } from '@/modules/kernel/server';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
@@ -27,12 +30,17 @@ export type ProcedureLogger = {
 export type ProtectedContext = {
   user: AuthenticatedUser;
   session: AuthenticatedSession;
+  scope: RequestScope;
   logger: ProcedureLogger;
 };
 
-export type PublicContext = Omit<ProtectedContext, 'user' | 'session'> & {
+export type PublicContext = Omit<
+  ProtectedContext,
+  'user' | 'session' | 'scope'
+> & {
   user: AuthenticatedUser | null;
   session: AuthenticatedSession | null;
+  scope: RequestScope | null;
 };
 
 type ServerContextDeps = {
@@ -45,6 +53,31 @@ const formatTiming = (entries: ServerTimingEntry[]) =>
 const appendServerTiming = (entries: ServerTimingEntry[]) => {
   if (!entries.length) return;
   setResponseHeader('Server-Timing', formatTiming(entries));
+};
+
+const setAuthenticatedResponseCacheHeaders = () => {
+  setResponseHeader('Cache-Control', 'no-store');
+  setResponseHeader('Vary', 'Cookie, Authorization');
+};
+
+export const setPublicResponseCacheHeaders = (input: {
+  maxAgeSeconds: number;
+}) => {
+  setResponseHeader(
+    'Cache-Control',
+    `public, max-age=${input.maxAgeSeconds}, s-maxage=${input.maxAgeSeconds}`
+  );
+};
+
+const bindSentryUser = (user: AuthenticatedUser | null) => {
+  if (!user) {
+    Sentry.setUser(null);
+    return;
+  }
+
+  Sentry.setUser({ id: user.id });
+  Sentry.setTag('role', user.role);
+  Sentry.setTag('tenantId', 'none');
 };
 
 const finalize = (
@@ -139,16 +172,22 @@ export const createServerContextTools = ({
       try {
         const session = await getSession(timings);
         if (session?.user?.id) {
+          setAuthenticatedResponseCacheHeaders();
+          bindSentryUser(session.user);
           procedureLogger = logger.child({
             requestId,
             userId: session.user.id,
+            role: session.user.role,
             scope: 'procedure',
           });
+        } else {
+          bindSentryUser(null);
         }
 
         const ctx: PublicContext = {
           user: session?.user ?? null,
           session: session?.session ?? null,
+          scope: session?.user ? scopeFromUser(session.user) : null,
           logger: procedureLogger,
         };
         return await fn(ctx);
@@ -164,12 +203,13 @@ export const createServerContextTools = ({
     fn: (ctx: ProtectedContext) => Promise<T>
   ): Promise<T> => {
     return withPublicContext(async (ctx) => {
-      if (!ctx.user || !ctx.session) {
+      if (!ctx.user || !ctx.session || !ctx.scope) {
         throw new ServerFnError('UNAUTHORIZED');
       }
       return fn({
         user: ctx.user,
         session: ctx.session,
+        scope: ctx.scope,
         logger: ctx.logger,
       });
     });

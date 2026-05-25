@@ -1,6 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeftIcon } from 'lucide-react';
-import { SubmitHandler, useForm } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -10,6 +8,9 @@ import {
   FormFieldController,
   FormFieldHelper,
   FormFieldLabel,
+  setAppFormFieldError,
+  useAppForm,
+  useAppFormState,
 } from '@/platform/components/form';
 import { Button } from '@/platform/components/ui/button';
 import { ButtonLink } from '@/platform/components/ui/button-link';
@@ -42,48 +43,47 @@ export default function PageLoginVerify({
   const { t } = useTranslation(['auth', 'common']);
   const session = useAuthSession();
 
-  const form = useForm({
-    mode: 'onSubmit',
-    resolver: zodResolver(zFormFieldsLoginVerify()),
+  const form = useAppForm<FormFieldsLoginVerify>({
     defaultValues: {
       otp: '',
+    } satisfies FormFieldsLoginVerify,
+    validators: {
+      onSubmit: zFormFieldsLoginVerify(),
+    },
+    onSubmit: async ({ value: { otp }, formApi }) => {
+      const { error } = await signInEmailOtp({
+        email: search.email,
+        otp,
+      });
+
+      if (error) {
+        toast.error(
+          error.code
+            ? t(
+                `auth:errorCode.${error.code as unknown as keyof typeof authErrorCodes}`
+              )
+            : error.message || t('auth:errorCode.UNKNOWN_ERROR')
+        );
+        setAppFormFieldError(formApi, 'otp', t('auth:common.otp.invalid'));
+        return;
+      }
+
+      // Refetch session to update guards and redirect
+      session.refetch();
     },
   });
-  const { isValid, isSubmitted } = form.formState;
+  const { isValid, isSubmitted, isSubmitting } = useAppFormState(
+    form.store,
+    (state) => ({
+      isValid: state.isValid,
+      isSubmitted: state.submissionAttempts > 0 || state.isSubmitted,
+      isSubmitting: state.isSubmitting,
+    })
+  );
   useMascot({ isError: !isValid && isSubmitted });
 
-  const submitHandler: SubmitHandler<FormFieldsLoginVerify> = async ({
-    otp,
-  }) => {
-    const { error } = await signInEmailOtp({
-      email: search.email,
-      otp,
-    });
-
-    if (error) {
-      toast.error(
-        error.code
-          ? t(
-              `auth:errorCode.${error.code as unknown as keyof typeof authErrorCodes}`
-            )
-          : error.message || t('auth:errorCode.UNKNOWN_ERROR')
-      );
-      form.setError('otp', {
-        message: t('auth:common.otp.invalid'),
-      });
-      return;
-    }
-
-    // Refetch session to update guards and redirect
-    session.refetch();
-  };
-
   return (
-    <Form
-      {...form}
-      onSubmit={submitHandler}
-      className="flex flex-col gap-4 pb-12"
-    >
+    <Form form={form} className="flex flex-col gap-4 pb-12">
       <div className="flex flex-col gap-1">
         <ButtonLink variant="link" to="/login">
           <ArrowLeftIcon />
@@ -110,7 +110,6 @@ export default function PageLoginVerify({
           <FormFieldLabel>{t('auth:common.otp.label')}</FormFieldLabel>
           <FormFieldController
             type="otp"
-            control={form.control}
             name="otp"
             size="lg"
             maxLength={6}
@@ -123,7 +122,7 @@ export default function PageLoginVerify({
             })}
           </FormFieldHelper>
         </FormField>
-        <Button loading={form.formState.isSubmitting} type="submit" size="lg">
+        <Button loading={isSubmitting} type="submit" size="lg">
           {t(`${I18N_KEY_PAGE_PREFIX}.confirm`)}
         </Button>
         <LoginEmailOtpHint />

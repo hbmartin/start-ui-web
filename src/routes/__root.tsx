@@ -7,12 +7,14 @@ import {
   HeadContent,
   Outlet,
   Scripts,
+  useRouteContext,
 } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { createServerFn } from '@tanstack/react-start';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { captureRouteError } from '@/composition/sentry';
 import { getPageTitle } from '@/platform/lib/get-page-title';
 import i18n, { syncLanguage } from '@/platform/lib/i18n';
 import { AVAILABLE_LANGUAGES } from '@/platform/lib/i18n/constants';
@@ -44,13 +46,7 @@ export const Route = createRootRouteWithContext<{
     }
   },
   notFoundComponent: () => <PageError type="404" />,
-  errorComponent: () => {
-    return (
-      <RootDocument>
-        <PageError type="error-boundary" />
-      </RootDocument>
-    );
-  },
+  errorComponent: ({ error }) => <RootError error={error} />,
   component: RootComponent,
   head: () => ({
     meta: [
@@ -101,9 +97,11 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
+  const { queryClient } = useRouteContext({ from: Route.id });
+
   return (
     <RootDocument>
-      <Providers>
+      <Providers client={queryClient}>
         <Outlet />
         <TanStackDevtools
           config={{
@@ -118,6 +116,18 @@ function RootComponent() {
           ]}
         />
       </Providers>
+    </RootDocument>
+  );
+}
+
+function RootError({ error }: { error: unknown }) {
+  useEffect(() => {
+    captureRouteError(error);
+  }, [error]);
+
+  return (
+    <RootDocument>
+      <PageError type="error-boundary" />
     </RootDocument>
   );
 }

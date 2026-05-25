@@ -20,6 +20,7 @@ import { SearchButton } from '@/platform/components/ui/search-button';
 import { SearchInput } from '@/platform/components/ui/search-input';
 
 import { BookCover } from '@/modules/book/presentation/book-cover';
+import { useCurrentScopeKey } from '@/modules/auth/client';
 import {
   ManagerPageLayout as PageLayout,
   ManagerPageLayoutContent as PageLayoutContent,
@@ -32,6 +33,7 @@ import { bookQueries } from '../queries';
 export const PageBooks = (props: { search: { searchTerm?: string } }) => {
   const router = useRouter();
   const { t } = useTranslation(['book']);
+  const scopeKey = useCurrentScopeKey();
 
   const searchInputProps = {
     value: props.search.searchTerm ?? '',
@@ -44,7 +46,10 @@ export const PageBooks = (props: { search: { searchTerm?: string } }) => {
   };
 
   const booksQuery = useInfiniteQuery(
-    bookQueries.getAllInfinite({ searchTerm: props.search.searchTerm })
+    bookQueries.getAllInfinite({
+      scopeKey,
+      searchTerm: props.search.searchTerm,
+    })
   );
 
   const ui = getUiState((set) => {

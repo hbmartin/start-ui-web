@@ -1,21 +1,24 @@
 import { getUiState } from '@bearstudio/ui-state';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircleIcon } from 'lucide-react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { useNavigateBack } from '@/platform/hooks/use-navigate-back';
 
 import { BackButton } from '@/platform/components/back-button';
-import { Form } from '@/platform/components/form';
+import {
+  Form,
+  setAppFormFieldError,
+  useAppForm,
+  useAppFormState,
+} from '@/platform/components/form';
 import { PreventNavigation } from '@/platform/components/prevent-navigation';
 import { Button } from '@/platform/components/ui/button';
 import { Card, CardContent } from '@/platform/components/ui/card';
 import { Skeleton } from '@/platform/components/ui/skeleton';
 
-import { useAuthSession } from '@/modules/auth/client';
+import { useAuthSession, useCurrentScopeKey } from '@/modules/auth/client';
 import { isServerFnError } from '@/modules/kernel/client';
 import {
   ManagerPageLayout as PageLayout,
@@ -24,7 +27,10 @@ import {
   ManagerPageLayoutTopBarTitle as PageLayoutTopBarTitle,
 } from '@/modules/shell/presentation';
 import { FormUser } from '@/modules/user/presentation/manager/form-user';
-import { zFormFieldsUser } from '@/modules/user/presentation/schema';
+import {
+  FormFieldsUser,
+  zFormFieldsUser,
+} from '@/modules/user/presentation/schema';
 
 import { userQueries } from '../queries';
 
@@ -33,55 +39,66 @@ export const PageUserUpdate = (props: { params: { id: string } }) => {
   const { navigateBack } = useNavigateBack();
   const session = useAuthSession();
   const queryClient = useQueryClient();
-  const userQuery = useQuery(userQueries.getById({ id: props.params.id }));
-  const userUpdate = useMutation({
-    ...userQueries.updateById(),
-    onSuccess: async (data) => {
-      // Update session if user is the connected user
-      if (data.id === session.data?.user.id) {
-        session.refetch();
-      }
-
-      await Promise.all([
-        // Invalidate User
-        queryClient.invalidateQueries({
-          queryKey: userQueries.getById({ id: props.params.id }).queryKey,
-        }),
-        // Invalidate Users list
-        queryClient.invalidateQueries({
-          queryKey: userQueries.getAll(),
-          type: 'all',
-        }),
-      ]);
-
-      // Redirect
-      navigateBack({ ignoreBlocker: true });
-    },
-    onError: (error) => {
-      if (
-        isServerFnError(error) &&
-        error.code === 'CONFLICT' &&
-        Array.isArray(error.data?.target) &&
-        error.data.target.includes('email')
-      ) {
-        form.setError('email', {
-          message: t('user:manager.form.emailAlreadyExist'),
-        });
-        return;
-      }
-
-      toast.error(t('user:manager.update.updateError'));
-    },
-  });
-
-  const form = useForm({
-    resolver: zodResolver(zFormFieldsUser()),
-    values: {
+  const scopeKey = useCurrentScopeKey();
+  const userQuery = useQuery(
+    userQueries.getById({ id: props.params.id, scopeKey })
+  );
+  const userUpdate = useMutation(userQueries.updateById());
+  const form = useAppForm<FormFieldsUser>({
+    defaultValues: {
       name: userQuery.data?.name ?? '',
       email: userQuery.data?.email ?? '',
       role: userQuery.data?.role ?? 'user',
+    } satisfies FormFieldsUser,
+    validators: {
+      onSubmit: zFormFieldsUser(),
+    },
+    onSubmit: async ({ value, formApi }) => {
+      try {
+        const data = await userUpdate.mutateAsync({
+          id: props.params.id,
+          ...value,
+        });
+        // Update session if user is the connected user
+        if (data.id === session.data?.user.id) {
+          session.refetch();
+        }
+
+        await Promise.all([
+          // Invalidate User
+          queryClient.invalidateQueries({
+            queryKey: userQueries.getById({ id: props.params.id, scopeKey })
+              .queryKey,
+          }),
+          // Invalidate Users list
+          queryClient.invalidateQueries({
+            queryKey: userQueries.getAll(scopeKey),
+            type: 'all',
+          }),
+        ]);
+
+        // Redirect
+        navigateBack({ ignoreBlocker: true });
+      } catch (error) {
+        if (
+          isServerFnError(error) &&
+          error.code === 'CONFLICT' &&
+          Array.isArray(error.data?.target) &&
+          error.data.target.includes('email')
+        ) {
+          setAppFormFieldError(
+            formApi,
+            'email',
+            t('user:manager.form.emailAlreadyExist')
+          );
+          return;
+        }
+
+        toast.error(t('user:manager.update.updateError'));
+      }
     },
   });
+  const isDirty = useAppFormState(form, (state) => state.isDirty);
 
   const ui = getUiState((set) => {
     if (userQuery.status === 'pending') return set('pending');
@@ -98,13 +115,8 @@ export const PageUserUpdate = (props: { params: { id: string } }) => {
 
   return (
     <>
-      <PreventNavigation shouldBlock={form.formState.isDirty} />
-      <Form
-        {...form}
-        onSubmit={(values) => {
-          userUpdate.mutate({ id: props.params.id, ...values });
-        }}
-      >
+      <PreventNavigation shouldBlock={isDirty} />
+      <Form form={form}>
         <PageLayout>
           <PageLayoutTopBar
             startActions={<BackButton />}

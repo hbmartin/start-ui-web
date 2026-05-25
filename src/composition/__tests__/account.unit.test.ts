@@ -6,6 +6,8 @@ import { toUserId } from '@/modules/kernel/domain/ids';
 import { makeTestKernel } from './helpers';
 import { __resetAccountComposition, getAccountUseCases } from '../account';
 
+const scope = { userId: 'user-1', role: 'user', tenantId: null } as const;
+
 const makeAccountRepository = (
   overrides: Partial<AccountRepository> = {}
 ): AccountRepository => ({
@@ -46,7 +48,7 @@ describe('account composition', () => {
 
     await expect(
       useCases.updateInfo({
-        currentUserId: toUserId('user-1'),
+        scope,
         name: 'Updated User',
       })
     ).resolves.toMatchObject({ ok: true, value: { id: toUserId('user-1') } });

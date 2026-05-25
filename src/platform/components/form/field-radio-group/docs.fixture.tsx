@@ -1,12 +1,10 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { CheckIcon } from 'lucide-react';
-import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { cn } from '@/platform/lib/tailwind/utils';
 import { zu } from '@/platform/lib/zod/zod-utils';
 
-import { FormFieldController } from '@/platform/components/form';
+import { FormFieldController, useAppForm } from '@/platform/components/form';
 import { onSubmit } from '@/platform/components/form/docs.utils';
 import { Button } from '@/platform/components/ui/button';
 import { Radio } from '@/platform/components/ui/radio-group';
@@ -20,8 +18,7 @@ const zFormSchema = () =>
   });
 
 const formOptions = {
-  mode: 'onBlur',
-  resolver: zodResolver(zFormSchema()),
+  validators: { onSubmit: zFormSchema(), onBlur: zFormSchema() },
   defaultValues: {
     bear: '',
   },
@@ -34,7 +31,7 @@ const options = [
 ];
 
 const Default = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -58,7 +55,7 @@ const Default = () => {
 };
 
 const DefaultValue = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       bear: 'pawdrin',
@@ -87,7 +84,7 @@ const DefaultValue = () => {
 };
 
 const Disabled = () => {
-  const form = useForm({
+  const form = useAppForm({
     ...formOptions,
     defaultValues: {
       bear: 'pawdrin',
@@ -117,7 +114,7 @@ const Disabled = () => {
 };
 
 const Row = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>
@@ -142,7 +139,7 @@ const Row = () => {
 };
 
 const WithDisabledOption = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   const optionsWithDisabled = [
     { value: 'bearstrong', label: 'Bearstrong' },
@@ -172,7 +169,7 @@ const WithDisabledOption = () => {
 };
 
 const WithCustomRadio = () => {
-  const form = useForm(formOptions);
+  const form = useAppForm(formOptions);
 
   return (
     <Form {...form} onSubmit={onSubmit}>

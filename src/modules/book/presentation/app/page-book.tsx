@@ -11,6 +11,7 @@ import { Skeleton } from '@/platform/components/ui/skeleton';
 import { Spinner } from '@/platform/components/ui/spinner';
 
 import { BookCover } from '@/modules/book/presentation/book-cover';
+import { useCurrentScopeKey } from '@/modules/auth/client';
 import { isServerFnError } from '@/modules/kernel/client';
 import {
   AppPageLayout as PageLayout,
@@ -23,7 +24,10 @@ import { bookQueries } from '../queries';
 
 export const PageBook = (props: { params: { id: string } }) => {
   const { t } = useTranslation(['book']);
-  const bookQuery = useQuery(bookQueries.getById({ id: props.params.id }));
+  const scopeKey = useCurrentScopeKey();
+  const bookQuery = useQuery(
+    bookQueries.getById({ id: props.params.id, scopeKey })
+  );
 
   const ui = getUiState((set) => {
     if (bookQuery.status === 'pending') return set('pending');

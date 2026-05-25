@@ -7,6 +7,7 @@ import { PageError } from '@/platform/components/errors/page-error';
 import { Button } from '@/platform/components/ui/button';
 
 import { BookCover } from '@/modules/book/presentation/book-cover';
+import { useCurrentScopeKey } from '@/modules/auth/client';
 import {
   AppPageLayout as PageLayout,
   AppPageLayoutContent as PageLayoutContent,
@@ -18,7 +19,8 @@ import { bookQueries } from '../queries';
 
 export const PageBooks = () => {
   const { t } = useTranslation(['book']);
-  const booksQuery = useInfiniteQuery(bookQueries.getAllInfinite());
+  const scopeKey = useCurrentScopeKey();
+  const booksQuery = useInfiniteQuery(bookQueries.getAllInfinite({ scopeKey }));
 
   const ui = getUiState((set) => {
     if (booksQuery.status === 'pending') return set('pending');

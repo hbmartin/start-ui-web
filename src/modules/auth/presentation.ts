@@ -6,3 +6,10 @@ export { default as PageLoginError } from './presentation/page-login-error';
 export { default as PageLoginVerify } from './presentation/page-login-verify';
 export { PageLogout } from './presentation/page-logout';
 export { PageOnboarding } from './presentation/page-onboarding';
+export {
+  ForbiddenRouteError,
+  isForbiddenRouteError,
+  redirectAuthenticatedRoute,
+  requireAuthenticatedRoute,
+  requireOnboardingRoute,
+} from './presentation/route-guards';

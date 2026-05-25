@@ -1,6 +1,9 @@
 import { useRef } from 'react';
-import { useFormState } from 'react-hook-form';
 
+import {
+  useAppFormContext,
+  useAppFormState,
+} from '@/platform/components/form/app-form-context';
 import { useFormField } from '@/platform/components/form/form-field';
 import { FormFieldContainer } from '@/platform/components/form/form-field-container';
 import { useFormFieldController } from '@/platform/components/form/form-field-controller/context';
@@ -25,7 +28,11 @@ export const FieldOtp = (
 
   const containerRef = useRef<React.ComponentRef<'div'>>(null);
   const ctx = useFormField();
-  const formState = useFormState();
+  const form = useAppFormContext();
+  const isSubmitted = useAppFormState(
+    form,
+    (state) => state.submissionAttempts > 0 || state.isSubmitted
+  );
   const { field, fieldState } = useFormFieldController();
   return (
     <FormFieldContainer {...containerProps} ref={containerRef}>
@@ -36,7 +43,7 @@ export const FieldOtp = (
         onComplete={(v) => {
           rest.onComplete?.(v);
           // Only auto submit on first try
-          if (!formState.isSubmitted && autoSubmit) {
+          if (!isSubmitted && autoSubmit) {
             const button = document.createElement('button');
             button.type = 'submit';
             button.style.display = 'none';

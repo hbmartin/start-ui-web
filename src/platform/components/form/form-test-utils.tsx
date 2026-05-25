@@ -1,49 +1,56 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { ReactNode } from 'react';
-import {
-  FieldValues,
-  SubmitHandler,
-  useForm,
-  UseFormProps,
-  UseFormReturn,
-} from 'react-hook-form';
 import { z, ZodType } from 'zod';
 
-import { Form } from '@/platform/components/form';
+import { Form, useAppForm } from '@/platform/components/form';
 
-export const FormMocked = <T extends ZodType<FieldValues>>({
+type TestForm<TValues> = ReturnType<typeof useAppForm<TValues>> & {
+  control: undefined;
+};
+
+export const FormMocked = <T extends ZodType>({
   children,
   schema,
-  useFormOptions,
+  useFormOptions = {},
   onSubmit,
 }: {
-  children(options: { form: UseFormReturn<z.infer<T>> }): ReactNode;
+  children(options: { form: TestForm<z.infer<T>> }): ReactNode;
   schema: T;
-  useFormOptions?: UseFormProps<z.infer<T>>;
-  onSubmit?: SubmitHandler<z.infer<T>>;
+  useFormOptions?: Record<string, ExplicitAny> & {
+    defaultValues?: z.infer<T>;
+  };
+  onSubmit?: (values: z.infer<T>) => void | Promise<void>;
 }) => {
-  const form = useForm<z.infer<T>>({
-    mode: 'onBlur',
-    resolver: zodResolver(schema as TODO),
-    ...useFormOptions,
-  });
   const defaultValues = useFormOptions?.defaultValues;
   const defaultValueKeys =
     defaultValues && typeof defaultValues === 'object'
       ? Object.keys(defaultValues)
       : [];
-  const handleSubmit: SubmitHandler<z.infer<T>> | undefined = onSubmit
+  const handleSubmit:
+    | ((values: z.infer<T>) => void | Promise<void>)
+    | undefined = onSubmit
     ? (values) =>
         onSubmit({
           ...Object.fromEntries(
             defaultValueKeys.map((key) => [key, undefined])
           ),
-          ...values,
+          ...((values ?? {}) as Record<string, unknown>),
         } as z.infer<T>)
     : undefined;
+  const form = useAppForm<z.infer<T>>({
+    defaultValues: useFormOptions.defaultValues,
+    validators: {
+      onSubmit: schema,
+      onBlur: schema,
+    },
+    onSubmit: async ({ value }) => {
+      await handleSubmit?.(value);
+    },
+    ...useFormOptions,
+  }) as TestForm<z.infer<T>>;
+  form.control = undefined;
 
   return (
-    <Form {...form} onSubmit={handleSubmit}>
+    <Form form={form}>
       {children({ form })}
       <button type="submit">Submit</button>
     </Form>

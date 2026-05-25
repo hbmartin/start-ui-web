@@ -1,7 +1,5 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { ReactElement, useState } from 'react';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -10,6 +8,7 @@ import {
   FormField,
   FormFieldController,
   FormFieldLabel,
+  useAppForm,
 } from '@/platform/components/form';
 import { Button } from '@/platform/components/ui/button';
 import {
@@ -35,22 +34,24 @@ export const ChangeNameDrawer = (props: { children: ReactElement }) => {
   const { t } = useTranslation(['account']);
   const [open, setOpen] = useState(false);
   const session = useAuthSession();
-  const form = useForm<FormFieldsAccountUpdateName>({
-    resolver: zodResolver(zFormFieldsAccountUpdateName()),
-    values: {
-      name: session.data?.user.name ?? '',
-    },
-  });
-
   const updateUser = useMutation({
     ...accountQueries.updateInfo(),
-    onSuccess: async () => {
+    onError: () => toast.error(t('account:changeNameDrawer.errorMessage')),
+  });
+  const form = useAppForm<FormFieldsAccountUpdateName>({
+    defaultValues: {
+      name: session.data?.user.name ?? '',
+    } satisfies FormFieldsAccountUpdateName,
+    validators: {
+      onSubmit: zFormFieldsAccountUpdateName(),
+    },
+    onSubmit: async ({ value: { name }, formApi }) => {
+      await updateUser.mutateAsync({ name });
       await session.refetch();
       toast.success(t('account:changeNameDrawer.successMessage'));
-      form.reset();
+      formApi.reset();
       setOpen(false);
     },
-    onError: () => toast.error(t('account:changeNameDrawer.errorMessage')),
   });
 
   return (
@@ -64,13 +65,7 @@ export const ChangeNameDrawer = (props: { children: ReactElement }) => {
       <ResponsiveDrawerTrigger render={props.children} />
 
       <ResponsiveDrawerContent className="sm:max-w-xs">
-        <Form
-          {...form}
-          onSubmit={async ({ name }) => {
-            updateUser.mutate({ name });
-          }}
-          className="flex flex-col gap-4"
-        >
+        <Form form={form} className="flex flex-col gap-4">
           <ResponsiveDrawerHeader>
             <ResponsiveDrawerTitle>
               {t('account:changeNameDrawer.title')}
@@ -85,7 +80,6 @@ export const ChangeNameDrawer = (props: { children: ReactElement }) => {
                 {t('account:changeNameDrawer.label')}
               </FormFieldLabel>
               <FormFieldController
-                control={form.control}
                 type="text"
                 name="name"
                 size="lg"

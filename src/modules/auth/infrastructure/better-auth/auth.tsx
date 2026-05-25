@@ -1,13 +1,12 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin, emailOTP, openAPI } from 'better-auth/plugins';
+import { admin, emailOTP } from 'better-auth/plugins';
 import { match } from 'ts-pattern';
 
 import {
   AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES,
   AUTH_EMAIL_OTP_MOCKED,
 } from '@/modules/auth';
-import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/client';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { DEMO_MODE_ERROR } from '@/modules/kernel/domain/errors/demo-mode';
 import {
@@ -41,6 +40,7 @@ export function createAuth(input?: Database | CreateAuthOptions) {
         : { database: input };
   const database = options.database ?? getDefaultDbClient();
   const authEmailPort = options.authEmailPort ?? new AuthEmailPortResend();
+  const authSignupEnabled = !envClient.VITE_IS_DEMO;
 
   return betterAuth({
     baseURL: {
@@ -75,19 +75,16 @@ export function createAuth(input?: Database | CreateAuthOptions) {
         ),
         clientId: envServer.GITHUB_CLIENT_ID!,
         clientSecret: envServer.GITHUB_CLIENT_SECRET!,
-        disableImplicitSignUp: !AUTH_SIGNUP_ENABLED,
+        disableImplicitSignUp: !authSignupEnabled,
       },
     },
 
     plugins: [
-      openAPI({
-        disableDefaultReference: true,
-      }),
       admin({
         ...betterAuthPermissions,
       }),
       emailOTP({
-        disableSignUp: !AUTH_SIGNUP_ENABLED,
+        disableSignUp: !authSignupEnabled,
         expiresIn: AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES * 60,
         // Use predictable mocked code in dev and demo
         ...(envClient.DEV || envClient.VITE_IS_DEMO

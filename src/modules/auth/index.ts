@@ -3,6 +3,14 @@ export type {
   AuthenticatedUser,
   AuthSession,
 } from './domain/session';
+export {
+  sanitizeCurrentSession,
+  scopeFromUser,
+  scopeKeyFromScope,
+  scopeKeyFromSession,
+  type CurrentSession,
+  type RequestScope,
+} from './domain/request-scope';
 export type {
   AuthEmailPort,
   SendSignInOtpInput,
