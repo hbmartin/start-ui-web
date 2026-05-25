@@ -9,7 +9,7 @@ export type BookOverrides = {
   bookRepository?: BookRepository;
 };
 
-const buildBookUseCases = (overrides?: BookOverrides) => {
+const factory = createCachedFactory((overrides?: BookOverrides) => {
   const kernel = overrides?.kernel ?? getKernel();
   return createBookUseCases({
     bookRepository:
@@ -17,12 +17,9 @@ const buildBookUseCases = (overrides?: BookOverrides) => {
     permissionChecker: kernel.permissionChecker,
     logger: kernel.logger,
   });
-};
+});
 
-const factory = createCachedFactory(buildBookUseCases);
-
-export const getBookUseCases = (overrides?: BookOverrides) =>
-  factory.get(overrides);
+export const getBookUseCases = factory.get;
 
 /** Test-only. */
-export const __resetBookComposition = () => factory.reset();
+export const __resetBookComposition = factory.reset;

@@ -5,8 +5,8 @@ import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { toBookId, toGenreId } from '@/modules/kernel/domain/ids';
 
 import type { BookRepository } from '../ports/book-repository';
+import { createBookUseCases } from '../use-cases';
 import type { Book } from '../../domain/book';
-import { createBookUseCases } from '../../factory';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const book: Book = {

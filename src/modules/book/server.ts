@@ -1,32 +1,23 @@
 import { createServerOnlyFn } from '@tanstack/react-start';
 
-import { createBookHandlers } from './transport/http/book-handlers';
-import { createBookServerFunctions } from './transport/tanstack/book-server-functions';
+import type { ProtectedContext } from '@/modules/auth/server';
+
+import { createBookServerFunctions } from './transport/server-functions';
 
 const getDeps = createServerOnlyFn(async () => {
   const [
     { getBookUseCases },
-    { getKernel },
+    { getKernelForCtx },
     { withProtectedContext, withProtectedMutation },
   ] = await Promise.all([
     import('@/composition/book'),
-    import('@/composition/kernel'),
+    import('@/composition/shared/server-deps'),
     import('@/modules/auth/server'),
   ]);
 
   return {
-    handlers: createBookHandlers({
-      getUseCases: (ctx) =>
-        getBookUseCases({
-          kernel: getKernel({
-            logger: {
-              info: (event, fields) => ctx.logger.info(fields ?? {}, event),
-              warn: (event, fields) => ctx.logger.warn(fields ?? {}, event),
-              error: (event, fields) => ctx.logger.error(fields ?? {}, event),
-            },
-          }),
-        }),
-    }),
+    useCases: (ctx: ProtectedContext) =>
+      getBookUseCases({ kernel: getKernelForCtx(ctx) }),
     withProtectedContext,
     withProtectedMutation,
   };
@@ -39,4 +30,4 @@ export const bookGetById = serverFunctions.bookGetById;
 export const bookCreate = serverFunctions.bookCreate;
 export const bookUpdateById = serverFunctions.bookUpdateById;
 export const bookDeleteById = serverFunctions.bookDeleteById;
-export type { BookServerFunctions } from './transport/tanstack/book-server-functions';
+export type { BookServerFunctions } from './transport/server-functions';
