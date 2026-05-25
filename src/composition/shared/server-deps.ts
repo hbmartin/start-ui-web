@@ -1,5 +1,4 @@
 import { getKernel, type Kernel } from '@/composition/kernel';
-
 import type { ProtectedContext } from '@/modules/auth/server';
 
 export const getKernelForCtx = (ctx: ProtectedContext): Kernel =>

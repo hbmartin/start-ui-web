@@ -68,10 +68,7 @@ type UserServerFunctionDeps = {
   }>;
 };
 
-const mapReason = (
-  reason: string,
-  options?: { selfMessage?: string }
-): never =>
+const mapReason = (reason: string, options?: { selfMessage?: string }): never =>
   throwServerFnErrorForReason(reason, {
     duplicate: {
       code: 'CONFLICT',

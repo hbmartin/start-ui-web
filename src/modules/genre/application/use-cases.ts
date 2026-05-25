@@ -5,10 +5,7 @@ import type { GenreId } from '@/modules/kernel/domain/ids';
 import { toUserId } from '@/modules/kernel/domain/ids';
 
 import type { GenreRepository } from './ports/genre-repository';
-import {
-  type GenreListPage,
-  normalizeGenreSearchTerm,
-} from '../domain/genre';
+import { type GenreListPage, normalizeGenreSearchTerm } from '../domain/genre';
 
 export type GenreUseCaseDeps = {
   genreRepository: GenreRepository;
