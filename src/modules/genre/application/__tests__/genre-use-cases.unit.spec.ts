@@ -4,8 +4,8 @@ import type { PermissionChecker } from '@/modules/kernel/application/ports/permi
 import { toGenreId } from '@/modules/kernel/domain/ids';
 
 import type { GenreRepository } from '../ports/genre-repository';
+import { createGenreUseCases } from '../use-cases';
 import type { Genre } from '../../domain/genre';
-import { createGenreUseCases } from '../../factory';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const genre: Genre = {

@@ -1,12 +1,24 @@
 import type { RequestScope } from '@/modules/auth';
+import type { Logger } from '@/modules/kernel/application/ports/logger';
+import type { PermissionChecker } from '@/modules/kernel/application/ports/permission-checker';
 import type { GenreId } from '@/modules/kernel/domain/ids';
 import { toUserId } from '@/modules/kernel/domain/ids';
 
-import type { GenreUseCaseDeps, UseCaseResult } from './types';
+import type { GenreRepository } from './ports/genre-repository';
 import {
   type GenreListPage,
   normalizeGenreSearchTerm,
-} from '../../domain/genre';
+} from '../domain/genre';
+
+export type GenreUseCaseDeps = {
+  genreRepository: GenreRepository;
+  permissionChecker: PermissionChecker;
+  logger: Logger;
+};
+
+export type UseCaseResult<T, TReason extends string> =
+  | { ok: true; value: T }
+  | { ok: false; reason: TReason };
 
 export type ListGenresInput = {
   scope: RequestScope;
@@ -34,3 +46,11 @@ export async function listGenres(
   });
   return { ok: true, value };
 }
+
+export function createGenreUseCases(deps: GenreUseCaseDeps) {
+  return {
+    list: (input: ListGenresInput) => listGenres(deps, input),
+  };
+}
+
+export type GenreUseCases = ReturnType<typeof createGenreUseCases>;

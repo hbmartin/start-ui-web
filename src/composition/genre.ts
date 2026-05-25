@@ -9,7 +9,7 @@ export type GenreOverrides = {
   genreRepository?: GenreRepository;
 };
 
-const buildGenreUseCases = (overrides?: GenreOverrides) => {
+const factory = createCachedFactory((overrides?: GenreOverrides) => {
   const kernel = overrides?.kernel ?? getKernel();
   return createGenreUseCases({
     genreRepository:
@@ -17,12 +17,9 @@ const buildGenreUseCases = (overrides?: GenreOverrides) => {
     permissionChecker: kernel.permissionChecker,
     logger: kernel.logger,
   });
-};
+});
 
-const factory = createCachedFactory(buildGenreUseCases);
-
-export const getGenreUseCases = (overrides?: GenreOverrides) =>
-  factory.get(overrides);
+export const getGenreUseCases = factory.get;
 
 /** Test-only. */
-export const __resetGenreComposition = () => factory.reset();
+export const __resetGenreComposition = factory.reset;
