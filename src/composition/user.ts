@@ -48,7 +48,7 @@ export type UserOverrides = {
   userAuthGateway?: UserAuthGateway;
 };
 
-const buildUserUseCases = (overrides?: UserOverrides) => {
+const factory = createCachedFactory((overrides?: UserOverrides) => {
   const kernel = overrides?.kernel ?? getKernel();
   return createUserUseCases({
     userRepository:
@@ -58,12 +58,9 @@ const buildUserUseCases = (overrides?: UserOverrides) => {
     permissionChecker: kernel.permissionChecker,
     logger: kernel.logger,
   });
-};
+});
 
-const factory = createCachedFactory(buildUserUseCases);
-
-export const getUserUseCases = (overrides?: UserOverrides) =>
-  factory.get(overrides);
+export const getUserUseCases = factory.get;
 
 /** Test-only. */
-export const __resetUserComposition = () => factory.reset();
+export const __resetUserComposition = factory.reset;

@@ -1,32 +1,23 @@
 import { createServerOnlyFn } from '@tanstack/react-start';
 
-import { createUserHandlers } from './transport/http/user-handlers';
-import { createUserServerFunctions } from './transport/tanstack/user-server-functions';
+import type { ProtectedContext } from '@/modules/auth/server';
+
+import { createUserServerFunctions } from './transport/server-functions';
 
 const getDeps = createServerOnlyFn(async () => {
   const [
     { getUserUseCases },
-    { getKernel },
+    { getKernelForCtx },
     { withProtectedContext, withProtectedMutation },
   ] = await Promise.all([
     import('@/composition/user'),
-    import('@/composition/kernel'),
+    import('@/composition/shared/server-deps'),
     import('@/modules/auth/server'),
   ]);
 
   return {
-    handlers: createUserHandlers({
-      getUseCases: (ctx) =>
-        getUserUseCases({
-          kernel: getKernel({
-            logger: {
-              info: (event, fields) => ctx.logger.info(fields ?? {}, event),
-              warn: (event, fields) => ctx.logger.warn(fields ?? {}, event),
-              error: (event, fields) => ctx.logger.error(fields ?? {}, event),
-            },
-          }),
-        }),
-    }),
+    useCases: (ctx: ProtectedContext) =>
+      getUserUseCases({ kernel: getKernelForCtx(ctx) }),
     withProtectedContext,
     withProtectedMutation,
   };
@@ -42,4 +33,4 @@ export const userDeleteById = serverFunctions.userDeleteById;
 export const userGetUserSessions = serverFunctions.userGetUserSessions;
 export const userRevokeUserSessions = serverFunctions.userRevokeUserSessions;
 export const userRevokeUserSession = serverFunctions.userRevokeUserSession;
-export type { UserServerFunctions } from './transport/tanstack/user-server-functions';
+export type { UserServerFunctions } from './transport/server-functions';

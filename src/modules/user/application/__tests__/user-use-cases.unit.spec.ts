@@ -10,8 +10,8 @@ import {
 
 import type { UserAuthGateway } from '../ports/user-auth-gateway';
 import type { UserRepository } from '../ports/user-repository';
+import { createUserUseCases } from '../use-cases';
 import type { User } from '../../domain/user';
-import { createUserUseCases } from '../../factory';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const user: User = {
