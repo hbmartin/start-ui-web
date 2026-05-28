@@ -54,7 +54,6 @@ export function getRouter() {
     },
     telemetry: telemetryProxy,
     flags,
-    tenant: null,
   };
 
   const router = createRouter({
