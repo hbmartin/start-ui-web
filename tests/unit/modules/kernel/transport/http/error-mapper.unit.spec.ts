@@ -45,6 +45,26 @@ describe('appErrorToResponse', () => {
     });
   });
 
+  it('hides non-system 5xx messages and details from the client', async () => {
+    const response = appErrorToResponse(
+      new AppError({
+        code: 'UPSTREAM_CONFLICT',
+        category: 'conflict',
+        status: 503,
+        message: 'upstream conflict contained secret details',
+        details: { upstream: 'internal-service' },
+        exposeDetails: true,
+      })
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      code: 'UPSTREAM_CONFLICT',
+      category: 'conflict',
+      message: 'Internal server error',
+    });
+  });
+
   it('maps unknown errors to a generic 500', async () => {
     const response = appErrorToResponse(new Error('raw stack details'));
 

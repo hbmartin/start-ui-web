@@ -286,6 +286,16 @@ module.exports = {
       to: { path: '^src/routes' },
     },
     {
+      name: 'composition-no-kernel-env-schema-internals',
+      severity: 'error',
+      comment:
+        'Composition code should use kernel public gates for runtime environment helpers instead of importing env-schema internals.',
+      from: { path: '^src/composition' },
+      to: {
+        path: '^src/modules/kernel/infrastructure/config/env-schema\\.ts$',
+      },
+    },
+    {
       name: 'routes-use-module-public-api',
       severity: 'error',
       from: { path: '^src/routes' },

@@ -1,11 +1,14 @@
 /* oxlint-disable vitest/no-conditional-in-test -- Request capture branches are the browser behavior under test. */
 
 import { expect, test } from '@tests/e2e/utils';
+import { USER_FILE } from '@tests/e2e/utils/constants';
 
 const vendorHostPattern =
   /(?:sentry\.io|honeycomb\.io|opentelemetry|otel|collector)/i;
 
 test.describe('browser telemetry transport', () => {
+  test.use({ storageState: USER_FILE });
+
   test('keeps browser telemetry on same-origin proxy routes', async ({
     page,
     baseURL,
@@ -26,9 +29,11 @@ test.describe('browser telemetry transport', () => {
       }
     });
 
-    await page.goto('/login', { waitUntil: 'commit' });
-    await page.evaluate(() =>
-      fetch('/api/telemetry/logs', {
+    await page.goto('/app', { waitUntil: 'commit' });
+    await expect(page.getByTestId('layout-app')).toBeVisible();
+
+    const logResponseStatus = await page.evaluate(async () => {
+      const response = await fetch('/api/telemetry/logs', {
         body: JSON.stringify({
           records: [
             {
@@ -40,10 +45,13 @@ test.describe('browser telemetry transport', () => {
         }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
-      })
-    );
+      });
+
+      return response.status;
+    });
 
     expect(directVendorRequests).toEqual([]);
+    expect(logResponseStatus).toBe(202);
     expect(telemetryRequests.length).toBeGreaterThan(0);
     expect(
       telemetryRequests.every(

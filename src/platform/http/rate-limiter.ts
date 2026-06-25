@@ -21,6 +21,16 @@ type WindowState = {
 
 /** Above this many tracked keys, prune expired entries to bound memory. */
 const SWEEP_THRESHOLD = 10_000;
+const SWEEP_INTERVAL_MS = 30_000;
+
+export type RateLimiterOptions = {
+  /** Minimum tracked keys before expired-window pruning runs. */
+  sweepThreshold?: number;
+  /** Minimum time between pruning passes. */
+  sweepIntervalMs?: number;
+  /** Observability hook for tests and diagnostics. */
+  onSweep?: (trackedKeys: number) => void;
+};
 
 export type RateLimiter = {
   /**
@@ -32,10 +42,17 @@ export type RateLimiter = {
   reset: () => void;
 };
 
-export function createRateLimiter(now: () => number = Date.now): RateLimiter {
+export function createRateLimiter(
+  now: () => number = Date.now,
+  options: RateLimiterOptions = {}
+): RateLimiter {
   const windows = new Map<string, WindowState>();
+  const sweepThreshold = options.sweepThreshold ?? SWEEP_THRESHOLD;
+  const sweepIntervalMs = options.sweepIntervalMs ?? SWEEP_INTERVAL_MS;
+  let lastSweepAt = Number.NEGATIVE_INFINITY;
 
   const sweep = (currentTime: number) => {
+    options.onSweep?.(windows.size);
     for (const [key, state] of windows) {
       if (currentTime >= state.resetAt) windows.delete(key);
     }
@@ -47,7 +64,13 @@ export function createRateLimiter(now: () => number = Date.now): RateLimiter {
       const existing = windows.get(key);
 
       if (!existing || currentTime >= existing.resetAt) {
-        if (windows.size >= SWEEP_THRESHOLD) sweep(currentTime);
+        if (
+          windows.size >= sweepThreshold &&
+          currentTime - lastSweepAt >= sweepIntervalMs
+        ) {
+          sweep(currentTime);
+          lastSweepAt = currentTime;
+        }
         windows.set(key, { count: 1, resetAt: currentTime + windowMs });
         return { allowed: true, retryAfterSeconds: 0 };
       }
@@ -65,7 +88,10 @@ export function createRateLimiter(now: () => number = Date.now): RateLimiter {
 
       return { allowed: true, retryAfterSeconds: 0 };
     },
-    reset: () => windows.clear(),
+    reset: () => {
+      windows.clear();
+      lastSweepAt = Number.NEGATIVE_INFINITY;
+    },
   };
 }
 
