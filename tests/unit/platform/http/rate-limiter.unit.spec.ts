@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createRateLimiter } from '@/platform/http/rate-limiter';
 
@@ -42,5 +42,33 @@ describe('createRateLimiter', () => {
 
     limiter.reset();
     expect(limiter.check('k', 1, 60_000).allowed).toBe(true);
+  });
+
+  it('throttles expired-key sweeps once the key threshold is reached', () => {
+    let now = 0;
+    const onSweep = vi.fn();
+    const limiter = createRateLimiter(() => now, {
+      onSweep,
+      sweepIntervalMs: 30_000,
+      sweepThreshold: 2,
+    });
+
+    expect(limiter.check('a', 1, 60_000).allowed).toBe(true);
+    expect(limiter.check('b', 1, 60_000).allowed).toBe(true);
+    expect(limiter.check('c', 1, 60_000).allowed).toBe(true);
+    expect(onSweep).toHaveBeenCalledTimes(1);
+
+    expect(limiter.check('d', 1, 60_000).allowed).toBe(true);
+    expect(onSweep).toHaveBeenCalledTimes(1);
+
+    now += 30_000;
+    expect(limiter.check('e', 1, 60_000).allowed).toBe(true);
+    expect(onSweep).toHaveBeenCalledTimes(2);
+
+    limiter.reset();
+    expect(limiter.check('f', 1, 60_000).allowed).toBe(true);
+    expect(limiter.check('g', 1, 60_000).allowed).toBe(true);
+    expect(limiter.check('h', 1, 60_000).allowed).toBe(true);
+    expect(onSweep).toHaveBeenCalledTimes(3);
   });
 });

@@ -86,6 +86,30 @@ describe('tanstack result mapper', () => {
     });
   });
 
+  it('hides non-system 5xx app error messages and details from the client', async () => {
+    await expect(
+      unwrapApplicationResult(
+        Promise.resolve(
+          Result.Error(
+            new AppError({
+              code: 'UPSTREAM_CONFLICT',
+              category: 'conflict',
+              status: 503,
+              message: 'upstream conflict contained secret details',
+              details: { upstream: 'internal-service' },
+              exposeDetails: true,
+            })
+          )
+        ),
+        handlers
+      )
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Internal server error',
+      data: undefined,
+    });
+  });
+
   it('maps thrown app errors for legacy promise boundaries', async () => {
     await expect(
       unwrapApplicationResult(

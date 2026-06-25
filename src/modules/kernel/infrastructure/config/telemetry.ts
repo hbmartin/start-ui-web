@@ -9,9 +9,14 @@ import { ConfigurationError } from '../../domain/errors/configuration-error';
 
 const LOCAL_TELEMETRY_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
+const stripIpv6Brackets = (value: string) =>
+  value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value;
+
 const isLocalTelemetryUrl = (value: string) => {
   try {
-    return LOCAL_TELEMETRY_HOSTS.has(new URL(value).hostname);
+    return LOCAL_TELEMETRY_HOSTS.has(
+      stripIpv6Brackets(new URL(value).hostname)
+    );
   } catch {
     return false;
   }

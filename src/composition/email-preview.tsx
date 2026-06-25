@@ -4,7 +4,7 @@ import type { ReactElement } from 'react';
 import { DEFAULT_LANGUAGE_KEY } from '@/platform/lib/i18n/constants';
 
 import { TemplateLoginCode } from '@/modules/email/presentation';
-import { isProdRuntimeEnvironment } from '@/modules/kernel/infrastructure/config/env-schema';
+import { isProdRuntimeEnvironment } from '@/modules/kernel/backend';
 
 type PreviewEmailComponent = (props: Record<string, string>) => ReactElement;
 

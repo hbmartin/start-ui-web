@@ -59,8 +59,9 @@
     "codeql:analyze": "mkdir -p test-results/codeql && db=test-results/codeql/start-ui-web-db; if [ ! -d \"$db\" ]; then echo \"CodeQL database not found at $db. Run pnpm codeql:db to create it before pnpm codeql:analyze.\" >&2; exit 1; fi; codeql version && codeql pack install .github/codeql/start-ui-web-queries && codeql database analyze \"$db\" .github/codeql/start-ui-web-queries/start-ui-web-codeql.qls --format=sarifv2.1.0 --output=test-results/codeql/start-ui-web.sarif --rerun",
     "codeql:test": "mkdir -p test-results/codeql && codeql version && codeql pack install .github/codeql/start-ui-web-queries && codeql test run .github/codeql/start-ui-web-queries/test",
     "check:migrations": "node scripts/check-migration-edits.mjs",
-    "security:audit": "pnpm audit --audit-level=high && pnpm security:tanstack && pnpm security:risk-register",
+    "security:audit": "pnpm audit --audit-level=high && pnpm security:tanstack && pnpm security:licenses && pnpm security:risk-register",
     "security:tanstack": "node scripts/check-tanstack-security.mjs",
+    "security:licenses": "node scripts/check-license-compliance.mjs",
     "security:risk-register": "node scripts/check-risk-register.mjs",
     "knip:deps": "dotenv -e .env -e .env.example -- knip --include dependencies,unlisted --no-progress",
     "gen:build-info": "dotenv -- node ./run-jiti ./src/app/build-info/infrastructure/generate-build-info.ts",
@@ -172,12 +173,9 @@
     "@react-email/render": "2.0.8",
     "@sentry/tanstackstart-react": "^10.58.0",
     "@swan-io/boxed": "3.2.1",
-    "@tanstack/react-devtools": "0.10.5",
     "@tanstack/react-form": "^1.33.0",
     "@tanstack/react-query": "5.101.0",
-    "@tanstack/react-query-devtools": "5.101.0",
     "@tanstack/react-router": "1.170.15",
-    "@tanstack/react-router-devtools": "1.167.0",
     "@tanstack/react-router-ssr-query": "1.167.1",
     "@tanstack/react-start": "1.168.25",
     "@tanstack/zod-adapter": "1.167.0",
@@ -234,6 +232,9 @@
     "@tanstack/devtools-vite": "0.7.0",
     "@tanstack/eslint-plugin-query": "5.100.14",
     "@tanstack/eslint-plugin-router": "1.162.0",
+    "@tanstack/react-devtools": "0.10.5",
+    "@tanstack/react-query-devtools": "5.101.0",
+    "@tanstack/react-router-devtools": "1.167.0",
     "@testcontainers/postgresql": "^12.0.1",
     "@types/node": "^24.12.3",
     "@types/pg": "^8.20.0",
@@ -281,7 +282,7 @@
   "engines": {
     "node": "24.x"
   },
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b",
   "jscpd": {
     "threshold": 0,
     "reporters": [

@@ -386,6 +386,17 @@ describe('server config accessors', () => {
     expect(() => getTelemetryConfig()).toThrow('OTEL_COLLECTOR_URL');
   });
 
+  it('accepts cleartext production OpenTelemetry collector URLs for IPv6 loopback', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('OTEL_COLLECTOR_URL', 'http://[::1]:4318/v1/traces');
+    const { getTelemetryConfig } =
+      await import('@/modules/kernel/infrastructure/config/telemetry');
+
+    expect(getTelemetryConfig().collectorUrl).toBe(
+      'http://[::1]:4318/v1/traces'
+    );
+  });
+
   it('rejects cleartext production S3 transport for non-local storage hosts', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('S3_ACCESS_KEY_ID', makeTestSecret('s3-access-key'));
@@ -400,6 +411,24 @@ describe('server config accessors', () => {
     expect(() => getStorageConfig()).toThrow(ConfigurationError);
     expect(() => getStorageConfig()).toThrow('S3_SECURE');
   });
+
+  it.each(['[::1]:9000', '::1:9000'])(
+    'accepts cleartext production S3 transport for IPv6 loopback host %s',
+    async (host) => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('S3_ACCESS_KEY_ID', makeTestSecret('s3-access-key'));
+      vi.stubEnv('S3_SECRET_ACCESS_KEY', makeTestSecret('s3-secret-key'));
+      vi.stubEnv('S3_HOST', host);
+      vi.stubEnv('S3_SECURE', 'false');
+      const { getStorageConfig } =
+        await import('@/modules/kernel/infrastructure/config/storage');
+
+      expect(getStorageConfig()).toMatchObject({
+        host,
+        secure: false,
+      });
+    }
+  );
 
   it('rejects placeholder production S3 credentials', async () => {
     vi.stubEnv('NODE_ENV', 'production');

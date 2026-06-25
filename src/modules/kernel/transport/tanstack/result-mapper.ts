@@ -49,14 +49,19 @@ export const mapAppErrorToServerFnError = (error: unknown): never => {
     // Never forward an internal (5xx/system) error's developer-facing message
     // to the client. The real message is still logged server-side; the client
     // only sees a generic string. Client-error categories keep their message.
-    const isInternal = error.category === 'system';
-    throw new ServerFnError(codeForCategory[error.category], {
-      message: isInternal ? 'Internal server error' : error.message,
-      data:
-        !isInternal && error.exposeDetails && typeof error.details === 'object'
-          ? error.details
-          : undefined,
-    });
+    const isInternal = error.category === 'system' || error.status >= 500;
+    throw new ServerFnError(
+      isInternal ? 'INTERNAL_SERVER_ERROR' : codeForCategory[error.category],
+      {
+        message: isInternal ? 'Internal server error' : error.message,
+        data:
+          !isInternal &&
+          error.exposeDetails &&
+          typeof error.details === 'object'
+            ? error.details
+            : undefined,
+      }
+    );
   }
   throw error;
 };

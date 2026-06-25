@@ -24,9 +24,28 @@ const LOCAL_STORAGE_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const isPlaceholderStorageSecret = (value: string) =>
   PLACEHOLDER_STORAGE_SECRET_VALUES.has(value.trim().toLowerCase());
 
+const stripIpv6Brackets = (value: string) =>
+  value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value;
+
+const storageHostUrl = (value: string) => {
+  if (value.includes('://')) return value;
+
+  const [host = '', ...pathParts] = value.split('/');
+  const path = pathParts.length ? `/${pathParts.join('/')}` : '';
+  if (host === '::1') return `http://[::1]${path}`;
+  if (host.startsWith('::1:') && /^\d+$/.test(host.slice('::1:'.length))) {
+    return `http://[::1]:${host.slice('::1:'.length)}${path}`;
+  }
+  if ((host.match(/:/g) ?? []).length > 1 && !host.startsWith('[')) {
+    return `http://[${host}]${path}`;
+  }
+
+  return `http://${value}`;
+};
+
 const hostnameFromStorageHost = (value: string) => {
   try {
-    return new URL(value.includes('://') ? value : `http://${value}`).hostname;
+    return new URL(storageHostUrl(value)).hostname;
   } catch {
     return undefined;
   }
@@ -34,7 +53,9 @@ const hostnameFromStorageHost = (value: string) => {
 
 const isLocalStorageHost = (value: string) => {
   const hostname = hostnameFromStorageHost(value);
-  return hostname ? LOCAL_STORAGE_HOSTS.has(hostname) : false;
+  return hostname
+    ? LOCAL_STORAGE_HOSTS.has(stripIpv6Brackets(hostname))
+    : false;
 };
 
 const storageEnvSchema = baseEnvSchema

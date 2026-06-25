@@ -19,6 +19,15 @@ the same Windows UNC path handling risk shape as `launch-editor`.
 
 High-severity audit results remain blocking through `pnpm security:audit`.
 
+## Accepted Pre-release Dependencies
+
+Tracked here so the `scripts/check-risk-register.mjs` expiry gate forces a
+periodic re-review even though `pnpm audit` reports no advisory for these.
+
+| Package | Note | Current path | Decision | Next review |
+| --- | --- | --- | --- | --- |
+| `nitro` (`npm:nitro-nightly@3.0.1-20260501-164602-aee73f19`) | Pre-release dependency (no CVE). Nitro 3 server bundling for TanStack Start; no Nitro 3 GA stable is published upstream yet. | Build-time only — imported as `nitro/vite` in `vite.config.ts`; no runtime imports in `src/`. | Accepted because the pin is exact and npm-sourced, the package is build-time only (no library/runtime surface ships to template consumers), and TanStack Start does not declare `nitro` as a peer dependency. Upgrade to a Nitro 3 GA release as soon as one is published. | 2026-07-23 |
+
 ## Resolved Previous Accepted Advisories
 
 - `esbuild <= 0.24.2` via `drizzle-kit` and `@esbuild-kit/*` is no longer
