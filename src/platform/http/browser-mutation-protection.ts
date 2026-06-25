@@ -51,9 +51,19 @@ type BrowserMutationSignalValidationResult =
 const toProtectedPathSet = (
   pathnames: BrowserMutationProtectionInput['protectedPathnames']
 ) =>
-  pathnames instanceof Set
-    ? pathnames
-    : new Set(pathnames ?? DEFAULT_PROTECTED_BROWSER_MUTATION_PATHNAMES);
+  new Set(
+    [...(pathnames ?? DEFAULT_PROTECTED_BROWSER_MUTATION_PATHNAMES)].map(
+      normalizeBrowserMutationPathname
+    )
+  );
+
+const normalizeBrowserMutationPathname = (pathname: string) => {
+  if (pathname.length <= 1) return pathname;
+
+  let end = pathname.length;
+  while (end > 1 && pathname[end - 1] === '/') end--;
+  return pathname.slice(0, end);
+};
 
 export function shouldProtectBrowserMutation({
   handlerType,
@@ -64,7 +74,9 @@ export function shouldProtectBrowserMutation({
   return (
     handlerType === 'router' &&
     !SAFE_METHODS.has(method.toUpperCase()) &&
-    toProtectedPathSet(protectedPathnames).has(pathname)
+    toProtectedPathSet(protectedPathnames).has(
+      normalizeBrowserMutationPathname(pathname)
+    )
   );
 }
 

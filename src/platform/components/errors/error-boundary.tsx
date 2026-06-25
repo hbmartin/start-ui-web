@@ -26,6 +26,7 @@ import {
   ResponsiveDrawerTrigger,
 } from '@/platform/components/ui/responsive-drawer';
 
+import { envClient } from '@/platform/env/client';
 import { getTelemetry } from '@/platform/telemetry';
 import { frontendLogger } from '@/platform/telemetry/frontend-logger';
 
@@ -34,7 +35,10 @@ const ErrorFallback = (props: FallbackProps) => {
   const [open, setOpen] = useState(false);
 
   const { copyToClipboard, isCopied } = useClipboard();
+  // Only surface the raw error message in development. In production it could
+  // expose internal details, so fall back to the generic "unknown" copy.
   const errorMessage =
+    envClient.DEV &&
     !!props.error &&
     typeof props.error === 'object' &&
     'message' in props.error &&

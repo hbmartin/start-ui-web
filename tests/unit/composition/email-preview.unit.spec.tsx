@@ -6,7 +6,7 @@ describe('email preview request handler', () => {
   it('hides the debug route when disabled', async () => {
     const preview = vi.fn();
     const handler = createEmailPreviewRequestHandler({
-      enabled: false,
+      isEnabled: () => false,
       preview,
     });
 
@@ -22,7 +22,7 @@ describe('email preview request handler', () => {
   it('parses query props and delegates preview rendering', async () => {
     const preview = vi.fn(async () => new Response('ok'));
     const handler = createEmailPreviewRequestHandler({
-      enabled: true,
+      isEnabled: () => true,
       preview,
     });
 

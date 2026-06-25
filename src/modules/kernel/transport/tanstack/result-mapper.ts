@@ -46,10 +46,14 @@ export const throwServerFnErrorForReason = (
 
 export const mapAppErrorToServerFnError = (error: unknown): never => {
   if (error instanceof AppError) {
+    // Never forward an internal (5xx/system) error's developer-facing message
+    // to the client. The real message is still logged server-side; the client
+    // only sees a generic string. Client-error categories keep their message.
+    const isInternal = error.category === 'system';
     throw new ServerFnError(codeForCategory[error.category], {
-      message: error.message,
+      message: isInternal ? 'Internal server error' : error.message,
       data:
-        error.exposeDetails && typeof error.details === 'object'
+        !isInternal && error.exposeDetails && typeof error.details === 'object'
           ? error.details
           : undefined,
     });

@@ -374,6 +374,48 @@ describe('server config accessors', () => {
     );
   });
 
+  it('rejects cleartext production OpenTelemetry collector URLs outside localhost', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('OTEL_COLLECTOR_URL', 'http://collector.example/v1');
+    const { getTelemetryConfig } =
+      await import('@/modules/kernel/infrastructure/config/telemetry');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getTelemetryConfig()).toThrow(ConfigurationError);
+    expect(() => getTelemetryConfig()).toThrow('OTEL_COLLECTOR_URL');
+  });
+
+  it('rejects cleartext production S3 transport for non-local storage hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('S3_ACCESS_KEY_ID', makeTestSecret('s3-access-key'));
+    vi.stubEnv('S3_SECRET_ACCESS_KEY', makeTestSecret('s3-secret-key'));
+    vi.stubEnv('S3_HOST', 'storage.example.com');
+    vi.stubEnv('S3_SECURE', 'false');
+    const { getStorageConfig } =
+      await import('@/modules/kernel/infrastructure/config/storage');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getStorageConfig()).toThrow(ConfigurationError);
+    expect(() => getStorageConfig()).toThrow('S3_SECURE');
+  });
+
+  it('rejects placeholder production S3 credentials', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('S3_ACCESS_KEY_ID', 'startui-access-key');
+    vi.stubEnv('S3_SECRET_ACCESS_KEY', makeTestSecret('s3-secret-key'));
+    vi.stubEnv('S3_HOST', 'storage.example.com');
+    vi.stubEnv('S3_SECURE', 'true');
+    const { getStorageConfig } =
+      await import('@/modules/kernel/infrastructure/config/storage');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getStorageConfig()).toThrow(ConfigurationError);
+    expect(() => getStorageConfig()).toThrow('S3_ACCESS_KEY_ID');
+  });
+
   it('defaults the Resend webhook body limit to one megabyte', async () => {
     vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
     vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
@@ -392,5 +434,19 @@ describe('server config accessors', () => {
       await import('@/modules/kernel/infrastructure/config/email');
 
     expect(getEmailConfig().resendWebhookMaxBytes).toBe(4096);
+  });
+
+  it('rejects placeholder production Resend webhook secrets', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
+    vi.stubEnv('RESEND_WEBHOOK_SECRET', 'REPLACE ME');
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getEmailConfig()).toThrow(ConfigurationError);
+    expect(() => getEmailConfig()).toThrow('RESEND_WEBHOOK_SECRET');
   });
 });

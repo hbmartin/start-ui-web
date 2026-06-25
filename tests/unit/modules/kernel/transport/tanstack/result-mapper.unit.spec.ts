@@ -62,6 +62,30 @@ describe('tanstack result mapper', () => {
     });
   });
 
+  it('hides internal (system) app error messages and details from the client', async () => {
+    await expect(
+      unwrapApplicationResult(
+        Promise.resolve(
+          Result.Error(
+            new AppError({
+              code: 'BOOK_REPOSITORY_ERROR',
+              category: 'system',
+              status: 500,
+              message: 'connection refused: postgres://secret-host:5432',
+              details: { query: 'SELECT * FROM users' },
+              exposeDetails: true,
+            })
+          )
+        ),
+        handlers
+      )
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Internal server error',
+      data: undefined,
+    });
+  });
+
   it('maps thrown app errors for legacy promise boundaries', async () => {
     await expect(
       unwrapApplicationResult(
