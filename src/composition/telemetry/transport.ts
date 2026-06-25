@@ -1,15 +1,20 @@
 import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields';
 
+import { getAuthUseCases } from '@/composition/auth';
 import { getKernel } from '@/composition/kernel';
 import { getTelemetryConfig } from '@/modules/kernel/infrastructure/config/telemetry';
 import {
   appendBrowserMutationVaryHeader,
   validateSameOriginBrowserMutationRequest,
 } from '@/platform/http/browser-mutation-protection';
+import { getClientIp } from '@/platform/http/get-client-ip';
+import { defaultRateLimiter } from '@/platform/http/rate-limiter';
 import type { TelemetryLogLevel } from '@/platform/telemetry';
 import { getTelemetry } from '@/platform/telemetry';
 
 import { recordLocalTelemetrySummary } from './local-sqlite-sink';
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 type OtlpSignal = 'metrics' | 'traces';
 
@@ -73,6 +78,21 @@ const tooManyEvents = () =>
     status: 413,
   });
 
+const tooManyRequests = (retryAfterSeconds: number) =>
+  new Response(JSON.stringify({ error: 'too_many_requests' }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': String(retryAfterSeconds),
+    },
+    status: 429,
+  });
+
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'unauthorized' }), {
+    headers: { 'Content-Type': 'application/json' },
+    status: 401,
+  });
+
 const accepted = () => new Response(null, { status: 202 });
 const noContent = () => new Response(null, { status: 204 });
 
@@ -93,6 +113,33 @@ const validateTelemetryMutationRequest = (
   }
 
   return undefined;
+};
+
+/**
+ * Best-effort per-IP rate limit. The same-origin guard is a CSRF control, not
+ * authentication, so these endpoints still accept forgeable non-browser
+ * traffic; this caps abuse/cost amplification per process. A platform/WAF limit
+ * remains the primary control on serverless. `scope` keeps a single page's
+ * traffic to one endpoint from starving the others.
+ */
+const enforceTelemetryRateLimit = (request: Request, scope: string) => {
+  const { rateLimitPerMinute } = getTelemetryConfig();
+  const ip = getClientIp(request) ?? 'unknown';
+  const result = defaultRateLimiter.check(
+    `telemetry:${scope}:${ip}`,
+    rateLimitPerMinute,
+    RATE_LIMIT_WINDOW_MS
+  );
+  if (result.allowed) return undefined;
+  return withTelemetryVary(tooManyRequests(result.retryAfterSeconds));
+};
+
+const hasAuthenticatedSession = async (request: Request) => {
+  const result = await getAuthUseCases().getCurrentSession({
+    headers: request.headers,
+  });
+  if (result.isError()) return false;
+  return result.get().type === 'auth_session_found';
 };
 
 const readBoundedBody = async (request: Request) => {
@@ -230,6 +277,9 @@ export const handleOtlpProxyRequest = async (
   const invalid = validateTelemetryMutationRequest(request, OTLP_CONTENT_TYPES);
   if (invalid) return invalid;
 
+  const rateLimited = enforceTelemetryRateLimit(request, signal);
+  if (rateLimited) return rateLimited;
+
   const body = await readBoundedBody(request);
   if (!body.ok) return withTelemetryVary(body.response);
 
@@ -244,6 +294,9 @@ export const handleSentryTunnelRequest = async (request: Request) => {
     SENTRY_ENVELOPE_CONTENT_TYPES
   );
   if (invalid) return invalid;
+
+  const rateLimited = enforceTelemetryRateLimit(request, 'sentry');
+  if (rateLimited) return rateLimited;
 
   const body = await readBoundedBody(request);
   if (!body.ok) return withTelemetryVary(body.response);
@@ -302,6 +355,16 @@ export const handleFrontendLogsRequest = async (request: Request) => {
     new Set(['application/json'])
   );
   if (invalid) return invalid;
+
+  const rateLimited = enforceTelemetryRateLimit(request, 'logs');
+  if (rateLimited) return rateLimited;
+
+  // The frontend log sink writes into the trusted server log/telemetry stream,
+  // so require an authenticated session. Anonymous (pre-login) client logs are
+  // intentionally dropped to keep this endpoint from being an open log relay.
+  if (!(await hasAuthenticatedSession(request))) {
+    return withTelemetryVary(unauthorized());
+  }
 
   const batch = await toFrontendLogBatch(request);
   if (!batch.ok) return withTelemetryVary(batch.response);

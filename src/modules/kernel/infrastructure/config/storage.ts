@@ -1,16 +1,73 @@
 import { z } from 'zod';
 
-import { baseEnvSchema, parseEnv, zNonEmptyEnvString } from './env-schema';
+import {
+  baseEnvSchema,
+  isProdRuntimeEnvironment,
+  parseEnv,
+  zNonEmptyEnvString,
+} from './env-schema';
 
-const storageEnvSchema = baseEnvSchema.extend({
-  S3_ACCESS_KEY_ID: zNonEmptyEnvString(),
-  S3_SECRET_ACCESS_KEY: zNonEmptyEnvString(),
-  S3_BUCKET_NAME: zNonEmptyEnvString().default('default'),
-  S3_REGION: zNonEmptyEnvString().default('auto'),
-  S3_HOST: zNonEmptyEnvString(),
-  S3_SECURE: z.stringbool().default(true),
-  S3_FORCE_PATH_STYLE: z.stringbool().default(false),
-});
+const PLACEHOLDER_STORAGE_SECRET_VALUES = new Set([
+  'access-key',
+  'changeme',
+  'change-me',
+  'change_me',
+  'minioadmin',
+  'replace me',
+  'secret',
+  'secret-key',
+  'startui-access-key',
+  'startui-secret-key',
+]);
+const LOCAL_STORAGE_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+const isPlaceholderStorageSecret = (value: string) =>
+  PLACEHOLDER_STORAGE_SECRET_VALUES.has(value.trim().toLowerCase());
+
+const hostnameFromStorageHost = (value: string) => {
+  try {
+    return new URL(value.includes('://') ? value : `http://${value}`).hostname;
+  } catch {
+    return undefined;
+  }
+};
+
+const isLocalStorageHost = (value: string) => {
+  const hostname = hostnameFromStorageHost(value);
+  return hostname ? LOCAL_STORAGE_HOSTS.has(hostname) : false;
+};
+
+const storageEnvSchema = baseEnvSchema
+  .extend({
+    S3_ACCESS_KEY_ID: zNonEmptyEnvString(),
+    S3_SECRET_ACCESS_KEY: zNonEmptyEnvString(),
+    S3_BUCKET_NAME: zNonEmptyEnvString().default('default'),
+    S3_REGION: zNonEmptyEnvString().default('auto'),
+    S3_HOST: zNonEmptyEnvString(),
+    S3_SECURE: z.stringbool().default(true),
+    S3_FORCE_PATH_STYLE: z.stringbool().default(false),
+  })
+  .superRefine((env, ctx) => {
+    if (!isProdRuntimeEnvironment(env)) return;
+
+    if (!env.S3_SECURE && !isLocalStorageHost(env.S3_HOST)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['S3_SECURE'],
+        message: 'S3_SECURE=false is only allowed for local storage hosts',
+      });
+    }
+
+    for (const field of ['S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const) {
+      if (isPlaceholderStorageSecret(env[field])) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `${field} must not use a placeholder value in production`,
+        });
+      }
+    }
+  });
 
 export type StorageConfig = {
   accessKeyId: string;

@@ -86,6 +86,11 @@ export function buildContentSecurityPolicy(
     ...(styleElementSources
       ? [formatDirective('style-src-elem', styleElementSources)]
       : []),
+    // `style-src-attr 'unsafe-inline'` is intentionally retained: the app applies
+    // dynamic inline `style=` attributes (e.g. the <html> font-scale in
+    // src/routes/__root.tsx and several UI components). CSP cannot nonce/hash
+    // style *attributes*, so tightening this to 'none' would break them.
+    // `script-src` stays nonce-locked, so the residual style-injection risk is low.
     formatDirective('style-src-attr', ["'unsafe-inline'"]),
     formatDirective('img-src', imgSources),
     formatDirective('connect-src', connectSources),

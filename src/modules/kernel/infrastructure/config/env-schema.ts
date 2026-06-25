@@ -28,6 +28,14 @@ export const shouldSkipEnvValidation = (source?: RuntimeEnv) => {
   return isTruthy(env.SKIP_ENV_VALIDATION) && !isProdRuntimeEnvironment(env);
 };
 
+/**
+ * Explicit opt-in (ALLOW_PROD_SEED=true) required to run the database seed
+ * against a production environment. Used by the seed entrypoint to avoid
+ * planting demo accounts in production.
+ */
+export const isProductionSeedAllowed = (source?: RuntimeEnv) =>
+  isTruthy((source ?? runtimeEnv()).ALLOW_PROD_SEED);
+
 export const zNonEmptyEnvString = () => z.string().trim().min(1);
 
 export const baseEnvSchema = z

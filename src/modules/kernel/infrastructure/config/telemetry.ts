@@ -7,6 +7,16 @@ import {
 } from './env-schema';
 import { ConfigurationError } from '../../domain/errors/configuration-error';
 
+const LOCAL_TELEMETRY_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+const isLocalTelemetryUrl = (value: string) => {
+  try {
+    return LOCAL_TELEMETRY_HOSTS.has(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+};
+
 const telemetryEnvSchema = baseEnvSchema.extend({
   SENTRY_DSN: z.string().url().optional(),
   VITE_SENTRY_DSN: z.string().url().optional(),
@@ -28,6 +38,11 @@ const telemetryEnvSchema = baseEnvSchema.extend({
   OTEL_LOCAL_SQLITE_PATH: z.string().optional(),
   TELEMETRY_PROXY_MAX_BYTES: z.coerce.number().int().positive().optional(),
   TELEMETRY_LOG_MAX_EVENTS: z.coerce.number().int().positive().optional(),
+  TELEMETRY_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
 });
 
 export type TelemetryConfig = {
@@ -48,6 +63,7 @@ export type TelemetryConfig = {
   localSqlitePath: string;
   proxyMaxBytes: number;
   logMaxEvents: number;
+  rateLimitPerMinute: number;
 };
 
 let cachedTelemetryConfig: TelemetryConfig | undefined;
@@ -60,6 +76,16 @@ export function getTelemetryConfig(): TelemetryConfig {
   if (isProduction && !env.OTEL_COLLECTOR_URL) {
     throw new ConfigurationError(
       'OTEL_COLLECTOR_URL is required in production telemetry configuration.'
+    );
+  }
+  if (
+    isProduction &&
+    env.OTEL_COLLECTOR_URL &&
+    new URL(env.OTEL_COLLECTOR_URL).protocol !== 'https:' &&
+    !isLocalTelemetryUrl(env.OTEL_COLLECTOR_URL)
+  ) {
+    throw new ConfigurationError(
+      'OTEL_COLLECTOR_URL must use HTTPS in production unless it targets localhost.'
     );
   }
 
@@ -85,6 +111,7 @@ export function getTelemetryConfig(): TelemetryConfig {
       env.OTEL_LOCAL_SQLITE_PATH ?? '.telemetry/telemetry.sqlite',
     proxyMaxBytes: env.TELEMETRY_PROXY_MAX_BYTES ?? 1_000_000,
     logMaxEvents: env.TELEMETRY_LOG_MAX_EVENTS ?? 50,
+    rateLimitPerMinute: env.TELEMETRY_RATE_LIMIT_PER_MINUTE ?? 600,
   };
   return cachedTelemetryConfig;
 }

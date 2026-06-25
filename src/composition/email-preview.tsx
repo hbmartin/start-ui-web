@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { DEFAULT_LANGUAGE_KEY } from '@/platform/lib/i18n/constants';
 
 import { TemplateLoginCode } from '@/modules/email/presentation';
+import { isProdRuntimeEnvironment } from '@/modules/kernel/infrastructure/config/env-schema';
 
 type PreviewEmailComponent = (props: Record<string, string>) => ReactElement;
 
@@ -12,7 +13,7 @@ const emailTemplates: Record<string, PreviewEmailComponent> = {
 };
 
 type EmailPreviewHandlerDeps = {
-  enabled: boolean;
+  isEnabled: () => boolean;
   preview: (
     template: string,
     props: Record<string, string>
@@ -43,9 +44,9 @@ export const previewEmailRoute = async (
 };
 
 export const createEmailPreviewRequestHandler =
-  ({ enabled, preview }: EmailPreviewHandlerDeps) =>
+  ({ isEnabled, preview }: EmailPreviewHandlerDeps) =>
   async (request: Request, template: string) => {
-    if (!enabled) {
+    if (!isEnabled()) {
       return new Response(undefined, {
         status: 404,
       });
@@ -57,6 +58,8 @@ export const createEmailPreviewRequestHandler =
   };
 
 export const handleEmailPreviewRequest = createEmailPreviewRequestHandler({
-  enabled: !import.meta.env.PROD,
+  // Build-time AND runtime gate: a non-production-mode bundle accidentally
+  // deployed to a production runtime still returns 404, evaluated per request.
+  isEnabled: () => !import.meta.env.PROD && !isProdRuntimeEnvironment(),
   preview: previewEmailRoute,
 });

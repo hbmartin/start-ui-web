@@ -51,6 +51,42 @@ describe('browser mutation protection', () => {
     ).toBe(false);
   });
 
+  it('protects trailing-slash variants of configured router mutations', () => {
+    for (const pathname of [
+      '/api/upload/',
+      '/api/upload//',
+      '/logout/',
+      '/api/telemetry/logs/',
+    ]) {
+      expect(
+        shouldProtectBrowserMutation({
+          handlerType: 'router',
+          method: 'POST',
+          pathname,
+        })
+      ).toBe(true);
+    }
+  });
+
+  it('normalizes custom protected pathnames before matching', () => {
+    expect(
+      shouldProtectBrowserMutation({
+        handlerType: 'router',
+        method: 'POST',
+        pathname: '/custom-mutation/',
+        protectedPathnames: ['/custom-mutation'],
+      })
+    ).toBe(true);
+    expect(
+      shouldProtectBrowserMutation({
+        handlerType: 'router',
+        method: 'POST',
+        pathname: '/custom-mutation',
+        protectedPathnames: ['/custom-mutation/'],
+      })
+    ).toBe(true);
+  });
+
   it('accepts any same-origin browser signal when no conflicting signal is present', () => {
     expect(
       validateSameOriginBrowserMutationRequest(

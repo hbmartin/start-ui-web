@@ -1,4 +1,7 @@
+import { Result } from '@swan-io/boxed';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { defaultRateLimiter } from '@/platform/http/rate-limiter';
 
 const configMock = vi.hoisted(() => ({
   browserDsn: undefined as string | undefined,
@@ -6,6 +9,7 @@ const configMock = vi.hoisted(() => ({
   collectorUrl: undefined as string | undefined,
   logMaxEvents: 2,
   proxyMaxBytes: 1_000,
+  rateLimitPerMinute: 1_000,
 }));
 
 const loggerMock = vi.hoisted(() => ({
@@ -22,6 +26,10 @@ const telemetryMock = vi.hoisted(() => ({
 
 const localSummaryMock = vi.hoisted(() => vi.fn());
 
+const authUseCasesMock = vi.hoisted(() => ({
+  getCurrentSession: vi.fn(),
+}));
+
 vi.mock('@/modules/kernel/infrastructure/config/telemetry', () => ({
   getTelemetryConfig: () => configMock,
 }));
@@ -36,6 +44,10 @@ vi.mock('@/platform/telemetry', () => ({
 
 vi.mock('@/composition/telemetry/local-sqlite-sink', () => ({
   recordLocalTelemetrySummary: localSummaryMock,
+}));
+
+vi.mock('@/composition/auth', () => ({
+  getAuthUseCases: () => authUseCasesMock,
 }));
 
 const sameOriginHeaders = (contentType: string) => ({
@@ -59,6 +71,11 @@ describe('telemetry transport handlers', () => {
     configMock.collectorUrl = undefined;
     configMock.logMaxEvents = 2;
     configMock.proxyMaxBytes = 1_000;
+    configMock.rateLimitPerMinute = 1_000;
+    defaultRateLimiter.reset();
+    authUseCasesMock.getCurrentSession.mockResolvedValue(
+      Result.Ok({ type: 'auth_session_found', session: { user: { id: 'u1' } } })
+    );
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -256,5 +273,51 @@ describe('telemetry transport handlers', () => {
       })
     );
     expect(telemetryMock.captureException).toHaveBeenCalledOnce();
+  });
+
+  it('rate limits telemetry ingest once the per-minute cap is exceeded', async () => {
+    configMock.rateLimitPerMinute = 1;
+    const { handleOtlpProxyRequest } =
+      await import('@/composition/telemetry/transport');
+
+    const first = await handleOtlpProxyRequest(
+      request(
+        '/api/telemetry/otel/v1/traces',
+        'application/x-protobuf',
+        new Uint8Array([1])
+      ),
+      'traces'
+    );
+    const second = await handleOtlpProxyRequest(
+      request(
+        '/api/telemetry/otel/v1/traces',
+        'application/x-protobuf',
+        new Uint8Array([1])
+      ),
+      'traces'
+    );
+
+    expect(first.status).toBe(204);
+    expect(second.status).toBe(429);
+    expect(second.headers.get('Retry-After')).toBeTruthy();
+  });
+
+  it('rejects frontend logs without an authenticated session', async () => {
+    authUseCasesMock.getCurrentSession.mockResolvedValue(
+      Result.Ok({ type: 'auth_session_not_found' })
+    );
+    const { handleFrontendLogsRequest } =
+      await import('@/composition/telemetry/transport');
+
+    const response = await handleFrontendLogsRequest(
+      request(
+        '/api/telemetry/logs',
+        'application/json',
+        JSON.stringify({ records: [] })
+      )
+    );
+
+    expect(response.status).toBe(401);
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 });

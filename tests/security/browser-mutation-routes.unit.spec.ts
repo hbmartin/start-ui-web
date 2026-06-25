@@ -74,5 +74,15 @@ describe('browser mutation route coverage', () => {
       '/api/auth/$',
       '/api/webhooks/resend',
     ]);
+
+    for (const pathname of appGuardedRoutes) {
+      expect(
+        shouldProtectBrowserMutation({
+          handlerType: 'router',
+          method: 'POST',
+          pathname: `${pathname}/`,
+        })
+      ).toBe(true);
+    }
   });
 });
