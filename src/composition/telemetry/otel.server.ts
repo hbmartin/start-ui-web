@@ -32,17 +32,11 @@ import {
 import { getTelemetryConfig } from '@/modules/kernel/infrastructure/config/telemetry';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 
+import { telemetrySignalUrl } from './collector-url';
 import { createOpenTelemetryAdapter } from './otel-adapter';
 
 let initialized = false;
 let adapter: TelemetryAdapter | undefined;
-
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
-
-const signalUrl = (
-  collectorUrl: string,
-  signal: 'logs' | 'metrics' | 'traces'
-) => `${trimTrailingSlash(collectorUrl)}/v1/${signal}`;
 
 const createResource = () => {
   const config = getTelemetryConfig();
@@ -82,7 +76,7 @@ export const initOpenTelemetryServer = (): TelemetryAdapter | undefined => {
       new BatchSpanProcessor(
         new OTLPTraceExporter({
           headers,
-          url: signalUrl(config.collectorUrl, 'traces'),
+          url: telemetrySignalUrl(config.collectorUrl, 'traces'),
         })
       ),
     ],
@@ -102,7 +96,7 @@ export const initOpenTelemetryServer = (): TelemetryAdapter | undefined => {
       new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           headers,
-          url: signalUrl(config.collectorUrl, 'metrics'),
+          url: telemetrySignalUrl(config.collectorUrl, 'metrics'),
         }),
         exportIntervalMillis: 30_000,
       }),
@@ -116,7 +110,7 @@ export const initOpenTelemetryServer = (): TelemetryAdapter | undefined => {
       new BatchLogRecordProcessor(
         new OTLPLogExporter({
           headers,
-          url: signalUrl(config.collectorUrl, 'logs'),
+          url: telemetrySignalUrl(config.collectorUrl, 'logs'),
         })
       ),
     ],

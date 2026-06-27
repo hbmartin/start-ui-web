@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 const root = process.cwd();
 const sourceRoot = path.join(root, 'src');
@@ -28,20 +29,13 @@ function toProjectPath(filePath) {
 }
 
 function readImportSpecifiers(source) {
-  const specifiers = new Set();
-  const importFromPattern =
-    /\b(?:import|export)\s+(?:type\s+)?[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
-  const sideEffectPattern = /\bimport\s+['"]([^'"]+)['"]/g;
-
-  for (const match of source.matchAll(importFromPattern)) {
-    specifiers.add(match[1]);
-  }
-
-  for (const match of source.matchAll(sideEffectPattern)) {
-    specifiers.add(match[1]);
-  }
-
-  return [...specifiers];
+  return [
+    ...new Set(
+      ts
+        .preProcessFile(source, true, true)
+        .importedFiles.map((file) => file.fileName)
+    ),
+  ];
 }
 
 function resolveLocalImport(importer, specifier) {

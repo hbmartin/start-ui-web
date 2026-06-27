@@ -40,16 +40,27 @@ const initTelemetryClientOnly = createClientOnlyFn(async (router: unknown) => {
 // adapter so all call sites remain unconditional.
 const shouldAutoInitTelemetry = import.meta.env.MODE !== 'test';
 
-if (import.meta.env.SSR && shouldAutoInitTelemetry) {
-  void initTelemetryServerOnly().catch((error: unknown) => {
-    frontendLogger.warn('telemetry.server_init_failed', { error });
+const startTelemetryInitialization = (
+  initialization: Promise<unknown>,
+  failureEvent: string
+) => {
+  initialization.catch((error: unknown) => {
+    frontendLogger.warn(failureEvent, { error });
   });
+};
+
+if (import.meta.env.SSR && shouldAutoInitTelemetry) {
+  startTelemetryInitialization(
+    initTelemetryServerOnly(),
+    'telemetry.server_init_failed'
+  );
 } else if (shouldAutoInitTelemetry) {
   // Start client instrumentation at module evaluation so document/fetch
   // telemetry is active before router subscriptions begin handling navigation.
-  void initTelemetryClientOnly(undefined).catch((error: unknown) => {
-    frontendLogger.warn('telemetry.client_init_failed', { error });
-  });
+  startTelemetryInitialization(
+    initTelemetryClientOnly(undefined),
+    'telemetry.client_init_failed'
+  );
 }
 
 const flags = createNoOpFlags();

@@ -1,46 +1,31 @@
 import { z } from 'zod';
 
-export interface DatabaseErrorDetails {
-  name?: string | undefined;
-  message?: string | undefined;
-  code?: string | undefined;
-  detail?: string | undefined;
-  schema?: string | undefined;
-  table?: string | undefined;
-  column?: string | undefined;
-  constraint?: string | undefined;
-  dataType?: string | undefined;
-  severity?: string | undefined;
-  hint?: string | undefined;
-  position?: string | number | undefined;
-  where?: string | undefined;
-  routine?: string | undefined;
-  internalPosition?: string | number | undefined;
-  internalQuery?: string | undefined;
-  cause?: string | undefined;
-}
+type DatabaseErrorDetailValue = string | number;
 
-const databaseErrorFields = [
-  'code',
-  'detail',
-  'schema',
-  'table',
-  'column',
-  'constraint',
-  'dataType',
-  'severity',
-  'hint',
-  'position',
-  'where',
-  'routine',
-  'internalPosition',
-  'internalQuery',
-] as const;
+export interface DatabaseErrorDetails {
+  name?: string;
+  message?: string;
+  code?: string;
+  detail?: string;
+  schema?: string;
+  table?: string;
+  column?: string;
+  constraint?: string;
+  dataType?: string;
+  severity?: string;
+  hint?: string;
+  position?: DatabaseErrorDetailValue;
+  where?: string;
+  routine?: string;
+  internalPosition?: DatabaseErrorDetailValue;
+  internalQuery?: string;
+  cause?: string;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-function readDetailValue(value: unknown): string | number | undefined {
+function readDetailValue(value: unknown): DatabaseErrorDetailValue | undefined {
   if (typeof value === 'string' || typeof value === 'number') return value;
   return undefined;
 }
@@ -53,6 +38,17 @@ function readCauseMessage(error: unknown): string | undefined {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return undefined;
+}
+
+function assignIfMissing<T>(
+  currentValue: T | undefined,
+  nextValue: T | undefined,
+  assign: (value: T) => void
+): boolean {
+  if (nextValue === undefined || currentValue !== undefined) return false;
+
+  assign(nextValue);
+  return true;
 }
 
 function readNameAndMessage(
@@ -95,17 +91,78 @@ function readDatabaseFields(
 ): boolean {
   if (!isRecord(error)) return false;
 
-  let updated = false;
-
-  for (const field of databaseErrorFields) {
-    const value = readDetailValue(error[field]);
-    if (value !== undefined && details[field] === undefined) {
-      details[field] = value as never;
-      updated = true;
-    }
-  }
-
-  return updated;
+  return [
+    assignIfMissing(details.code, readStringValue(error.code), (value) => {
+      details.code = value;
+    }),
+    assignIfMissing(details.detail, readStringValue(error.detail), (value) => {
+      details.detail = value;
+    }),
+    assignIfMissing(details.schema, readStringValue(error.schema), (value) => {
+      details.schema = value;
+    }),
+    assignIfMissing(details.table, readStringValue(error.table), (value) => {
+      details.table = value;
+    }),
+    assignIfMissing(details.column, readStringValue(error.column), (value) => {
+      details.column = value;
+    }),
+    assignIfMissing(
+      details.constraint,
+      readStringValue(error.constraint),
+      (value) => {
+        details.constraint = value;
+      }
+    ),
+    assignIfMissing(
+      details.dataType,
+      readStringValue(error.dataType),
+      (value) => {
+        details.dataType = value;
+      }
+    ),
+    assignIfMissing(
+      details.severity,
+      readStringValue(error.severity),
+      (value) => {
+        details.severity = value;
+      }
+    ),
+    assignIfMissing(details.hint, readStringValue(error.hint), (value) => {
+      details.hint = value;
+    }),
+    assignIfMissing(
+      details.position,
+      readDetailValue(error.position),
+      (value) => {
+        details.position = value;
+      }
+    ),
+    assignIfMissing(details.where, readStringValue(error.where), (value) => {
+      details.where = value;
+    }),
+    assignIfMissing(
+      details.routine,
+      readStringValue(error.routine),
+      (value) => {
+        details.routine = value;
+      }
+    ),
+    assignIfMissing(
+      details.internalPosition,
+      readDetailValue(error.internalPosition),
+      (value) => {
+        details.internalPosition = value;
+      }
+    ),
+    assignIfMissing(
+      details.internalQuery,
+      readStringValue(error.internalQuery),
+      (value) => {
+        details.internalQuery = value;
+      }
+    ),
+  ].some(Boolean);
 }
 
 function ensureStandardDbFields(details: DatabaseErrorDetails): void {
@@ -152,7 +209,7 @@ export function withDatabaseErrorDetails(
 export interface DatabaseErrorLogFields {
   event: string;
   error: string;
-  exception?: Error | undefined;
+  exception?: Error;
   details: Record<string, unknown>;
 }
 
@@ -205,7 +262,7 @@ function extractFromErrorOrCause<T, R>(
   return fromCause.success ? extract(fromCause.data) : undefined;
 }
 
-const errorWithCodeSchema = z.object({ code: z.string() }).passthrough();
+const errorWithCodeSchema = z.looseObject({ code: z.string() });
 
 export function isUniqueConstraintViolation(error: unknown): boolean {
   return checkErrorOrCause(
@@ -215,9 +272,7 @@ export function isUniqueConstraintViolation(error: unknown): boolean {
   );
 }
 
-const errorWithConstraintSchema = z
-  .object({ constraint: z.string() })
-  .passthrough();
+const errorWithConstraintSchema = z.looseObject({ constraint: z.string() });
 
 export function getConstraintName(error: unknown): string | undefined {
   return extractFromErrorOrCause(
@@ -227,7 +282,7 @@ export function getConstraintName(error: unknown): string | undefined {
   );
 }
 
-const errorWithDetailSchema = z.object({ detail: z.string() }).passthrough();
+const errorWithDetailSchema = z.looseObject({ detail: z.string() });
 
 export function getErrorDetail(error: unknown): string | undefined {
   return extractFromErrorOrCause(

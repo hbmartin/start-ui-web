@@ -9,9 +9,10 @@ import {
 } from '@/platform/http/browser-mutation-protection';
 import { getClientIp } from '@/platform/http/get-client-ip';
 import { defaultRateLimiter } from '@/platform/http/rate-limiter';
-import type { TelemetryLogLevel } from '@/platform/telemetry';
+import type { TelemetryAdapter, TelemetryLogLevel } from '@/platform/telemetry';
 import { getTelemetry } from '@/platform/telemetry';
 
+import { telemetrySignalUrl } from './collector-url';
 import { recordLocalTelemetrySummary } from './local-sqlite-sink';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -38,11 +39,16 @@ const SENTRY_ENVELOPE_CONTENT_TYPES = new Set([
   'application/x-sentry-envelope',
   'text/plain',
 ]);
+const JSON_CONTENT_TYPES = new Set(['application/json']);
+const FRONTEND_LOG_LEVELS = new Set<TelemetryLogLevel>([
+  'debug',
+  'error',
+  'info',
+  'warn',
+]);
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
-
-const signalUrl = (collectorUrl: string, signal: OtlpSignal | 'logs') =>
-  `${trimTrailingSlash(collectorUrl)}/v1/${signal}`;
+type KernelLogger = ReturnType<typeof getKernel>['logger'];
+type KernelLogFields = Parameters<KernelLogger['info']>[0];
 
 const contentType = (request: Request) =>
   request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() ??
@@ -98,6 +104,10 @@ const noContent = () => new Response(null, { status: 204 });
 
 const withTelemetryVary = (response: Response) =>
   appendBrowserMutationVaryHeader(response);
+
+const isTelemetryLogLevel = (value: unknown): value is TelemetryLogLevel =>
+  typeof value === 'string' &&
+  FRONTEND_LOG_LEVELS.has(value as TelemetryLogLevel);
 
 const validateTelemetryMutationRequest = (
   request: Request,
@@ -210,7 +220,7 @@ const forwardToCollector = async (
       : {}),
   };
   const collectorResponse = await fetch(
-    signalUrl(config.collectorUrl, signal),
+    telemetrySignalUrl(config.collectorUrl, signal),
     {
       body,
       headers,
@@ -307,9 +317,122 @@ export const handleSentryTunnelRequest = async (request: Request) => {
 const isFrontendLogRecord = (value: unknown): value is FrontendLogRecord => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return (
-    ['debug', 'error', 'info', 'warn'].includes(String(record.level)) &&
-    typeof record.event === 'string'
+  return isTelemetryLogLevel(record.level) && typeof record.event === 'string';
+};
+
+const optionalString = (value: unknown) =>
+  typeof value === 'string' ? value : undefined;
+
+const recordValue = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const frontendLogEvent = (record: Record<string, unknown>) => {
+  const event = optionalString(record.event);
+  return event ? `frontend.${event}` : 'frontend.log';
+};
+
+const frontendLogLevel = (record: Record<string, unknown>) =>
+  isTelemetryLogLevel(record.level) ? record.level : 'info';
+
+const frontendTraceDetails = (record: Record<string, unknown>) => {
+  const spanId = optionalString(record.spanId);
+  const traceId = optionalString(record.traceId);
+
+  return {
+    ...(spanId ? { spanId } : {}),
+    ...(traceId ? { traceId } : {}),
+  };
+};
+
+const frontendTelemetryAttributes = (record: Record<string, unknown>) => {
+  const spanId = optionalString(record.spanId);
+  const traceId = optionalString(record.traceId);
+
+  return {
+    'log.source': 'frontend',
+    ...(traceId ? { 'trace.id': traceId } : {}),
+    ...(spanId ? { 'span.id': spanId } : {}),
+  };
+};
+
+const frontendTimestamp = (record: Record<string, unknown>) => {
+  const timestamp = optionalString(record.timestamp);
+  return timestamp ? new Date(timestamp) : undefined;
+};
+
+const frontendErrorMessage = (record: Record<string, unknown>, event: string) =>
+  optionalString(record.error) ?? optionalString(record.message) ?? event;
+
+const writeFrontendBackendLog = (
+  logger: KernelLogger,
+  level: TelemetryLogLevel,
+  fields: KernelLogFields
+) => {
+  switch (level) {
+    case 'debug':
+      logger.debug(fields);
+      return;
+    case 'error':
+      logger.error(fields);
+      return;
+    case 'info':
+      logger.info(fields);
+      return;
+    case 'warn':
+      logger.warn(fields);
+      return;
+  }
+};
+
+const recordFrontendLog = ({
+  logger,
+  record,
+  telemetry,
+}: {
+  logger: KernelLogger;
+  record: FrontendLogRecord;
+  telemetry: TelemetryAdapter;
+}) => {
+  const sanitized = sanitizeLogFields(record);
+  const details = recordValue(sanitized.details);
+  const event = frontendLogEvent(sanitized);
+  const level = frontendLogLevel(sanitized);
+  const error = optionalString(sanitized.error);
+  const message = optionalString(sanitized.message);
+
+  writeFrontendBackendLog(logger, level, {
+    details: {
+      ...details,
+      ...frontendTraceDetails(sanitized),
+    },
+    direction: 'inbound',
+    error,
+    event,
+    telemetryExtras: { frontendLog: sanitized },
+    telemetryTags: { source: 'frontend' },
+  });
+
+  telemetry.emitLog({
+    attributes: frontendTelemetryAttributes(sanitized),
+    details,
+    error,
+    event,
+    level,
+    message,
+    timestamp: frontendTimestamp(sanitized),
+  });
+
+  if (level !== 'error') return;
+
+  telemetry.captureException(
+    new Error(frontendErrorMessage(sanitized, event)),
+    {
+      extra: { frontendLog: sanitized },
+      level: 'error',
+      tags: { event, source: 'frontend' },
+    }
   );
 };
 
@@ -350,10 +473,7 @@ const toFrontendLogBatch = async (request: Request) => {
 };
 
 export const handleFrontendLogsRequest = async (request: Request) => {
-  const invalid = validateTelemetryMutationRequest(
-    request,
-    new Set(['application/json'])
-  );
+  const invalid = validateTelemetryMutationRequest(request, JSON_CONTENT_TYPES);
   if (invalid) return invalid;
 
   const rateLimited = enforceTelemetryRateLimit(request, 'logs');
@@ -373,78 +493,7 @@ export const handleFrontendLogsRequest = async (request: Request) => {
   const telemetry = getTelemetry();
 
   for (const record of batch.records) {
-    const sanitized = sanitizeLogFields(record);
-    const details =
-      sanitized.details &&
-      typeof sanitized.details === 'object' &&
-      !Array.isArray(sanitized.details)
-        ? (sanitized.details as Record<string, unknown>)
-        : {};
-    const event =
-      typeof sanitized.event === 'string'
-        ? `frontend.${sanitized.event}`
-        : 'frontend.log';
-    const level =
-      typeof sanitized.level === 'string' &&
-      ['debug', 'error', 'info', 'warn'].includes(sanitized.level)
-        ? (sanitized.level as TelemetryLogLevel)
-        : 'info';
-
-    logger[level]({
-      details: {
-        ...details,
-        ...(typeof sanitized.spanId === 'string'
-          ? { spanId: sanitized.spanId }
-          : {}),
-        ...(typeof sanitized.traceId === 'string'
-          ? { traceId: sanitized.traceId }
-          : {}),
-      },
-      direction: 'inbound',
-      error: typeof sanitized.error === 'string' ? sanitized.error : undefined,
-      event,
-      telemetryExtras: { frontendLog: sanitized },
-      telemetryTags: { source: 'frontend' },
-    });
-
-    telemetry.emitLog({
-      attributes: {
-        'log.source': 'frontend',
-        ...(typeof sanitized.traceId === 'string'
-          ? { 'trace.id': sanitized.traceId }
-          : {}),
-        ...(typeof sanitized.spanId === 'string'
-          ? { 'span.id': sanitized.spanId }
-          : {}),
-      },
-      details,
-      error: typeof sanitized.error === 'string' ? sanitized.error : undefined,
-      event,
-      level,
-      message:
-        typeof sanitized.message === 'string' ? sanitized.message : undefined,
-      timestamp:
-        typeof sanitized.timestamp === 'string'
-          ? new Date(sanitized.timestamp)
-          : undefined,
-    });
-
-    if (level === 'error') {
-      telemetry.captureException(
-        new Error(
-          typeof sanitized.error === 'string'
-            ? sanitized.error
-            : typeof sanitized.message === 'string'
-              ? sanitized.message
-              : event
-        ),
-        {
-          extra: { frontendLog: sanitized },
-          level: 'error',
-          tags: { event, source: 'frontend' },
-        }
-      );
-    }
+    recordFrontendLog({ logger, record, telemetry });
   }
 
   recordLocalTelemetrySummary({

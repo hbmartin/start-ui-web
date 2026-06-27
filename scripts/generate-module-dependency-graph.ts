@@ -240,11 +240,10 @@ export const buildModuleLayerGraph = (
 
 const escapeMermaidLabel = (label: string) => label.replaceAll('"', '#quot;');
 
-const mermaidNodeId = (id: string) =>
-  `node_${id.replaceAll(/[^a-zA-Z0-9_]/g, '_')}`;
+const mermaidNodeId = (id: string) => `node_${id.replaceAll(/\W/g, '_')}`;
 
 const mermaidModuleId = (moduleName: string) =>
-  `module_${moduleName.replaceAll(/[^a-zA-Z0-9_]/g, '_')}`;
+  `module_${moduleName.replaceAll(/\W/g, '_')}`;
 
 const groupNodesByModule = (nodes: ModuleLayerNode[]) => {
   const groupedNodes = new Map<string, ModuleLayerNode[]>();
@@ -307,7 +306,7 @@ const escapeDotValue = (value: string) =>
 const dotId = (id: string) => `"${escapeDotValue(id)}"`;
 
 const dotClusterId = (moduleName: string) =>
-  `cluster_${moduleName.replaceAll(/[^a-zA-Z0-9_]/g, '_')}`;
+  `cluster_${moduleName.replaceAll(/\W/g, '_')}`;
 
 const dotFillColorForLayer = (layerName: ModuleLayerName) => {
   switch (layerName) {
