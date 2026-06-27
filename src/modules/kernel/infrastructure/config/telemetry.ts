@@ -5,6 +5,7 @@ import {
   isProdRuntimeEnvironment,
   parseEnv,
 } from './env-schema';
+import { assertSecureUrlInProduction } from './url-security';
 import { ConfigurationError } from '../../domain/errors/configuration-error';
 
 const LOCAL_TELEMETRY_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
@@ -93,6 +94,16 @@ export function getTelemetryConfig(): TelemetryConfig {
       'OTEL_COLLECTOR_URL must use HTTPS in production unless it targets localhost.'
     );
   }
+  assertSecureUrlInProduction({
+    name: 'SENTRY_DSN',
+    value: env.SENTRY_DSN,
+    env,
+  });
+  assertSecureUrlInProduction({
+    name: 'VITE_SENTRY_DSN',
+    value: env.VITE_SENTRY_DSN,
+    env,
+  });
 
   cachedTelemetryConfig = {
     dsn: env.SENTRY_DSN,

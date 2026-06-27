@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { baseEnvSchema, parseEnv } from './env-schema';
+import { assertDatabaseUrlTls } from './url-security';
 import { ConfigurationError } from '../../domain/errors/configuration-error';
 
 export const DATABASE_DRIVERS = [
@@ -52,6 +53,12 @@ export function getDatabaseConfig(): DatabaseConfig {
   if (cachedDatabaseConfig) return cachedDatabaseConfig;
 
   const env = parseEnv(databaseEnvSchema);
+  assertDatabaseUrlTls({
+    name: 'DATABASE_URL',
+    url: env.DATABASE_URL,
+    driver: env.DATABASE_DRIVER,
+    env,
+  });
   cachedDatabaseConfig = {
     databaseUrl: env.DATABASE_URL,
     driver: env.DATABASE_DRIVER,
@@ -82,6 +89,14 @@ export function getMigrationDatabaseConfig(): MigrationDatabaseConfig {
   assertMigrationDriver(driver);
 
   const databaseUrl = env.DATABASE_MIGRATION_URL ?? env.DATABASE_URL;
+  assertDatabaseUrlTls({
+    name: env.DATABASE_MIGRATION_URL
+      ? 'DATABASE_MIGRATION_URL'
+      : 'DATABASE_URL',
+    url: databaseUrl,
+    driver,
+    env,
+  });
   if (isLikelyTransactionPooledDatabaseUrl(databaseUrl)) {
     throw new ConfigurationError(
       'DATABASE_MIGRATION_URL must use a direct or session-sticky PostgreSQL connection. Transaction-pooler URLs are not safe for migrations.'

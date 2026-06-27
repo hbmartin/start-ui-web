@@ -1,6 +1,11 @@
 /* oxlint-disable no-process-env */
 import { z } from 'zod';
 
+import {
+  httpsInProductionMessage,
+  isSecureUrlForProduction,
+} from './url-security';
+
 type RuntimeEnv = Record<string, unknown>;
 
 const runtimeEnv = (): RuntimeEnv => ({
@@ -35,7 +40,11 @@ const getBaseUrl = (env: RuntimeEnv) => {
 
 const clientSchema = () =>
   z.object({
-    VITE_BASE_URL: z.url(),
+    VITE_BASE_URL: z
+      .url()
+      .refine((value) => isSecureUrlForProduction(value, isProd()), {
+        message: httpsInProductionMessage('VITE_BASE_URL'),
+      }),
     VITE_IS_DEMO: z
       .enum(['true', 'false'])
       .optional()
@@ -62,8 +71,18 @@ const clientSchema = () =>
       .string()
       .optional()
       .transform((value) => value ?? (isDev() ? 'gold' : 'plum')),
-    VITE_S3_BUCKET_PUBLIC_URL: z.url(),
-    VITE_SENTRY_DSN: z.string().url().optional(),
+    VITE_S3_BUCKET_PUBLIC_URL: z
+      .url()
+      .refine((value) => isSecureUrlForProduction(value, isProd()), {
+        message: httpsInProductionMessage('VITE_S3_BUCKET_PUBLIC_URL'),
+      }),
+    VITE_SENTRY_DSN: z
+      .string()
+      .url()
+      .refine((value) => isSecureUrlForProduction(value, isProd()), {
+        message: httpsInProductionMessage('VITE_SENTRY_DSN'),
+      })
+      .optional(),
     VITE_SENTRY_ENVIRONMENT: z.string().optional(),
     VITE_SENTRY_TRACES_SAMPLE_RATE: z.coerce
       .number()
