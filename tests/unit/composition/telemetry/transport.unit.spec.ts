@@ -105,7 +105,7 @@ describe('telemetry transport handlers', () => {
 
   it('forwards OTLP protobuf payloads to the Collector with bearer auth', async () => {
     configMock.collectorBearerToken = 'collector-token';
-    configMock.collectorUrl = 'https://collector.example';
+    configMock.collectorUrl = 'https://collector.example///';
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
     const { handleOtlpProxyRequest } =
       await import('@/composition/telemetry/transport');

@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 
 import { listChangedFiles, resolveBase } from './lib/git-utils.mjs';
+import { resolveTrustedProjectBin } from './lib/trusted-tool.mjs';
 
 const FORMAT_EXTENSIONS = new Set([
   '.ts',
@@ -15,7 +17,7 @@ const FORMAT_EXTENSIONS = new Set([
 ]);
 
 const hasFormatterExtension = (file) =>
-  FORMAT_EXTENSIONS.has(file.match(/\.[^.]+$/)?.[0] ?? '');
+  FORMAT_EXTENSIONS.has(path.extname(file));
 
 const inputFiles = process.argv.slice(2);
 const changedFiles = [
@@ -29,7 +31,10 @@ if (changedFiles.length === 0) {
   process.exit(0);
 }
 
-const result = spawnSync('oxfmt', changedFiles, { stdio: 'inherit' });
+const result = spawnSync(resolveTrustedProjectBin('oxfmt'), changedFiles, {
+  shell: process.platform === 'win32',
+  stdio: 'inherit',
+});
 
 if (result.error) {
   console.error(result.error.message);

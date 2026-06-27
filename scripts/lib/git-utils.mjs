@@ -1,7 +1,11 @@
 import { spawnSync } from 'node:child_process';
 
+import { resolveTrustedTool } from './trusted-tool.mjs';
+
+const GIT_COMMAND = resolveTrustedTool('git');
+
 export const runGit = (args) => {
-  const result = spawnSync('git', args, {
+  const result = spawnSync(GIT_COMMAND, args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -14,7 +18,7 @@ export const runGit = (args) => {
 };
 
 export const runGitStrict = (args) => {
-  const result = spawnSync('git', args, {
+  const result = spawnSync(GIT_COMMAND, args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });

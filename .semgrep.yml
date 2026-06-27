@@ -216,6 +216,19 @@ rules:
         - scripts/**/*.ts
         - scripts/**/*.js
 
+  - id: no-path-resolved-pnpm-child-process
+    message: Do not execute pnpm through PATH from child_process; invoke Node with an absolute pnpm CLI path.
+    severity: ERROR
+    languages:
+      - typescript
+      - javascript
+    pattern-regex: '\b(?:execFileSync|execFile|spawnSync|spawn)\(\s*["'']pnpm(?:\.cmd)?["'']|\bexecSync\(\s*["'']pnpm(?:\s|["''])'
+    paths:
+      include:
+        - scripts/**/*.ts
+        - scripts/**/*.js
+        - scripts/**/*.mjs
+
   - id: no-unbounded-postgres-readiness-loop
     message: Bound GitHub Actions PostgreSQL readiness loops so failed containers do not burn the full job timeout.
     severity: ERROR

@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { resolveTrustedProjectBin } from './lib/trusted-tool.mjs';
+
 const root = process.cwd();
 const testRoot = path.join(root, 'tests');
 const testFilePattern = /\.(?:unit\.)?(?:test|spec)\.[cm]?[jt]sx?$/;
@@ -33,7 +35,7 @@ if (propertyTestFiles.length === 0) {
 console.log(`Running ${propertyTestFiles.length} property test files.`);
 
 const result = spawnSync(
-  'vitest',
+  resolveTrustedProjectBin('vitest'),
   ['run', '--project=unit', ...propertyTestFiles],
   {
     shell: process.platform === 'win32',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  resolveTrustedProjectBin,
   resolveTrustedTool,
   TrustedToolError,
 } from '../../../scripts/trusted-tool';
@@ -17,5 +18,11 @@ describe('trusted tool resolution', () => {
 
   it('resolves git from the fixed trusted directory allowlist', () => {
     expect(resolveTrustedTool('git')).toMatch(/git(?:\.exe)?$/);
+  });
+
+  it('resolves project tools from the fixed local bin directory', () => {
+    expect(resolveTrustedProjectBin('vitest')).toMatch(
+      /node_modules[/\\]\.bin[/\\]vitest(?:\.(?:cmd|exe))?$/i
+    );
   });
 });

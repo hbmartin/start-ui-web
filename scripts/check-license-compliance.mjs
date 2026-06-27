@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // License-compliance gate (OWASP A09 supply-chain hardening).
@@ -70,35 +71,78 @@ export const LICENSE_EXCEPTIONS = [
   },
 ];
 
-function matchesException(packageName) {
+function matchesException(packageName, license) {
   return LICENSE_EXCEPTIONS.find(
     (entry) =>
-      packageName === entry.name || packageName.startsWith(`${entry.name}-`)
+      entry.license === license &&
+      (packageName === entry.name || packageName.startsWith(`${entry.name}-`))
   );
 }
 
-// Evaluate a single SPDX license expression against the allowlist.
-// Handles single ids and simple `OR` / `AND` expressions (the only shapes that
-// appear in the tree). For `OR`, any acceptable disjunct passes; for `AND`,
-// every conjunct must be acceptable. Unknown/missing licenses never pass.
+// Evaluate a single SPDX license expression against the allowlist. Supports
+// identifiers, AND, OR, and parentheses. Unknown or invalid expressions fail
+// closed so a restricted conjunct cannot be hidden inside an allowed disjunct.
 export function isLicenseAllowed(expression) {
   if (!expression) return false;
 
-  const normalized = expression.replaceAll('(', '').replaceAll(')', '').trim();
+  const tokens = expression.match(/\(|\)|\bAND\b|\bOR\b|[^\s()]+/gi) ?? [];
+  let index = 0;
+  let valid = true;
 
-  if (/\sOR\s/i.test(normalized)) {
-    return normalized
-      .split(/\sOR\s/i)
-      .some((part) => isLicenseAllowed(part.trim()));
+  const peek = () => tokens[index];
+  const take = () => tokens[index++];
+  const isOperator = (token, operator) =>
+    typeof token === 'string' && token.toUpperCase() === operator;
+
+  function parsePrimary() {
+    const token = take();
+    if (!token || isOperator(token, 'AND') || isOperator(token, 'OR')) {
+      valid = false;
+      return false;
+    }
+
+    if (token === '(') {
+      const result = parseOr();
+      if (take() !== ')') {
+        valid = false;
+        return false;
+      }
+      return result;
+    }
+
+    if (token === ')') {
+      valid = false;
+      return false;
+    }
+    return ALLOWED_LICENSES.has(token);
   }
 
-  if (/\sAND\s/i.test(normalized)) {
-    return normalized
-      .split(/\sAND\s/i)
-      .every((part) => isLicenseAllowed(part.trim()));
+  function parseAnd() {
+    let result = parsePrimary();
+    while (isOperator(peek(), 'AND')) {
+      take();
+      const right = parsePrimary();
+      result = result && right;
+    }
+    return result;
   }
 
-  return ALLOWED_LICENSES.has(normalized);
+  function parseOr() {
+    let result = parseAnd();
+    while (isOperator(peek(), 'OR')) {
+      take();
+      const right = parseAnd();
+      result = result || right;
+    }
+    return result;
+  }
+
+  try {
+    const allowed = parseOr();
+    return allowed && valid && index === tokens.length;
+  } catch {
+    return false;
+  }
 }
 
 // Flatten `pnpm licenses list --json` (a map of license -> package[]) into a
@@ -111,7 +155,8 @@ export function findLicenseViolations(licenseReport) {
     if (isLicenseAllowed(license)) continue;
 
     for (const pkg of packages) {
-      if (matchesException(pkg.name)) continue;
+      const effectiveLicense = pkg.license ?? license;
+      if (matchesException(pkg.name, effectiveLicense)) continue;
 
       const versions = Array.isArray(pkg.versions)
         ? pkg.versions.join(', ')
@@ -119,7 +164,7 @@ export function findLicenseViolations(licenseReport) {
       violations.push({
         name: pkg.name,
         versions,
-        license: pkg.license ?? license,
+        license: effectiveLicense,
       });
     }
   }
@@ -127,11 +172,35 @@ export function findLicenseViolations(licenseReport) {
   return violations;
 }
 
+export function resolvePnpmCliPath(env = process.env) {
+  const npmExecPath = env.npm_execpath;
+  if (!npmExecPath) {
+    throw new Error(
+      'Unable to locate pnpm CLI. Run this script through pnpm, for example `pnpm security:licenses`.'
+    );
+  }
+
+  if (!path.isAbsolute(npmExecPath)) {
+    throw new Error('Refusing to execute a non-absolute package-manager path.');
+  }
+
+  if (!path.basename(npmExecPath).toLowerCase().includes('pnpm')) {
+    throw new Error('License compliance must be run by pnpm.');
+  }
+
+  return npmExecPath;
+}
+
 function readLicenseReport() {
-  const raw = execFileSync('pnpm', ['licenses', 'list', '--json'], {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const pnpmCliPath = resolvePnpmCliPath();
+  const raw = execFileSync(
+    process.execPath,
+    [pnpmCliPath, 'licenses', 'list', '--json'],
+    {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  );
 
   const report = JSON.parse(raw);
   if (report === null || typeof report !== 'object') {

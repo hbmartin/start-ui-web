@@ -412,7 +412,13 @@ describe('server config accessors', () => {
     expect(() => getStorageConfig()).toThrow('S3_SECURE');
   });
 
-  it.each(['[::1]:9000', '::1:9000'])(
+  it.each([
+    '[::1]:9000',
+    '::1:9000',
+    '::1',
+    '::1/uploads',
+    'http://[::1]:9000',
+  ])(
     'accepts cleartext production S3 transport for IPv6 loopback host %s',
     async (host) => {
       vi.stubEnv('NODE_ENV', 'production');
@@ -429,6 +435,36 @@ describe('server config accessors', () => {
       });
     }
   );
+
+  it('rejects cleartext production S3 transport for non-loopback IPv6 hosts', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('S3_ACCESS_KEY_ID', makeTestSecret('s3-access-key'));
+    vi.stubEnv('S3_SECRET_ACCESS_KEY', makeTestSecret('s3-secret-key'));
+    vi.stubEnv('S3_HOST', '2001:db8::1');
+    vi.stubEnv('S3_SECURE', 'false');
+    const { getStorageConfig } =
+      await import('@/modules/kernel/infrastructure/config/storage');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getStorageConfig()).toThrow(ConfigurationError);
+    expect(() => getStorageConfig()).toThrow('S3_SECURE');
+  });
+
+  it('rejects cleartext production S3 transport when the storage host is malformed', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('S3_ACCESS_KEY_ID', makeTestSecret('s3-access-key'));
+    vi.stubEnv('S3_SECRET_ACCESS_KEY', makeTestSecret('s3-secret-key'));
+    vi.stubEnv('S3_HOST', 'http://[');
+    vi.stubEnv('S3_SECURE', 'false');
+    const { getStorageConfig } =
+      await import('@/modules/kernel/infrastructure/config/storage');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getStorageConfig()).toThrow(ConfigurationError);
+    expect(() => getStorageConfig()).toThrow('S3_SECURE');
+  });
 
   it('rejects placeholder production S3 credentials', async () => {
     vi.stubEnv('NODE_ENV', 'production');

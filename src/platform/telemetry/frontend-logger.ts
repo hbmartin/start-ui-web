@@ -110,10 +110,14 @@ export const flushFrontendLogs = async () => {
   }
 };
 
+const requestFrontendLogFlush = () => {
+  flushFrontendLogs().catch(() => undefined);
+};
+
 const scheduleFlush = () => {
   if (flushTimer || !isBrowser()) return;
   flushTimer = setTimeout(() => {
-    void flushFrontendLogs();
+    requestFrontendLogFlush();
   }, FLUSH_DELAY_MS);
 };
 
@@ -122,11 +126,11 @@ const registerLifecycleFlush = () => {
   listenersRegistered = true;
 
   window.addEventListener('pagehide', () => {
-    void flushFrontendLogs();
+    requestFrontendLogFlush();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
-      void flushFrontendLogs();
+      requestFrontendLogFlush();
     }
   });
 };
@@ -142,7 +146,7 @@ const enqueueFrontendLog = (
   queue.push(serializeLogInput(level, event, input));
 
   if (queue.length >= MAX_BATCH_SIZE) {
-    void flushFrontendLogs();
+    requestFrontendLogFlush();
     return;
   }
 
