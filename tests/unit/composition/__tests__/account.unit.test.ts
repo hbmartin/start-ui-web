@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { makeTestKernel } from '@tests/unit/composition/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

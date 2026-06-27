@@ -9,10 +9,9 @@ const shouldRunVisualTests = process.env.VITE_VISUAL_TEST === 'true';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testIgnore:
-    process.env.CI || !shouldRunVisualTests
-      ? /visual[/\\].*\.visual\.spec\.ts/
-      : undefined,
+  testIgnore: !shouldRunVisualTests
+    ? /visual[/\\].*\.visual\.spec\.ts/
+    : undefined,
   /* Max time for the full CI tests */
   globalTimeout: 15 * 60 * 1000,
   /* Max test failure */

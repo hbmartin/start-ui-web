@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 

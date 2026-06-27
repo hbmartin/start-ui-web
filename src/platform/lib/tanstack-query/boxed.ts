@@ -5,7 +5,7 @@ import {
   Option,
   type Result as BoxedResult,
   Result,
-} from '@swan-io/boxed';
+} from '@bloodyowl/boxed';
 import type { UseQueryResult } from '@tanstack/react-query';
 
 type QueryStateForBoxed<TData, TError> = Pick<

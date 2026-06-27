@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import { toEmailAddress, toUserId } from '@/modules/kernel/domain/ids';
 import { shouldUnverifyEmail } from '@/modules/user/domain/user';
-import { canChangeRole, isSelfTarget } from '@/modules/user/domain/user-policy';
+import {
+  assignsPrivilegedRole,
+  canChangeRole,
+  isSelfTarget,
+} from '@/modules/user/domain/user-policy';
 
 const localEmailCharacter = fc.constantFrom(
   'a',
@@ -72,6 +76,13 @@ describe('user domain', () => {
   it('detects self-target operations', () => {
     expect(isSelfTarget(toUserId('user-1'), toUserId('user-1'))).toBe(true);
     expect(isSelfTarget(toUserId('user-1'), toUserId('user-2'))).toBe(false);
+  });
+
+  it('flags only explicitly-requested privileged roles', () => {
+    expect(assignsPrivilegedRole('admin')).toBe(true);
+    expect(assignsPrivilegedRole('user')).toBe(false);
+    expect(assignsPrivilegedRole(null)).toBe(false);
+    expect(assignsPrivilegedRole(undefined)).toBe(false);
   });
 
   it('allows role changes only for other users with a different requested role', () => {

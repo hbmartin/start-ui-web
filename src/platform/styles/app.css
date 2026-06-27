@@ -280,6 +280,7 @@
   --color-status-positive-hover: var(--status-positive-hover);
   --color-book-cover: var(--book-cover);
   --color-book-cover-foreground: var(--book-cover-foreground);
+  --color-book-cover-fallback: var(--book-cover-fallback);
   --color-book-cover-shadow-transparent: var(--book-cover-shadow-transparent);
   --color-book-cover-shadow-subtle: var(--book-cover-shadow-subtle);
   --color-book-cover-shadow: var(--book-cover-shadow);

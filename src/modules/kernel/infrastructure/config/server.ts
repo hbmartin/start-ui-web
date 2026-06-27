@@ -18,5 +18,3 @@ export function validateServerConfig() {
   getStorageConfig();
   getTelemetryConfig();
 }
-
-validateServerConfig();

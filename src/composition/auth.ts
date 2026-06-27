@@ -3,6 +3,7 @@ import {
   type AuthHttpGateway,
   type AuthorizationGateway,
   createAuthUseCases,
+  type SecondaryStore,
   type SessionGateway,
   type UserAdminGateway,
 } from '@/modules/auth';
@@ -14,11 +15,14 @@ import { isBlockedBetterAuthHttpPath } from '@/modules/auth/infrastructure/bette
 import { AuthorizationGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/authorization-gateway-better-auth';
 import { SessionGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/session-gateway-better-auth';
 import { UserAdminGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/user-admin-gateway-better-auth';
+import { InMemorySecondaryStore } from '@/modules/auth/infrastructure/secondary-store/in-memory-secondary-store';
+import { UpstashSecondaryStore } from '@/modules/auth/infrastructure/secondary-store/upstash-secondary-store';
 import { ConfigurationError } from '@/modules/kernel/domain/errors/configuration-error';
 import {
   getAuthProviderConfig,
   getBetterAuthConfig,
 } from '@/modules/kernel/infrastructure/config/auth';
+import { isRedisConfigured } from '@/modules/kernel/infrastructure/config/redis';
 
 import { AuthEmailPortEmailGateway } from './auth-email-port';
 import { getEmailGateway } from './email';
@@ -33,6 +37,7 @@ export type AuthOverrides = {
 
 type AuthInstanceOverrides = {
   authEmailPort?: AuthEmailPort;
+  secondaryStore?: SecondaryStore;
 };
 
 type AuthHttpOverrides = AuthInstanceOverrides & {
@@ -41,6 +46,22 @@ type AuthHttpOverrides = AuthInstanceOverrides & {
 
 const buildAuthEmailPort = (overrides?: AuthInstanceOverrides) =>
   overrides?.authEmailPort ?? new AuthEmailPortEmailGateway(getEmailGateway());
+
+/**
+ * Durable when Upstash Redis is configured, otherwise a per-process map. The
+ * map is fine for single-instance deploys; multi-instance/serverless needs the
+ * shared Redis backend (or an edge/WAF control) for cross-instance rate limits.
+ */
+const buildSecondaryStore = (): SecondaryStore =>
+  isRedisConfigured()
+    ? new UpstashSecondaryStore()
+    : new InMemorySecondaryStore();
+
+const secondaryStoreFactory = createCachedFactory<SecondaryStore, never>(
+  buildSecondaryStore
+);
+
+const getSecondaryStore = () => secondaryStoreFactory.get();
 
 const assertBetterAuthProvider = () => {
   const { provider } = getAuthProviderConfig();
@@ -55,6 +76,7 @@ const buildAuth = (overrides?: AuthInstanceOverrides) => {
   assertBetterAuthProvider();
   return createAuth({
     authEmailPort: buildAuthEmailPort(overrides),
+    secondaryStore: overrides?.secondaryStore ?? getSecondaryStore(),
   });
 };
 
@@ -128,6 +150,7 @@ export const __resetAuthComposition = () => {
   factory.reset();
   authFactory.reset();
   authHttpFactory.reset();
+  secondaryStoreFactory.reset();
 };
 
 export { createAuth };

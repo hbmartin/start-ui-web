@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { ConfigurationError } from '@/modules/kernel/domain/errors/configuration-error';
 import {
   baseEnvSchema,
+  getSeedAccountEmails,
   parseEnv,
 } from '@/modules/kernel/infrastructure/config/env-schema';
 
@@ -66,5 +67,34 @@ describe('server env parser', () => {
     });
     expect((error as Error).message).not.toContain(secret);
     expect((error as Error).cause).toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe('seed account email config', () => {
+  it('uses stable local defaults when seed email overrides are absent', () => {
+    expect(getSeedAccountEmails({})).toEqual({
+      adminEmail: 'admin@e2e.local',
+      userEmail: 'user@e2e.local',
+    });
+  });
+
+  it('normalizes explicit seed email overrides', () => {
+    expect(
+      getSeedAccountEmails({
+        SEED_ADMIN_EMAIL: ' Admin@E2E.Local ',
+        SEED_USER_EMAIL: ' User@E2E.Local ',
+      })
+    ).toEqual({
+      adminEmail: 'admin@e2e.local',
+      userEmail: 'user@e2e.local',
+    });
+  });
+
+  it('rejects malformed seed email overrides', () => {
+    expect(() =>
+      getSeedAccountEmails({
+        SEED_ADMIN_EMAIL: 'not-an-email',
+      })
+    ).toThrow(ConfigurationError);
   });
 });

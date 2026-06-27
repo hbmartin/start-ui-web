@@ -273,9 +273,10 @@ describe('server config accessors', () => {
     vi.stubEnv('AUTH_SECRET', undefined);
     vi.stubEnv('DATABASE_URL', undefined);
 
-    await expect(
-      import('@/modules/kernel/infrastructure/config/server')
-    ).resolves.toHaveProperty('validateServerConfig');
+    const { validateServerConfig } =
+      await import('@/modules/kernel/infrastructure/config/server');
+
+    expect(() => validateServerConfig()).not.toThrow();
   });
 
   it('runs server config validation in production even when SKIP_ENV_VALIDATION is true', async () => {
@@ -286,9 +287,10 @@ describe('server config accessors', () => {
     const { ConfigurationError } =
       await import('@/modules/kernel/domain/errors/configuration-error');
 
-    await expect(
-      import('@/modules/kernel/infrastructure/config/server')
-    ).rejects.toThrow(ConfigurationError);
+    const { validateServerConfig } =
+      await import('@/modules/kernel/infrastructure/config/server');
+
+    expect(() => validateServerConfig()).toThrow(ConfigurationError);
   });
 
   it('returns null for absent optional Redis config', async () => {
@@ -331,6 +333,33 @@ describe('server config accessors', () => {
       await import('@/modules/kernel/domain/errors/configuration-error');
 
     expect(() => getRedisConfig()).toThrow(ConfigurationError);
+  });
+
+  it('reports Redis as configured only when both values are present', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', makeTestSecret('redis'));
+    const { isRedisConfigured } =
+      await import('@/modules/kernel/infrastructure/config/redis');
+
+    expect(isRedisConfigured()).toBe(true);
+  });
+
+  it('reports Redis as not configured when a value is missing', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', undefined);
+    const { isRedisConfigured } =
+      await import('@/modules/kernel/infrastructure/config/redis');
+
+    expect(isRedisConfigured()).toBe(false);
+  });
+
+  it('reports Redis as not configured (without throwing) for a malformed URL', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'not-a-url');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', makeTestSecret('redis'));
+    const { isRedisConfigured } =
+      await import('@/modules/kernel/infrastructure/config/redis');
+
+    expect(isRedisConfigured()).toBe(false);
   });
 
   it('accepts LOGGER_PRETTY as a legacy console mirror alias', async () => {

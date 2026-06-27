@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { and, eq } from 'drizzle-orm';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';

@@ -310,6 +310,7 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
       emailInputMatches: (await emailInput.inputValue()) === input.email,
     });
 
+    const otpRequestedAfterMs = Date.now();
     await page
       .getByRole('button', {
         name: locales[DEFAULT_LANGUAGE_KEY].auth[
@@ -331,7 +332,9 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
       'true'
     );
     diagnostics.log('login.verify.form.hydrated');
-    const code = input.code ?? (await readLatestOtp(input.email));
+    const code =
+      input.code ??
+      (await readLatestOtp(input.email, { afterMs: otpRequestedAfterMs }));
     await page
       .getByText(locales[DEFAULT_LANGUAGE_KEY].auth.common.otp.label)
       .fill(code);

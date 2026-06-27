@@ -33,8 +33,8 @@ export const LoginEmailOtpHint = () => {
     <Alert dir="ltr">
       <TerminalIcon className="size-4" />
       <AlertTitle>Dev mode</AlertTitle>
-      <AlertDescription className="flex text-sm leading-4">
-        Read the code from Maildev (
+      <AlertDescription className="flex flex-wrap gap-x-1 text-sm leading-4">
+        <span>Read the code from Maildev (</span>
         <a
           // eslint-disable-next-line sonarjs/no-clear-text-protocols
           href="http://localhost:1080"
@@ -44,7 +44,7 @@ export const LoginEmailOtpHint = () => {
         >
           http://localhost:1080
         </a>
-        ).
+        <span>).</span>
       </AlertDescription>
     </Alert>
   );

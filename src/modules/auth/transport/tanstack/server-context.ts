@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { getGlobalStartContext } from '@tanstack/react-start';
 import {
   getRequestHeaders,

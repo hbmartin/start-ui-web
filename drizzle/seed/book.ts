@@ -1,8 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { sql } from 'drizzle-orm';
 
-import { getDefaultDbClient } from '@/modules/kernel/infrastructure/db/client';
-import { book, genre } from '@/modules/kernel/infrastructure/db/schema';
+import { book, genre, getDefaultDbClient } from '@/modules/kernel/backend';
 
 import data from './book-data.json';
 

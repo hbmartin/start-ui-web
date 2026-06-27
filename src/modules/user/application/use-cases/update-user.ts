@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
 import type { UserId } from '@/modules/kernel/domain/ids';

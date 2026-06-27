@@ -1,31 +1,20 @@
 import { faker } from '@faker-js/faker';
 import { notInArray, sql } from 'drizzle-orm';
-import { randomBytes } from 'node:crypto';
 
 import {
+  getDefaultDbClient,
   getSeedAccountEmails,
   isProdRuntimeEnvironment,
-} from '@/modules/kernel/infrastructure/config/env-schema';
-import { getDefaultDbClient } from '@/modules/kernel/infrastructure/db/client';
-import { user } from '@/modules/kernel/infrastructure/db/schema';
+  user,
+} from '@/modules/kernel/backend';
 
 import { emphasis } from './_utils';
 
 /**
- * Seed accounts are never hardcoded: their emails come from SEED_ADMIN_EMAIL /
- * SEED_USER_EMAIL when provided, otherwise a fresh random local address is
- * generated per run. `randomBytes` is used instead of faker so the address is
- * not made predictable by the deterministic `faker.seed()` call in index.ts.
+ * Seed accounts come from SEED_ADMIN_EMAIL / SEED_USER_EMAIL when provided,
+ * otherwise stable local defaults keep reruns idempotent.
  */
-const randomSeedEmail = (role: string) =>
-  `${role}-${randomBytes(8).toString('hex')}@seed.local`;
-
-const { adminEmail: adminEmailOverride, userEmail: userEmailOverride } =
-  getSeedAccountEmails();
-const adminEmail = (
-  adminEmailOverride ?? randomSeedEmail('admin')
-).toLowerCase();
-const userEmail = (userEmailOverride ?? randomSeedEmail('user')).toLowerCase();
+const { adminEmail, userEmail } = getSeedAccountEmails();
 
 const seedOnboardedAt = new Date('2024-01-01T00:00:00.000Z');
 

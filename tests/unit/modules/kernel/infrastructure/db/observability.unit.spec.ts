@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { observeRepository } from '@/modules/kernel/infrastructure/db/observability';

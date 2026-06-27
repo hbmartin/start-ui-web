@@ -7,6 +7,7 @@ export type {
   AuthorizationGateway,
   AuthorizationPermission,
 } from './application/ports/authorization-gateway';
+export type { SecondaryStore } from './application/ports/secondary-store';
 export type { SessionGateway } from './application/ports/session-gateway';
 export type { UserAdminGateway } from './application/ports/user-admin-gateway';
 export {

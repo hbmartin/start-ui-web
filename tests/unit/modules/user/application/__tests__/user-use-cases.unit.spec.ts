@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -358,7 +358,12 @@ describe('user use cases', () => {
         role: 'admin' as const,
       };
       const { useCases, repo, permissionChecker, logger } = makeContext({
-        permissionChecker: makePermissionChecker(userCreatePermission),
+        // Creating an admin is a privileged role assignment, so the create flow
+        // also requires user:set-role (see the dedicated gate tests below).
+        permissionChecker: makePermissionChecker(
+          userCreatePermission,
+          userSetRolePermission
+        ),
       });
 
       await expect(
@@ -436,6 +441,91 @@ describe('user use cases', () => {
           })
         )
       ).resolves.toMatchObject({ code: 'OTHER_CONFLICT' });
+    });
+
+    it('does not create a privileged user when set-role is denied', async () => {
+      const { useCases, repo, permissionChecker } = makeContext({
+        permissionChecker: makePermissionChecker(userCreatePermission),
+      });
+
+      await expect(
+        expectOk(
+          useCases.create({
+            currentUserId: adminId,
+            user: { email: toEmailAddress('new@example.com'), role: 'admin' },
+          })
+        )
+      ).resolves.toEqual({ type: 'user_forbidden' });
+
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        1,
+        adminId,
+        userCreatePermission
+      );
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        2,
+        adminId,
+        userSetRolePermission
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a privileged user when both create and set-role are granted', async () => {
+      const input = {
+        name: 'New Admin',
+        email: toEmailAddress('admin2@example.com'),
+        role: 'admin' as const,
+      };
+      const { useCases, repo, permissionChecker } = makeContext({
+        permissionChecker: makePermissionChecker(
+          userCreatePermission,
+          userSetRolePermission
+        ),
+      });
+
+      await expect(
+        expectOk(useCases.create({ currentUserId: adminId, user: input }))
+      ).resolves.toMatchObject({
+        type: 'user_created',
+        user: { role: 'admin' },
+      });
+
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        1,
+        adminId,
+        userCreatePermission
+      );
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        2,
+        adminId,
+        userSetRolePermission
+      );
+      expect(repo.create).toHaveBeenCalledWith(input);
+    });
+
+    it('creates a default-role user without consulting set-role', async () => {
+      const { useCases, repo, permissionChecker } = makeContext({
+        permissionChecker: makePermissionChecker(userCreatePermission),
+      });
+
+      await expect(
+        expectOk(
+          useCases.create({
+            currentUserId: adminId,
+            user: { email: toEmailAddress('member@example.com'), role: 'user' },
+          })
+        )
+      ).resolves.toMatchObject({
+        type: 'user_created',
+        user: { role: 'user' },
+      });
+
+      expect(permissionChecker.hasPermission).toHaveBeenCalledTimes(1);
+      expect(permissionChecker.hasPermission).toHaveBeenCalledWith(
+        adminId,
+        userCreatePermission
+      );
+      expect(repo.create).toHaveBeenCalled();
     });
   });
 

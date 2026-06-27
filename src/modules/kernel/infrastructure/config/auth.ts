@@ -44,12 +44,27 @@ const betterAuthEnvSchema = baseEnvSchema
       .number()
       .int()
       .min(1)
-      .prefault(2_592_000),
+      .prefault(604_800),
     AUTH_SESSION_UPDATE_AGE_IN_SECONDS: z.coerce
       .number()
       .int()
       .min(1)
       .prefault(86_400),
+    AUTH_SESSION_FRESH_AGE_IN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .prefault(900),
+    AUTH_SESSION_ABSOLUTE_MAX_IN_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .prefault(2_592_000),
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).prefault(60),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).prefault(100),
+    AUTH_OTP_ALLOWED_ATTEMPTS: z.coerce.number().int().min(1).prefault(3),
+    AUTH_OTP_SEND_WINDOW_SECONDS: z.coerce.number().int().min(1).prefault(60),
+    AUTH_OTP_SEND_MAX: z.coerce.number().int().min(1).prefault(3),
     AUTH_ALLOWED_HOSTS: z.string().optional(),
     AUTH_TRUSTED_ORIGINS: z.string().optional(),
     AUTH_ADMIN_ENDPOINTS_ENABLED: z.stringbool().default(false),
@@ -108,6 +123,13 @@ export type BetterAuthConfig = {
   secret: string;
   sessionExpirationInSeconds: number;
   sessionUpdateAgeInSeconds: number;
+  sessionFreshAgeInSeconds: number;
+  sessionAbsoluteMaxInSeconds: number;
+  rateLimitWindowSeconds: number;
+  rateLimitMax: number;
+  otpAllowedAttempts: number;
+  otpSendWindowSeconds: number;
+  otpSendMax: number;
   allowedHosts?: string[];
   trustedOrigins?: string[];
   adminEndpointsEnabled: boolean;
@@ -139,6 +161,13 @@ export function getBetterAuthConfig(): BetterAuthConfig {
     secret: env.AUTH_SECRET,
     sessionExpirationInSeconds: env.AUTH_SESSION_EXPIRATION_IN_SECONDS,
     sessionUpdateAgeInSeconds: env.AUTH_SESSION_UPDATE_AGE_IN_SECONDS,
+    sessionFreshAgeInSeconds: env.AUTH_SESSION_FRESH_AGE_IN_SECONDS,
+    sessionAbsoluteMaxInSeconds: env.AUTH_SESSION_ABSOLUTE_MAX_IN_SECONDS,
+    rateLimitWindowSeconds: env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    rateLimitMax: env.AUTH_RATE_LIMIT_MAX,
+    otpAllowedAttempts: env.AUTH_OTP_ALLOWED_ATTEMPTS,
+    otpSendWindowSeconds: env.AUTH_OTP_SEND_WINDOW_SECONDS,
+    otpSendMax: env.AUTH_OTP_SEND_MAX,
     allowedHosts: splitCsv(env.AUTH_ALLOWED_HOSTS),
     trustedOrigins: splitCsv(env.AUTH_TRUSTED_ORIGINS),
     adminEndpointsEnabled: env.AUTH_ADMIN_ENDPOINTS_ENABLED,

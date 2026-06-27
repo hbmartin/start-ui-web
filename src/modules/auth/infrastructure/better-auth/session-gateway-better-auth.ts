@@ -1,12 +1,15 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { and, eq } from 'drizzle-orm';
 
+import type { Clock } from '@/modules/kernel/application/ports/clock';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
   toEmailAddress,
   toSessionId,
   toUserId,
 } from '@/modules/kernel/domain/ids';
+import { systemClock } from '@/modules/kernel/infrastructure/clock/system-clock';
+import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
 import {
   type Database,
   getDefaultDbClient,
@@ -70,8 +73,23 @@ const toAuthenticatedSession = (
 export class SessionGatewayBetterAuth implements SessionGateway {
   constructor(
     private readonly auth: Auth = getDefaultAuth(),
-    private readonly db: Database = getDefaultDbClient()
+    private readonly db: Database = getDefaultDbClient(),
+    private readonly clock: Clock = systemClock
   ) {}
+
+  /**
+   * True when a session has lived past the absolute cap, regardless of how
+   * often it was refreshed (`updateAge` keeps sliding `expiresAt` forward). A
+   * missing `createdAt` is treated as not-expired so we never lock out a valid
+   * session on incomplete provider data.
+   */
+  private isPastAbsoluteMax(createdAt: Date | string | null | undefined) {
+    if (createdAt === null || createdAt === undefined) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const ageSeconds = (this.clock.now().getTime() - createdAtMs) / 1000;
+    return ageSeconds > getBetterAuthConfig().sessionAbsoluteMaxInSeconds;
+  }
 
   private async resolveAppUser(
     providerUser: AuthenticatedUserSource
@@ -122,6 +140,9 @@ export class SessionGatewayBetterAuth implements SessionGateway {
             headers: input.headers,
           });
           if (!session?.user || !session.session) {
+            return Result.Ok({ type: 'auth_session_missing' });
+          }
+          if (this.isPastAbsoluteMax(session.session.createdAt)) {
             return Result.Ok({ type: 'auth_session_missing' });
           }
           const user = await this.resolveAppUser(session.user);

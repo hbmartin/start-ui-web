@@ -1,4 +1,4 @@
-import type { Result } from '@swan-io/boxed';
+import type { Result } from '@bloodyowl/boxed';
 
 import type { AppError } from '../domain/errors/app-error';
 
