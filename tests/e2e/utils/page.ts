@@ -8,13 +8,11 @@ import { DEFAULT_LANGUAGE_KEY } from '@/platform/lib/i18n/constants';
 import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields';
 
 import locales from '@/app/i18n';
-import {
-  AUTH_EMAIL_OTP_MOCKED,
-  AUTH_SIGNUP_ENABLED,
-} from '@/modules/auth/client';
+import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/client';
 import { FileRouteTypes } from '@/routeTree.gen';
 
 import { installConsoleErrorGuard } from './console-error-guard';
+import { readLatestOtp } from './maildev';
 
 type PostAuthRoute = '/app' | '/manager';
 
@@ -333,11 +331,12 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
       'true'
     );
     diagnostics.log('login.verify.form.hydrated');
+    const code = input.code ?? (await readLatestOtp(input.email));
     await page
       .getByText(locales[DEFAULT_LANGUAGE_KEY].auth.common.otp.label)
-      .fill(input.code ?? AUTH_EMAIL_OTP_MOCKED);
+      .fill(code);
     diagnostics.log('login.otp.filled', {
-      codeLength: (input.code ?? AUTH_EMAIL_OTP_MOCKED).length,
+      codeLength: code.length,
     });
   };
 

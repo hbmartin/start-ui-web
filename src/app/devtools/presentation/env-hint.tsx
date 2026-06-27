@@ -11,7 +11,7 @@ export const EnvHint = () => {
       style={{ borderColor: envClient.VITE_ENV_COLOR }}
     >
       <p
-        className="fixed top-0 left-4 rounded-b-xs px-1 text-[0.6rem] font-bold text-black uppercase"
+        className="fixed top-0 left-4 rounded-b-xs px-1 text-[0.6rem] font-bold text-env-hint-foreground uppercase"
         style={{
           background: envClient.VITE_ENV_COLOR,
         }}

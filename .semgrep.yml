@@ -37,6 +37,36 @@ rules:
         - src/**/*.ts
         - src/**/*.tsx
 
+  - id: presentation-no-raw-tailwind-color-utilities
+    message: Use semantic design-token utilities in presentation code instead of raw palette utilities.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?:^|[\s"''`:])((?:bg|text|border(?:-[trblxyse])?|ring|from|via|to|fill|stroke|decoration|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black|negative|warning|positive)(?:-\d{1,3})?(?:/\d+)?)(?=$|[\s"''`:;,\]])'
+    paths:
+      include:
+        - src/platform/components/**/*.ts
+        - src/platform/components/**/*.tsx
+        - src/app/**/*.ts
+        - src/app/**/*.tsx
+        - src/modules/**/presentation/**/*.ts
+        - src/modules/**/presentation/**/*.tsx
+
+  - id: presentation-no-hardcoded-hex-colors
+    message: Put presentation colors in semantic tokens; hardcoded hex colors are only allowed in isolated token files.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '#[0-9A-Fa-f]{3,8}\b'
+    paths:
+      include:
+        - src/platform/components/**/*.ts
+        - src/platform/components/**/*.tsx
+        - src/app/**/*.ts
+        - src/app/**/*.tsx
+        - src/modules/**/presentation/**/*.ts
+        - src/modules/**/presentation/**/*.tsx
+      exclude:
+        - src/modules/email/presentation/theme.ts
+
   - id: no-unnormalized-glob-star-regexp
     message: Collapse consecutive '*' before converting glob strings to RegExp; raw split('*').join('.*') can create adjacent wildcards and backtracking risk.
     severity: ERROR

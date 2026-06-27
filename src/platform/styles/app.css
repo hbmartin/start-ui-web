@@ -97,6 +97,43 @@
   --border: var(--color-neutral-200);
   --input: var(--color-neutral-200);
   --ring: var(--color-neutral-300);
+  --canvas: var(--color-neutral-50);
+  --shell: var(--color-white);
+  --shell-foreground: var(--color-neutral-950);
+  --shell-muted-foreground: var(--color-neutral-500);
+  --shell-border: var(--color-neutral-200);
+  --shell-accent: var(--color-neutral-100);
+  --shell-accent-foreground: var(--color-neutral-900);
+  --overlay: oklch(0 0 0 / 0.8);
+  --skeleton: oklch(0 0 0 / 0.1);
+  --status-negative: var(--color-negative-100);
+  --status-negative-foreground: var(--color-negative-800);
+  --status-negative-hover: var(--color-negative-200);
+  --status-warning: var(--color-warning-100);
+  --status-warning-foreground: var(--color-warning-800);
+  --status-warning-hover: var(--color-warning-200);
+  --status-positive: var(--color-positive-100);
+  --status-positive-foreground: var(--color-positive-800);
+  --status-positive-hover: var(--color-positive-200);
+  --book-cover: var(--color-neutral-800);
+  --book-cover-foreground: var(--color-white);
+  --book-cover-fallback: var(--color-neutral-800);
+  --book-cover-shadow-transparent: oklch(0 0 0 / 0);
+  --book-cover-shadow-subtle: oklch(0 0 0 / 0.1);
+  --book-cover-shadow: oklch(0 0 0 / 0.4);
+  --book-cover-glare-transparent: oklch(1 0 0 / 0);
+  --book-cover-glare-subtle: oklch(1 0 0 / 0.2);
+  --book-cover-glare: oklch(1 0 0 / 0.4);
+  --avatar-1: #fcd34d;
+  --avatar-2: #f59e0b;
+  --avatar-3: #fd6243;
+  --avatar-4: #df74ee;
+  --avatar-5: #8364f4;
+  --avatar-6: #6ab7e0;
+  --avatar-7: #92efcd;
+  --avatar-8: #32cc91;
+  --avatar-foreground: var(--color-black);
+  --env-hint-foreground: var(--color-black);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -135,6 +172,59 @@
   --border: var(--color-neutral-800);
   --input: var(--color-neutral-800);
   --ring: var(--color-neutral-600);
+  --canvas: var(--color-neutral-950);
+  --shell: var(--color-neutral-900);
+  --shell-foreground: var(--color-neutral-50);
+  --shell-muted-foreground: var(--color-neutral-400);
+  --shell-border: var(--color-neutral-800);
+  --shell-accent: var(--color-neutral-800);
+  --shell-accent-foreground: var(--color-neutral-50);
+  --overlay: oklch(0 0 0 / 0.8);
+  --skeleton: oklch(1 0 0 / 0.2);
+  --status-negative: color-mix(
+    in oklch,
+    var(--color-negative-500) 25%,
+    transparent
+  );
+  --status-negative-foreground: var(--color-negative-100);
+  --status-negative-hover: color-mix(
+    in oklch,
+    var(--color-negative-500) 35%,
+    transparent
+  );
+  --status-warning: color-mix(
+    in oklch,
+    var(--color-warning-500) 25%,
+    transparent
+  );
+  --status-warning-foreground: var(--color-warning-100);
+  --status-warning-hover: color-mix(
+    in oklch,
+    var(--color-warning-500) 35%,
+    transparent
+  );
+  --status-positive: color-mix(
+    in oklch,
+    var(--color-positive-500) 25%,
+    transparent
+  );
+  --status-positive-foreground: var(--color-positive-100);
+  --status-positive-hover: color-mix(
+    in oklch,
+    var(--color-positive-500) 35%,
+    transparent
+  );
+  --book-cover: var(--color-neutral-800);
+  --book-cover-foreground: var(--color-white);
+  --book-cover-fallback: var(--color-neutral-800);
+  --book-cover-shadow-transparent: oklch(0 0 0 / 0);
+  --book-cover-shadow-subtle: oklch(0 0 0 / 0.1);
+  --book-cover-shadow: oklch(0 0 0 / 0.4);
+  --book-cover-glare-transparent: oklch(1 0 0 / 0);
+  --book-cover-glare-subtle: oklch(1 0 0 / 0.2);
+  --book-cover-glare: oklch(1 0 0 / 0.4);
+  --avatar-foreground: var(--color-black);
+  --env-hint-foreground: var(--color-black);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -170,6 +260,34 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-canvas: var(--canvas);
+  --color-shell: var(--shell);
+  --color-shell-foreground: var(--shell-foreground);
+  --color-shell-muted-foreground: var(--shell-muted-foreground);
+  --color-shell-border: var(--shell-border);
+  --color-shell-accent: var(--shell-accent);
+  --color-shell-accent-foreground: var(--shell-accent-foreground);
+  --color-overlay: var(--overlay);
+  --color-skeleton: var(--skeleton);
+  --color-status-negative: var(--status-negative);
+  --color-status-negative-foreground: var(--status-negative-foreground);
+  --color-status-negative-hover: var(--status-negative-hover);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-warning-hover: var(--status-warning-hover);
+  --color-status-positive: var(--status-positive);
+  --color-status-positive-foreground: var(--status-positive-foreground);
+  --color-status-positive-hover: var(--status-positive-hover);
+  --color-book-cover: var(--book-cover);
+  --color-book-cover-foreground: var(--book-cover-foreground);
+  --color-book-cover-shadow-transparent: var(--book-cover-shadow-transparent);
+  --color-book-cover-shadow-subtle: var(--book-cover-shadow-subtle);
+  --color-book-cover-shadow: var(--book-cover-shadow);
+  --color-book-cover-glare-transparent: var(--book-cover-glare-transparent);
+  --color-book-cover-glare-subtle: var(--book-cover-glare-subtle);
+  --color-book-cover-glare: var(--book-cover-glare);
+  --color-avatar-foreground: var(--avatar-foreground);
+  --color-env-hint-foreground: var(--env-hint-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -194,7 +312,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-neutral-50 text-foreground dark:bg-neutral-950;
+    @apply bg-canvas text-foreground;
 
     @media all and (display-mode: standalone) {
       height: 100lvh; /* Force full height on iOS standalone */

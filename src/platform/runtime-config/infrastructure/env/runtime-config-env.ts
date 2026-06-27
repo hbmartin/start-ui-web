@@ -9,7 +9,6 @@ export class RuntimeConfigSourceEnv implements RuntimeConfigSource {
       name: envClient.VITE_ENV_NAME,
       color: envClient.VITE_ENV_COLOR,
       emoji: envClient.VITE_ENV_EMOJI,
-      isDemo: envClient.VITE_IS_DEMO,
       isDev: envClient.DEV,
     };
   }

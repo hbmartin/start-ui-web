@@ -13,7 +13,6 @@ import {
 import { useCurrentScopeKey } from '@/modules/auth/client';
 import { bookCoverAcceptedFileTypes } from '@/modules/book';
 import { genreQueries } from '@/modules/genre/client';
-import { envClient } from '@/platform/env/client';
 
 import { type FormFieldsBook, zFormFieldsBook } from '../schema';
 
@@ -31,17 +30,10 @@ export const formBookValidators = {
   onSubmit: zFormFieldsBook(),
 } as const;
 
-type FormBookProps = {
-  onDemoUploadBlocked?: () => void;
-};
-
-const formBookProps: FormBookProps = {};
-
 /* eslint-disable react-hooks/rules-of-hooks -- TanStack Form's withForm render callback is invoked as a component body; hooks below are unconditional. */
 export const FormBook = withForm({
   defaultValues: formBookDefaultValues(),
-  props: formBookProps,
-  render: ({ form, onDemoUploadBlocked }) => {
+  render: ({ form }) => {
     const { t } = useTranslation(['book']);
     const scopeKey = useCurrentScopeKey();
     const genresQuery = useQuery(genreQueries.getAllList({ scopeKey }));
@@ -92,10 +84,6 @@ export const FormBook = withForm({
                   accept: join(bookCoverAcceptedFileTypes, ','),
                 }}
                 onError={() => {
-                  if (envClient.VITE_IS_DEMO) {
-                    onDemoUploadBlocked?.();
-                    return;
-                  }
                   toast.error(t('book:manager.uploadErrors.failed'));
                 }}
               />

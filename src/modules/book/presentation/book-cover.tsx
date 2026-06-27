@@ -18,7 +18,7 @@ export const BookCover = (props: {
   return (
     <div
       className={cn(
-        '@container relative flex aspect-[2/3] flex-col justify-between overflow-hidden rounded-sm bg-neutral-800 p-[10%] pl-[16%] text-white shadow-2xl',
+        '@container relative flex aspect-[2/3] flex-col justify-between overflow-hidden rounded-sm bg-book-cover p-[10%] pl-[16%] text-book-cover-foreground shadow-2xl',
         props.variant === 'tiny' && 'w-8 rounded-xs',
         props.className
       )}
@@ -26,15 +26,16 @@ export const BookCover = (props: {
         props.book.coverId
           ? undefined
           : {
-              backgroundColor: props.book.genre?.color ?? '#333',
+              backgroundColor:
+                props.book.genre?.color ?? 'var(--book-cover-fallback)',
             }
       }
     >
-      <div className="absolute inset-y-0 left-0 z-10 w-[5%] bg-gradient-to-r from-black/0 to-black/10 bg-blend-screen" />
-      <div className="absolute inset-y-0 left-[5%] z-10 w-[2%] bg-gradient-to-r from-white/0 to-white/20 bg-blend-screen" />
-      <div className="absolute inset-y-0 left-[7%] z-10 w-[2%] bg-gradient-to-r from-white/0 to-white/20 bg-blend-screen" />
-      <div className="absolute -top-1/8 -right-1/8 z-10 aspect-square w-3/4 rounded-full bg-white/40 bg-blend-screen blur-xl @6xs:blur-2xl @5xs:blur-3xl" />
-      <div className="absolute -bottom-1/8 -left-1/8 z-10 aspect-square w-3/4 rounded-full bg-black/40 bg-blend-screen blur-xl @6xs:blur-2xl @5xs:blur-3xl" />
+      <div className="absolute inset-y-0 left-0 z-10 w-[5%] bg-gradient-to-r from-book-cover-shadow-transparent to-book-cover-shadow-subtle bg-blend-screen" />
+      <div className="absolute inset-y-0 left-[5%] z-10 w-[2%] bg-gradient-to-r from-book-cover-glare-transparent to-book-cover-glare-subtle bg-blend-screen" />
+      <div className="absolute inset-y-0 left-[7%] z-10 w-[2%] bg-gradient-to-r from-book-cover-glare-transparent to-book-cover-glare-subtle bg-blend-screen" />
+      <div className="absolute -top-1/8 -right-1/8 z-10 aspect-square w-3/4 rounded-full bg-book-cover-glare bg-blend-screen blur-xl @6xs:blur-2xl @5xs:blur-3xl" />
+      <div className="absolute -bottom-1/8 -left-1/8 z-10 aspect-square w-3/4 rounded-full bg-book-cover-shadow bg-blend-screen blur-xl @6xs:blur-2xl @5xs:blur-3xl" />
       {!!props.book.coverId && (
         <>
           <img

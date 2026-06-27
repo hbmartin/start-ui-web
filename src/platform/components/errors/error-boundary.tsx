@@ -51,7 +51,7 @@ const ErrorFallback = (props: FallbackProps) => {
       <Alert
         variant="destructive"
         onClick={() => setOpen(true)}
-        className="@container cursor-pointer border-none bg-negative-500/5"
+        className="@container cursor-pointer border-none bg-destructive/5"
       >
         <CircleAlertIcon className="size-4 @max-2xs:absolute @max-2xs:top-1/2 @max-2xs:left-1/2 @max-2xs:-translate-x-1/2 @max-2xs:-translate-y-1/2!" />
         <AlertTitle className="flex flex-wrap items-center gap-2 @max-2xs:opacity-0">

@@ -41,4 +41,14 @@ describe('getEnvClient URL security', () => {
 
     expect(getEnvClient().VITE_BASE_URL).toBe('http://localhost:3000');
   });
+
+  it('rejects cleartext VITE_SENTRY_DSN for remote hosts in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITE_BASE_URL', 'https://app.example.com');
+    vi.stubEnv('VITE_S3_BUCKET_PUBLIC_URL', 'https://cdn.example.com/bucket');
+    vi.stubEnv('VITE_SENTRY_DSN', 'http://sentry.example.com/1');
+    const { getEnvClient } = await import('@/platform/env/config');
+
+    expect(() => getEnvClient()).toThrow(/VITE_SENTRY_DSN/);
+  });
 });

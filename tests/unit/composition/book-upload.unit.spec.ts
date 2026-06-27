@@ -10,9 +10,6 @@ const bookUploadMocks = vi.hoisted(() => {
 
   return {
     createBookCoverUploadRoute: vi.fn(() => 'book-cover-route'),
-    envClient: {
-      VITE_IS_DEMO: false,
-    },
     getDefaultUploadClient: vi.fn(() => 'upload-client'),
     getStorageConfig: vi.fn(() => ({ bucketName: 'book-covers' })),
     handleRequest: vi.fn(),
@@ -55,10 +52,6 @@ vi.mock('@/modules/kernel/infrastructure/storage/better-upload', () => ({
   getDefaultUploadClient: bookUploadMocks.getDefaultUploadClient,
 }));
 
-vi.mock('@/platform/env/client', () => ({
-  envClient: bookUploadMocks.envClient,
-}));
-
 vi.mock('@/platform/telemetry', () => ({
   getTelemetry: vi.fn(() => bookUploadMocks.telemetry),
 }));
@@ -67,7 +60,6 @@ describe('book upload composition', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    bookUploadMocks.envClient.VITE_IS_DEMO = false;
     bookUploadMocks.telemetry.startSpan.mockImplementation(
       (_options: unknown, fn: () => unknown) => fn()
     );
@@ -106,31 +98,6 @@ describe('book upload composition', () => {
           bookCover: 'book-cover-route',
         },
       })
-    );
-  });
-
-  it('keeps demo upload rejections inside the telemetry span', async () => {
-    bookUploadMocks.envClient.VITE_IS_DEMO = true;
-    const { handleBookUploadRequest } =
-      await import('@/composition/book-upload');
-    const request = new Request('https://app.example/api/upload', {
-      method: 'PUT',
-    });
-
-    const response = await handleBookUploadRequest(request);
-
-    expect(response.status).toBe(405);
-    await expect(response.text()).resolves.toBe('Demo Mode');
-    expect(bookUploadMocks.handleRequest).not.toHaveBeenCalled();
-    expect(bookUploadMocks.telemetry.startSpan).toHaveBeenCalledWith(
-      expect.objectContaining({
-        attributes: expect.objectContaining({
-          'http.request.method': 'PUT',
-          'operation.name': 'book.uploadRequest',
-        }),
-        name: 'book.uploadRequest',
-      }),
-      expect.any(Function)
     );
   });
 });

@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   userUpdateById: vi.fn(),
   envClient: {
     VITE_BASE_URL: 'http://localhost:3000',
-    VITE_IS_DEMO: false,
+    VITE_AUTH_SIGNUP_ENABLED: true,
     VITE_S3_BUCKET_PUBLIC_URL: 'http://localhost:9000/default',
     VITE_VISUAL_TEST: false,
   },
@@ -40,7 +40,6 @@ vi.mock('@/platform/env/config', () => ({
 }));
 
 vi.mock('@/modules/auth/client', () => ({
-  AUTH_EMAIL_OTP_MOCKED: '123456',
   AUTH_SIGNUP_ENABLED: true,
   WithPermissions: ({ children }: { children: ReactNode }) => children,
   authQueries: {
@@ -83,10 +82,6 @@ vi.mock('@/app/devtools/presentation', () => ({
   LoginEmailOtpHint: () => null,
   TanStackDevtoolsPanel: () => null,
   getEnvHintTitlePrefix: () => '',
-}));
-
-vi.mock('@/app/demo/presentation', () => ({
-  openDemoModeDrawer: vi.fn(),
 }));
 
 import { RouteError } from '@/platform/components/errors/route-error';

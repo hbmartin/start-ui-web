@@ -30,19 +30,12 @@ const testState = vi.hoisted(() => {
   return {
     emailConfig: makeEmailConfig(),
     makeEmailConfig,
-    envClient: {
-      VITE_IS_DEMO: false,
-    },
     render: vi.fn(),
   };
 });
 
 vi.mock('@/modules/kernel/infrastructure/config/email', () => ({
   getEmailConfig: () => testState.emailConfig,
-}));
-
-vi.mock('@/platform/env/client', () => ({
-  envClient: testState.envClient,
 }));
 
 vi.mock('@react-email/render', () => ({
@@ -126,34 +119,7 @@ describe('EmailGatewayResend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(testState.emailConfig, testState.makeEmailConfig());
-    Object.assign(testState.envClient, {
-      VITE_IS_DEMO: false,
-    });
     testState.render.mockResolvedValue('Plain text login code');
-  });
-
-  it('skips sending in demo mode without recording status', async () => {
-    testState.envClient.VITE_IS_DEMO = true;
-    const statusRepository = makeStatusRepository();
-    const resend = { emails: { send: vi.fn() } } as unknown as Resend;
-    const { EmailGatewayResend } = await loadGateway();
-
-    const result = await new EmailGatewayResend({
-      statusTransactionRunner: makeStatusTransactionRunner(statusRepository),
-      resend,
-    }).sendEmail({
-      to: recipient,
-      subject: 'Login code',
-      template: createElement('div', null, '123456'),
-      idempotencyKey,
-    });
-
-    expect(getOk(result)).toEqual({
-      type: 'email_send_skipped',
-      provider: 'resend',
-    });
-    expect(statusRepository.recordSendAttempt).not.toHaveBeenCalled();
-    expect(resend.emails.send).not.toHaveBeenCalled();
   });
 
   it('skips sending when delivery is disabled without recording status', async () => {

@@ -19,7 +19,6 @@ import {
   getAuthProviderConfig,
   getBetterAuthConfig,
 } from '@/modules/kernel/infrastructure/config/auth';
-import { envClient } from '@/platform/env/client';
 
 import { AuthEmailPortEmailGateway } from './auth-email-port';
 import { getEmailGateway } from './email';
@@ -85,7 +84,6 @@ const buildAuthHttpGateway = (
       if (
         isBlockedBetterAuthHttpPath(pathname, {
           adminEndpointsEnabled,
-          isDemo: envClient.VITE_IS_DEMO,
           openApiEnabled,
         })
       ) {

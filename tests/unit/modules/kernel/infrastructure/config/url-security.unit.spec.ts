@@ -15,16 +15,12 @@ describe('isLocalhostUrl', () => {
     expect(isLocalhostUrl('http://localhost:3000')).toBe(true);
     expect(isLocalhostUrl('http://127.0.0.1:9000/default')).toBe(true);
     expect(isLocalhostUrl('http://[::1]:4318/v1')).toBe(true);
-    expect(isLocalhostUrl('postgres://user:pass@localhost:5432/app')).toBe(
-      true
-    );
+    expect(isLocalhostUrl('postgres://user@localhost:5432/app')).toBe(true);
   });
 
   it('returns false for remote hosts and malformed URLs', () => {
     expect(isLocalhostUrl('https://example.com')).toBe(false);
-    expect(isLocalhostUrl('postgres://user:pass@db.example.com/app')).toBe(
-      false
-    );
+    expect(isLocalhostUrl('postgres://user@db.example.com/app')).toBe(false);
     expect(isLocalhostUrl('not-a-url')).toBe(false);
   });
 });
@@ -70,12 +66,10 @@ describe('assertSecureUrlInProduction', () => {
 
 describe('assertDatabaseUrlTls', () => {
   const remote = (sslmode?: string) =>
-    `postgres://user:pass@db.example.com:5432/app${
-      sslmode ? `?sslmode=${sslmode}` : ''
-    }`;
+    `postgres://user@db.example.com:5432/app${sslmode ? `?sslmode=${sslmode}` : ''}`;
 
-  it.each(['require', 'verify-ca', 'verify-full'])(
-    'accepts production node-pg URLs with sslmode=%s',
+  it.each(['verify-ca', 'verify-full', 'Verify-CA', 'Verify-Full'])(
+    'accepts production node-pg URLs with authenticated sslmode=%s',
     (mode) => {
       expect(() =>
         assertDatabaseUrlTls({
@@ -88,8 +82,8 @@ describe('assertDatabaseUrlTls', () => {
     }
   );
 
-  it.each([undefined, 'prefer', 'disable', 'allow'])(
-    'rejects production node-pg URLs with sslmode=%s',
+  it.each([undefined, 'require', 'REQUIRE', 'prefer', 'disable', 'allow'])(
+    'rejects production node-pg URLs with unauthenticated sslmode=%s',
     (mode) => {
       expect(() =>
         assertDatabaseUrlTls({
@@ -102,21 +96,76 @@ describe('assertDatabaseUrlTls', () => {
     }
   );
 
-  it('exempts Neon drivers, localhost, and non-production runtimes', () => {
-    for (const driver of ['neon-http', 'neon-websocket']) {
-      expect(() =>
-        assertDatabaseUrlTls({
-          name: 'DATABASE_URL',
-          url: remote(),
-          driver,
-          env: PROD,
-        })
-      ).not.toThrow();
-    }
+  it('rejects production node-pg URLs with duplicate sslmode values', () => {
     expect(() =>
       assertDatabaseUrlTls({
         name: 'DATABASE_URL',
-        url: 'postgres://user:pass@localhost:5432/app',
+        url: remote('verify-full&sslmode=disable'),
+        driver: 'node-pg',
+        env: PROD,
+      })
+    ).toThrow(ConfigurationError);
+  });
+
+  describe('Neon drivers are no longer blanket-exempt', () => {
+    it.each(['neon-http', 'neon-websocket'])(
+      'accepts a normal postgres:// connection string for %s (driver enforces TLS)',
+      (driver) => {
+        expect(() =>
+          assertDatabaseUrlTls({
+            name: 'DATABASE_URL',
+            url: remote(),
+            driver,
+            env: PROD,
+          })
+        ).not.toThrow();
+      }
+    );
+
+    it.each(['neon-http', 'neon-websocket'])(
+      'rejects a cleartext ws:// / sslmode=disable URL for %s',
+      (driver) => {
+        expect(() =>
+          assertDatabaseUrlTls({
+            name: 'DATABASE_URL',
+            url: 'ws://attacker.example.com/app',
+            driver,
+            env: PROD,
+          })
+        ).toThrow(ConfigurationError);
+        expect(() =>
+          assertDatabaseUrlTls({
+            name: 'DATABASE_URL',
+            url: remote('disable'),
+            driver,
+            env: PROD,
+          })
+        ).toThrow(ConfigurationError);
+      }
+    );
+  });
+
+  it('rejects cleartext http:// / ws:// schemes for node-pg too', () => {
+    for (const url of [
+      'http://db.example.com/app',
+      'ws://db.example.com/app',
+    ]) {
+      expect(() =>
+        assertDatabaseUrlTls({
+          name: 'DATABASE_URL',
+          url,
+          driver: 'node-pg',
+          env: PROD,
+        })
+      ).toThrow(ConfigurationError);
+    }
+  });
+
+  it('exempts localhost and non-production runtimes', () => {
+    expect(() =>
+      assertDatabaseUrlTls({
+        name: 'DATABASE_URL',
+        url: 'postgres://user@localhost:5432/app',
         driver: 'node-pg',
         env: PROD,
       })
@@ -124,7 +173,7 @@ describe('assertDatabaseUrlTls', () => {
     expect(() =>
       assertDatabaseUrlTls({
         name: 'DATABASE_URL',
-        url: remote(),
+        url: remote('require'),
         driver: 'node-pg',
         env: DEV,
       })

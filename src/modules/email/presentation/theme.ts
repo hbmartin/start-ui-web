@@ -4,10 +4,10 @@ export const theme = {
     code: 'monospace',
   },
   colors: {
-    white: '#ffffff',
-    black: '#000000',
-    text: '#222',
-    textMuted: '#666',
+    background: '#ffffff',
+    foreground: '#222',
+    mutedForeground: '#666',
     primary: '#18181b',
+    primaryForeground: '#ffffff',
   },
 } as const;

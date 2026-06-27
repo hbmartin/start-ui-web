@@ -19,7 +19,7 @@ export const MainNavDesktop = () => {
         }}
       />
       <header
-        className="fixed top-0 right-0 left-0 flex items-center border-b border-b-neutral-200 bg-white pt-safe-top dark:border-b-neutral-800 dark:bg-neutral-900"
+        className="fixed top-0 right-0 left-0 flex items-center border-b border-b-shell-border bg-shell pt-safe-top"
         style={{ height: HEIGHT }}
       >
         <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-4">
@@ -49,7 +49,7 @@ const Item = ({
   return (
     <Link
       {...linkProps}
-      className="flex items-center justify-center gap-2 rounded-md px-2.5 py-2 text-neutral-500 transition hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/5 [&.active]:text-primary"
+      className="flex items-center justify-center gap-2 rounded-md px-2.5 py-2 text-shell-muted-foreground transition hover:bg-shell-accent hover:text-shell-accent-foreground [&.active]:text-shell-foreground"
     >
       <Icon className="size-4 opacity-60 in-[.active]:hidden" />
       <IconActive className="hidden size-4 in-[.active]:block" />

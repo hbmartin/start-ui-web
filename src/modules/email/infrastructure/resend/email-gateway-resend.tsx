@@ -19,7 +19,6 @@ import {
   toEmailRecipientList,
 } from '@/modules/kernel/domain/ids';
 import { getEmailConfig } from '@/modules/kernel/infrastructure/config/email';
-import { envClient } from '@/platform/env/client';
 
 import { getDefaultResendClient } from './resend-client';
 
@@ -101,13 +100,6 @@ export class EmailGatewayResend implements EmailGateway {
   ): ReturnType<EmailGateway['sendEmail']> {
     if (!input.idempotencyKey.trim()) {
       return Result.Error(idempotencyKeyError());
-    }
-
-    if (envClient.VITE_IS_DEMO) {
-      return Result.Ok({
-        type: 'email_send_skipped',
-        provider: EMAIL_PROVIDER_RESEND,
-      });
     }
 
     const emailConfig = getEmailConfig();

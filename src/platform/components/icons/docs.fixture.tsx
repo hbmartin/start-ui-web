@@ -22,7 +22,7 @@ const CustomIcon = ({
     <button
       type="button"
       title={name}
-      className="text-4xl text-neutral-600 dark:text-neutral-300"
+      className="text-4xl text-muted-foreground"
     >
       {children}
     </button>

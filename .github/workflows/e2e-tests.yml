@@ -29,7 +29,9 @@ jobs:
     env:
       VITE_BASE_URL: http://localhost:3000
       VITE_ENV_NAME: tests
-      VITE_IS_DEMO: false
+      # Deterministic seed accounts shared by `pnpm db:seed` and the E2E suite.
+      SEED_ADMIN_EMAIL: admin@e2e.local
+      SEED_USER_EMAIL: user@e2e.local
       EMAIL_FROM: Start UI <noreply@example.com>
       EMAIL_DELIVERY_DISABLED: true
       S3_HOST: localhost:9000

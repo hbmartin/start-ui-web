@@ -113,17 +113,17 @@ function AvatarFallback(
           name={name}
           className="size-full"
           colors={[
-            '#FCD34D',
-            '#F59E0B',
-            '#FD6243',
-            '#DF74EE',
-            '#8364F4',
-            '#6AB7E0',
-            '#92EFCD',
-            '#32CC91',
+            'var(--avatar-1)',
+            'var(--avatar-2)',
+            'var(--avatar-3)',
+            'var(--avatar-4)',
+            'var(--avatar-5)',
+            'var(--avatar-6)',
+            'var(--avatar-7)',
+            'var(--avatar-8)',
           ]}
         />
-        <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-black uppercase mix-blend-overlay group-data-[size=sm]/avatar:text-2xs">
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-avatar-foreground uppercase mix-blend-overlay group-data-[size=sm]/avatar:text-2xs">
           {name
             ?.split(' ')
             .slice(0, 2)

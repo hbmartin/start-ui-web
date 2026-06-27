@@ -18,7 +18,7 @@ export const MainNavMobile = () => {
         }}
       />
       <nav
-        className="fixed right-0 bottom-0 left-0 flex border-t border-t-neutral-200 bg-white px-4 pb-safe-bottom dark:border-t-neutral-800 dark:bg-neutral-900"
+        className="fixed right-0 bottom-0 left-0 flex border-t border-t-shell-border bg-shell px-4 pb-safe-bottom"
         style={{ height: HEIGHT }}
       >
         {MAIN_NAV_LINKS.map(({ labelTranslationKey, ...item }) => (
@@ -41,7 +41,7 @@ const Item = ({
   return (
     <Link
       {...linkProps}
-      className="flex flex-1 flex-col items-center justify-center text-neutral-500 dark:text-neutral-400 [&.active]:text-primary"
+      className="flex flex-1 flex-col items-center justify-center text-shell-muted-foreground [&.active]:text-shell-foreground"
     >
       <Icon className="size-6 opacity-60 in-[.active]:hidden" />
       <IconActive className="hidden size-6 in-[.active]:block" />

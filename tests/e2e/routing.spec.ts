@@ -79,30 +79,32 @@ test.describe('Protected route navigation as manager', () => {
   test('preserves manager list search params across reloads', async ({
     page,
   }) => {
-    await page.goto('/manager/users?searchTerm=admin%40admin.com', {
+    const encodedEmail = encodeURIComponent(ADMIN_EMAIL);
+    const escapedEncodedEmail = encodedEmail.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&'
+    );
+
+    await page.goto(`/manager/users?searchTerm=${encodedEmail}`, {
       waitUntil: 'commit',
     });
 
     await expect(
       page.getByPlaceholder(t.components.searchInput.placeholder)
-    ).toHaveValue('admin@admin.com');
+    ).toHaveValue(ADMIN_EMAIL);
+    await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toBeVisible();
     await expect(
-      page.getByText('admin@admin.com', { exact: true })
-    ).toBeVisible();
-    await expect(
-      page.getByText('1 results for "admin@admin.com"')
+      page.getByText(`1 results for "${ADMIN_EMAIL}"`)
     ).toBeVisible();
 
     await page.reload({ waitUntil: 'commit' });
 
     await expect(page).toHaveURL(
-      /\/manager\/users\?searchTerm=admin%40admin\.com$/
+      new RegExp(`/manager/users\\?searchTerm=${escapedEncodedEmail}$`)
     );
     await expect(
       page.getByPlaceholder(t.components.searchInput.placeholder)
-    ).toHaveValue('admin@admin.com');
-    await expect(
-      page.getByText('admin@admin.com', { exact: true })
-    ).toBeVisible();
+    ).toHaveValue(ADMIN_EMAIL);
+    await expect(page.getByText(ADMIN_EMAIL, { exact: true })).toBeVisible();
   });
 });

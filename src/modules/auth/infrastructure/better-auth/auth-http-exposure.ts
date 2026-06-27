@@ -18,8 +18,6 @@ export type AuthHttpExposureFlags = {
   basePath?: string;
   /** Expose Better Auth's `/admin/*` HTTP endpoints. */
   adminEndpointsEnabled: boolean;
-  /** Demo deployments must keep provider-direct admin mutations unreachable. */
-  isDemo?: boolean;
   /** Expose `/open-api/generate-schema` and the `/reference` page. */
   openApiEnabled: boolean;
 };
@@ -59,11 +57,8 @@ export const isBlockedBetterAuthHttpPath = (
   const basePath = trimTrailingSlash(
     flags.basePath ?? DEFAULT_BETTER_AUTH_BASE_PATH
   );
-  const adminEndpointsEnabled =
-    flags.adminEndpointsEnabled && flags.isDemo !== true;
-
   if (
-    !adminEndpointsEnabled &&
+    !flags.adminEndpointsEnabled &&
     isUnderPrefix(normalizedPathname, `${basePath}/admin`)
   ) {
     return true;

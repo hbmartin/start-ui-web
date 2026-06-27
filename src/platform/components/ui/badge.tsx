@@ -13,11 +13,11 @@ const badgeVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/80',
         negative:
-          'bg-negative-100 text-negative-800 dark:bg-negative-500/25 dark:text-negative-100 [a&]:hover:bg-negative-200 dark:[a&]:hover:bg-negative-500/35',
+          'bg-status-negative text-status-negative-foreground [a&]:hover:bg-status-negative-hover',
         warning:
-          'bg-warning-100 text-warning-800 dark:bg-warning-500/25 dark:text-warning-100 [a&]:hover:bg-warning-200 dark:[a&]:hover:bg-warning-500/35',
+          'bg-status-warning text-status-warning-foreground [a&]:hover:bg-status-warning-hover',
         positive:
-          'bg-positive-100 text-positive-800 dark:bg-positive-500/25 dark:text-positive-100 [a&]:hover:bg-positive-200 dark:[a&]:hover:bg-positive-500/35',
+          'bg-status-positive text-status-positive-foreground [a&]:hover:bg-status-positive-hover',
       },
       size: {
         default: 'h-6 px-2 text-xs',
