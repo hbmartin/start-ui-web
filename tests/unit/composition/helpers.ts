@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 
 import type { Kernel } from '@/composition/kernel';
 import { toGeneratedId } from '@/modules/kernel/domain/ids';

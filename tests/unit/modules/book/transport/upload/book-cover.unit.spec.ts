@@ -1,5 +1,5 @@
 import { RejectUpload } from '@better-upload/server';
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { mockSession, mockUser } from '@tests/server/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

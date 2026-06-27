@@ -100,7 +100,7 @@ describe('assertDatabaseUrlTls', () => {
     expect(() =>
       assertDatabaseUrlTls({
         name: 'DATABASE_URL',
-        url: remote('verify-full&sslmode=disable'),
+        url: remote('verify-full&sslmode=verify-ca'),
         driver: 'node-pg',
         env: PROD,
       })

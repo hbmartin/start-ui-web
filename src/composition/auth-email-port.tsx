@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { createHash } from 'node:crypto';
 
 import i18n from '@/platform/lib/i18n';

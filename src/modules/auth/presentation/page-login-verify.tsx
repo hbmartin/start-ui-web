@@ -39,9 +39,11 @@ const I18N_KEY_PAGE_PREFIX = AUTH_SIGNUP_ENABLED
 export default function PageLoginVerify({
   emailOtpHint,
   search,
+  email,
 }: {
   emailOtpHint?: ReactNode;
-  search: { redirect?: string; email: string };
+  search: { redirect?: string };
+  email: string;
 }) {
   const { i18n, t } = useTranslation(['auth', 'common']);
   const session = useAuthSession();
@@ -61,7 +63,7 @@ export default function PageLoginVerify({
       });
 
       const result = await verifyEmailOtp({
-        email: search.email,
+        email,
         otp,
       });
 
@@ -131,7 +133,7 @@ export default function PageLoginVerify({
             t={t}
             i18nKey={`${I18N_KEY_PAGE_PREFIX}.description`}
             values={{
-              email: search.email,
+              email,
             }}
             components={{
               b: <strong />,

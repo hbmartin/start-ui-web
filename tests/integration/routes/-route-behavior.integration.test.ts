@@ -222,9 +222,17 @@ describe('route integration behavior', () => {
       })
     ).toEqual({ searchTerm: 'Dune' });
 
-    expect(() =>
+    // `email` is no longer part of the verify URL — it travels through router
+    // navigation state — so an `email` search param is ignored, not parsed.
+    expect(
       parseSearch(LoginVerifyRoute, { email: 'not-an-email' })
-    ).toThrow();
+    ).not.toHaveProperty('email');
+    expect(
+      parseSearch(LoginVerifyRoute, {
+        email: 'x@example.com',
+        redirect: '/app',
+      })
+    ).toMatchObject({ redirect: '/app' });
   });
 
   it('runs list loaders and seeds infinite query cache entries by scope and search', async () => {

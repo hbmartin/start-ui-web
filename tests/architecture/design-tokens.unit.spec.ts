@@ -17,7 +17,7 @@ const allowedHardcodedColorFiles = new Set([
 ]);
 
 const rawTailwindColorUtilityPattern =
-  /(?:^|[\s"'`:])((?:bg|text|border(?:-[trblxyse])?|ring|from|via|to|fill|stroke|decoration|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black|negative|warning|positive)(?:-\d{1,3})?(?:\/\d+)?)(?=$|[\s"'`:;,\]])/g;
+  /(?:^|[\s"'`:])((?:bg|text|border(?:-[trblxyse])?|ring|from|via|to|fill|stroke|decoration|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{1,3})?(?:\/\d+)?)(?=$|[\s"'`:;,\]])/g;
 const hardcodedHexColorPattern = /#[0-9A-Fa-f]{3,8}\b/g;
 
 function listSourceFiles(target: string): string[] {

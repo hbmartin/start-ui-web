@@ -35,3 +35,18 @@ export function getRedisConfig(): RedisConfig | null {
   };
   return cachedRedisConfig;
 }
+
+/**
+ * True only when both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+ * are present (and the URL passes the existing HTTPS/format guards). Never
+ * throws: a malformed Redis URL falls back to "not configured" here, while
+ * boot-time `validateServerConfig()` still surfaces it via `getRedisConfig()`.
+ * Used to decide between the durable Upstash store and the in-memory default.
+ */
+export function isRedisConfigured(): boolean {
+  try {
+    return getRedisConfig() !== null;
+  } catch {
+    return false;
+  }
+}

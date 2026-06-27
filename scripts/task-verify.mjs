@@ -30,9 +30,9 @@ const steps = [
   ...(runVisual
     ? [
         {
-          id: 'e2e-visual',
+          id: 'visual',
           command: 'pnpm',
-          args: ['test:e2e:visual'],
+          args: ['test:visual'],
         },
       ]
     : []),

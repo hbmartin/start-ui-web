@@ -1,6 +1,8 @@
 import { afterEach, vi } from 'vitest';
 import { cleanup } from 'vitest-browser-react';
 
+import '@/platform/styles/app.css';
+
 vi.mock('@/platform/env/client', () => ({
   envClient: {
     VITE_BASE_URL: 'http://localhost:3000',

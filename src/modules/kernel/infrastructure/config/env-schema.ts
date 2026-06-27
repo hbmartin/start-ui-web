@@ -13,6 +13,25 @@ const runtimeEnv = (): RuntimeEnv => ({
 
 const isTruthy = (value: unknown) => value === true || value === 'true';
 
+const seedEmailOverrideSchema = z
+  .preprocess(
+    (value) => (typeof value === 'string' ? value.trim() : undefined),
+    z.union([z.literal(''), z.email()]).optional()
+  )
+  .transform((value) => (value ? value.toLowerCase() : undefined));
+
+const seedAccountEmailEnvSchema = z
+  .object({
+    SEED_ADMIN_EMAIL: seedEmailOverrideSchema,
+    SEED_USER_EMAIL: seedEmailOverrideSchema,
+  })
+  .passthrough();
+
+const DEFAULT_SEED_ACCOUNT_EMAILS = {
+  adminEmail: 'admin@e2e.local',
+  userEmail: 'user@e2e.local',
+} as const;
+
 export const isProdRuntimeEnvironment = (source?: RuntimeEnv) => {
   const env = source ?? runtimeEnv();
   return env.NODE_ENV ? env.NODE_ENV === 'production' : isTruthy(env.PROD);
@@ -38,17 +57,18 @@ export const isProductionSeedAllowed = (source?: RuntimeEnv) =>
 
 /**
  * Optional explicit seed-account emails (SEED_ADMIN_EMAIL / SEED_USER_EMAIL).
- * When unset, the seed generates a fresh random local address per run (see
- * `drizzle/seed/user.ts`) so seeded accounts are never predictable. Resolved
- * here in kernel config so seed scripts avoid raw `process.env` access.
+ * When unset, stable local defaults keep `db:seed` idempotent across reruns.
+ * Resolved here in kernel config so seed scripts avoid raw `process.env`
+ * access.
  */
 export const getSeedAccountEmails = (source?: RuntimeEnv) => {
   const env = source ?? runtimeEnv();
-  const read = (value: unknown) =>
-    typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  const parsed = parseEnv(seedAccountEmailEnvSchema, env);
+
   return {
-    adminEmail: read(env.SEED_ADMIN_EMAIL),
-    userEmail: read(env.SEED_USER_EMAIL),
+    adminEmail:
+      parsed.SEED_ADMIN_EMAIL ?? DEFAULT_SEED_ACCOUNT_EMAILS.adminEmail,
+    userEmail: parsed.SEED_USER_EMAIL ?? DEFAULT_SEED_ACCOUNT_EMAILS.userEmail,
   };
 };
 

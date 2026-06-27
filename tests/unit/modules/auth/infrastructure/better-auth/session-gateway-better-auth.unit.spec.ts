@@ -15,6 +15,14 @@ vi.mock('@/platform/telemetry', () => ({
   getTelemetry: () => telemetryMock,
 }));
 
+const SESSION_ABSOLUTE_MAX_IN_SECONDS = 2_592_000;
+
+vi.mock('@/modules/kernel/infrastructure/config/auth', () => ({
+  getBetterAuthConfig: () => ({
+    sessionAbsoluteMaxInSeconds: SESSION_ABSOLUTE_MAX_IN_SECONDS,
+  }),
+}));
+
 const loadGateway = async () =>
   import('@/modules/auth/infrastructure/better-auth/session-gateway-better-auth');
 
@@ -23,6 +31,7 @@ const makeAuth = (
   overrides: {
     userId?: string;
     email?: string;
+    createdAt?: Date;
   } = {}
 ): Auth =>
   ({
@@ -40,6 +49,7 @@ const makeAuth = (
         session: {
           id: 'session-1',
           userId: overrides.userId ?? 'user-1',
+          createdAt: overrides.createdAt,
           expiresAt: new Date('2026-12-31'),
         },
       })),
@@ -197,6 +207,43 @@ describe('SessionGatewayBetterAuth', () => {
     const session = await gateway.getSession({ headers: new Headers() });
 
     expect(session.isOk()).toBe(true);
+    expect(session).toMatchObject({
+      tag: 'Ok',
+      value: { type: 'auth_session_missing' },
+    });
+  });
+
+  it('keeps sessions still within the absolute max age', async () => {
+    const { SessionGatewayBetterAuth } = await loadGateway();
+    const createdAt = new Date('2026-06-01T00:00:00.000Z');
+    const clock = { now: () => new Date('2026-06-10T00:00:00.000Z') };
+    const gateway = new SessionGatewayBetterAuth(
+      makeAuth('admin', { createdAt }),
+      makeDb(),
+      clock
+    );
+
+    const session = await gateway.getSession({ headers: new Headers() });
+
+    expect(session).toMatchObject({
+      tag: 'Ok',
+      value: { type: 'auth_session_found' },
+    });
+  });
+
+  it('expires perpetually-refreshed sessions past the absolute max age', async () => {
+    const { SessionGatewayBetterAuth } = await loadGateway();
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    // Well beyond the 30-day cap even though expiresAt is still in the future.
+    const clock = { now: () => new Date('2026-06-01T00:00:00.000Z') };
+    const gateway = new SessionGatewayBetterAuth(
+      makeAuth('admin', { createdAt }),
+      makeDb(),
+      clock
+    );
+
+    const session = await gateway.getSession({ headers: new Headers() });
+
     expect(session).toMatchObject({
       tag: 'Ok',
       value: { type: 'auth_session_missing' },

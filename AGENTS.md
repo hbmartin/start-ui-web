@@ -77,7 +77,7 @@ Keep files named by concrete concern. Avoid catch-all `utils.ts`, broad `service
 
 ## Result and Outcome Policy
 
-- Expected business outcomes must be domain-tagged `Result.Ok` variants from `@swan-io/boxed`, such as `{ type: 'book_found'; book: Book }` or `{ type: 'book_not_found' }`.
+- Expected business outcomes must be domain-tagged `Result.Ok` variants from `@bloodyowl/boxed`, such as `{ type: 'book_found'; book: Book }` or `{ type: 'book_not_found' }`.
 - Internal, external-service, system, and persistence failures must be `Result.Error(AppError)`.
 - Use direct Boxed APIs (`Result.Ok`, `Result.Error`, `isOk`, `isError`, `get`, `getError`) instead of local `ok` / `fail` wrappers.
 - Use `ts-pattern` with Boxed interop (`Result.P.Ok(...)` and `Result.P.Error(...)`) for exhaustive result handling at mapping boundaries.

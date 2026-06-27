@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 
 import { createUserRepository } from '@/modules/auth/infrastructure/drizzle/user-repository-drizzle';
 import {

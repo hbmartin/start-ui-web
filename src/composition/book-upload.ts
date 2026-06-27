@@ -1,5 +1,5 @@
 import { handleRequest, type Router } from '@better-upload/server';
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
 import { getAuthUseCases } from '@/composition/auth';

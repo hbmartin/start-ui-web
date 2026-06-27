@@ -1,5 +1,5 @@
 import { RejectUpload, route } from '@better-upload/server';
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
 import i18n from '@/platform/lib/i18n';

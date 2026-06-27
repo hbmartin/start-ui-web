@@ -111,7 +111,11 @@ export default function PageLogin({
         to: '/login/verify',
         search: {
           redirect: safeRedirect,
-          email:
+        },
+        // Carry the email in navigation state, not the URL, so it stays out of
+        // history, logs, and referrer headers.
+        state: {
+          loginEmail:
             result.value.status === 'verification_required'
               ? result.value.email
               : email,

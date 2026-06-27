@@ -41,13 +41,16 @@ rules:
     message: Use semantic design-token utilities in presentation code instead of raw palette utilities.
     severity: ERROR
     languages: [generic]
-    pattern-regex: '(?:^|[\s"''`:])((?:bg|text|border(?:-[trblxyse])?|ring|from|via|to|fill|stroke|decoration|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black|negative|warning|positive)(?:-\d{1,3})?(?:/\d+)?)(?=$|[\s"''`:;,\]])'
+    pattern-regex: '(?:^|[\s"''`:])((?:bg|text|border(?:-[trblxyse])?|ring|from|via|to|fill|stroke|decoration|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)(?:-\d{1,3})?(?:/\d+)?)(?=$|[\s"''`:;,\]])'
     paths:
       include:
+        - src/platform/components/**/*.css
         - src/platform/components/**/*.ts
         - src/platform/components/**/*.tsx
+        - src/app/**/*.css
         - src/app/**/*.ts
         - src/app/**/*.tsx
+        - src/modules/**/presentation/**/*.css
         - src/modules/**/presentation/**/*.ts
         - src/modules/**/presentation/**/*.tsx
 
@@ -58,14 +61,28 @@ rules:
     pattern-regex: '#[0-9A-Fa-f]{3,8}\b'
     paths:
       include:
+        - src/platform/components/**/*.css
         - src/platform/components/**/*.ts
         - src/platform/components/**/*.tsx
+        - src/app/**/*.css
         - src/app/**/*.ts
         - src/app/**/*.tsx
+        - src/modules/**/presentation/**/*.css
         - src/modules/**/presentation/**/*.ts
         - src/modules/**/presentation/**/*.tsx
       exclude:
         - src/modules/email/presentation/theme.ts
+
+  - id: app-seed-use-kernel-public-gates
+    message: App and seed entrypoints must use kernel public gates instead of kernel infrastructure deep imports.
+    severity: ERROR
+    languages:
+      - typescript
+    pattern-regex: 'from\s+["'']@/modules/kernel/infrastructure/'
+    paths:
+      include:
+        - src/server.ts
+        - drizzle/seed/**/*.ts
 
   - id: no-unnormalized-glob-star-regexp
     message: Collapse consecutive '*' before converting glob strings to RegExp; raw split('*').join('.*') can create adjacent wildcards and backtracking risk.
@@ -367,6 +384,7 @@ rules:
       exclude:
         - src/modules/kernel/infrastructure/config/**
         - src/platform/env/**
+        - tests/**
         - '*.config.ts'
         - '*.config.mjs'
         - '*.cosmos.ts'

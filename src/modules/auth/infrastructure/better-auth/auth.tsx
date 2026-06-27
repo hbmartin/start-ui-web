@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, emailOTP, openAPI } from 'better-auth/plugins';
@@ -26,6 +26,7 @@ import {
   normalizeCreateAuthInput,
 } from './create-auth-options';
 import { betterAuthPermissions } from './permissions';
+import { InMemorySecondaryStore } from '../secondary-store/in-memory-secondary-store';
 
 const missingAuthEmailPort = {
   async sendSignInOtp() {
@@ -44,6 +45,8 @@ export function createAuth(input?: Database | CreateAuthOptions) {
   const options = normalizeCreateAuthInput(input);
   const database = options.database ?? getDefaultDbClient();
   const authEmailPort = options.authEmailPort ?? missingAuthEmailPort;
+  const secondaryStorage =
+    options.secondaryStore ?? new InMemorySecondaryStore();
   const authConfig = getBetterAuthConfig();
   const authSignupEnabled = envClient.VITE_AUTH_SIGNUP_ENABLED;
 
@@ -55,9 +58,17 @@ export function createAuth(input?: Database | CreateAuthOptions) {
         ...(authConfig.allowedHosts ?? []),
       ],
     },
+    secondaryStorage,
+    rateLimit: {
+      enabled: true,
+      storage: 'secondary-storage',
+      window: authConfig.rateLimitWindowSeconds,
+      max: authConfig.rateLimitMax,
+    },
     session: {
       expiresIn: authConfig.sessionExpirationInSeconds,
       updateAge: authConfig.sessionUpdateAgeInSeconds,
+      freshAge: authConfig.sessionFreshAgeInSeconds,
     },
     advanced: createAuthCookieSecurityOptions(envClient.VITE_BASE_URL, {
       isProduction: import.meta.env.PROD,
@@ -99,6 +110,11 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       emailOTP({
         disableSignUp: !authSignupEnabled,
         expiresIn: AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES * 60,
+        allowedAttempts: authConfig.otpAllowedAttempts,
+        rateLimit: {
+          window: authConfig.otpSendWindowSeconds,
+          max: authConfig.otpSendMax,
+        },
         async sendVerificationOTP({ email, otp, type }) {
           await match(type)
             .with('sign-in', async () => {

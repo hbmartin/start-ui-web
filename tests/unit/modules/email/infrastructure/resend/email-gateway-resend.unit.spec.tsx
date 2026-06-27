@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { createElement } from 'react';
 import type { Resend } from 'resend';
 import { beforeEach, describe, expect, it, vi } from 'vitest';

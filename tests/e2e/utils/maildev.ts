@@ -34,13 +34,25 @@ const extractOtp = (message: MaildevMessage): string | undefined => {
   return undefined;
 };
 
-const isAddressedTo = (message: MaildevMessage, email: string) =>
-  (message.to ?? []).some(
-    (recipient) => recipient.address?.toLowerCase() === email.toLowerCase()
-  );
+const isAddressedTo = (
+  message: MaildevMessage,
+  email: null | string | undefined
+) => {
+  const normalizedEmail = email?.toLowerCase();
+  if (!normalizedEmail) return false;
 
-const messageTimestamp = (message: MaildevMessage) =>
-  new Date(message.date ?? message.time ?? 0).getTime();
+  return (message.to ?? []).some(
+    (recipient) => recipient.address?.toLowerCase() === normalizedEmail
+  );
+};
+
+const messageTimestamp = (message: MaildevMessage) => {
+  const dateText = message.date ?? message.time;
+  if (!dateText) return 0;
+
+  const timestamp = Date.parse(dateText);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
 
 const fetchMessages = async (): Promise<MaildevMessage[]> => {
   const response = await fetch(`${MAILDEV_BASE_URL}/email`);
@@ -52,8 +64,9 @@ const fetchMessages = async (): Promise<MaildevMessage[]> => {
 
 export const readLatestOtp = async (
   email: string,
-  options: { timeoutMs?: number; intervalMs?: number } = {}
+  options: { afterMs?: number; timeoutMs?: number; intervalMs?: number } = {}
 ): Promise<string> => {
+  const afterMs = options.afterMs ?? 0;
   const timeoutMs = options.timeoutMs ?? 15_000;
   const intervalMs = options.intervalMs ?? 500;
   const deadline = Date.now() + timeoutMs;
@@ -62,7 +75,11 @@ export const readLatestOtp = async (
   do {
     try {
       const otp = (await fetchMessages())
-        .filter((message) => isAddressedTo(message, email))
+        .filter(
+          (message) =>
+            isAddressedTo(message, email) &&
+            messageTimestamp(message) >= afterMs
+        )
         .sort((a, b) => messageTimestamp(b) - messageTimestamp(a))
         .map(extractOtp)
         .find((value): value is string => Boolean(value));

@@ -176,7 +176,7 @@ describe('createOpenTelemetryAdapter', () => {
   });
 
   it('marks Boxed Result.Error span returns as failed operations', async () => {
-    const { Result } = await import('@swan-io/boxed');
+    const { Result } = await import('@bloodyowl/boxed');
     const { createOpenTelemetryAdapter } =
       await import('@/composition/telemetry/otel-adapter');
     const adapter = createOpenTelemetryAdapter();

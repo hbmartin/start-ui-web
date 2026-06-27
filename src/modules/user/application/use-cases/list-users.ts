@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 
 import type { UserId } from '@/modules/kernel/domain/ids';
 

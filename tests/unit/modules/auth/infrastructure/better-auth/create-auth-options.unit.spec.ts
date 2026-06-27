@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it } from 'vitest';
 
 import { normalizeCreateAuthInput } from '@/modules/auth/infrastructure/better-auth/create-auth-options';

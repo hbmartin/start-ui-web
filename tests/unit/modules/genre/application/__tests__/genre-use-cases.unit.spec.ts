@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it } from 'vitest';
 
 import type { GenreRepository } from '@/modules/genre/application/ports/genre-repository';
