@@ -514,4 +514,94 @@ describe('server config accessors', () => {
     expect(() => getEmailConfig()).toThrow(ConfigurationError);
     expect(() => getEmailConfig()).toThrow('RESEND_WEBHOOK_SECRET');
   });
+
+  it('rejects cleartext production node-pg database URLs', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('DATABASE_URL', makeTestDatabaseUrl({ host: 'db.example.com' }));
+    const { getDatabaseConfig } =
+      await import('@/modules/kernel/infrastructure/config/database');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getDatabaseConfig()).toThrow(ConfigurationError);
+    expect(() => getDatabaseConfig()).toThrow('DATABASE_URL');
+  });
+
+  it('accepts production node-pg database URLs with a secure sslmode', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const databaseUrl = makeTestDatabaseUrl({
+      host: 'db.example.com',
+      searchParams: { sslmode: 'verify-full' },
+    });
+    vi.stubEnv('DATABASE_URL', databaseUrl);
+    const { getDatabaseConfig } =
+      await import('@/modules/kernel/infrastructure/config/database');
+
+    expect(getDatabaseConfig().databaseUrl).toBe(databaseUrl);
+  });
+
+  it('accepts cleartext production database URLs that target localhost', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const databaseUrl = makeTestDatabaseUrl();
+    vi.stubEnv('DATABASE_URL', databaseUrl);
+    const { getDatabaseConfig } =
+      await import('@/modules/kernel/infrastructure/config/database');
+
+    expect(getDatabaseConfig().databaseUrl).toBe(databaseUrl);
+  });
+
+  it('exempts Neon drivers from the production database TLS requirement', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const databaseUrl = makeTestDatabaseUrl({ host: 'db.example.com' });
+    vi.stubEnv('DATABASE_URL', databaseUrl);
+    vi.stubEnv('DATABASE_DRIVER', 'neon-websocket');
+    const { getDatabaseConfig } =
+      await import('@/modules/kernel/infrastructure/config/database');
+
+    expect(getDatabaseConfig().databaseUrl).toBe(databaseUrl);
+  });
+
+  it('rejects cleartext production migration database URLs', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('DATABASE_URL', makeTestDatabaseUrl());
+    vi.stubEnv(
+      'DATABASE_MIGRATION_URL',
+      makeTestDatabaseUrl({ host: 'db.example.com' })
+    );
+    const { getMigrationDatabaseConfig } =
+      await import('@/modules/kernel/infrastructure/config/database');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getMigrationDatabaseConfig()).toThrow(ConfigurationError);
+    expect(() => getMigrationDatabaseConfig()).toThrow(
+      'DATABASE_MIGRATION_URL'
+    );
+  });
+
+  it('rejects cleartext production Redis REST URLs outside localhost', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', 'http://redis.example.com');
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', makeTestSecret('redis'));
+    const { getRedisConfig } =
+      await import('@/modules/kernel/infrastructure/config/redis');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getRedisConfig()).toThrow(ConfigurationError);
+    expect(() => getRedisConfig()).toThrow('UPSTASH_REDIS_REST_URL');
+  });
+
+  it('rejects cleartext production Sentry DSNs outside localhost', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('OTEL_COLLECTOR_URL', 'https://collector.example/v1');
+    vi.stubEnv('SENTRY_DSN', 'http://public@sentry.example.com/1');
+    const { getTelemetryConfig } =
+      await import('@/modules/kernel/infrastructure/config/telemetry');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getTelemetryConfig()).toThrow(ConfigurationError);
+    expect(() => getTelemetryConfig()).toThrow('SENTRY_DSN');
+  });
 });
