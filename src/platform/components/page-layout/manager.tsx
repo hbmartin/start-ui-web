@@ -37,7 +37,7 @@ export const PageLayoutTopBar = (props: {
   return (
     <header
       className={cn(
-        'flex shrink-0 items-end border-b bg-white px-4 dark:bg-neutral-900',
+        'flex shrink-0 items-end border-b border-b-shell-border bg-shell px-4',
         props.className
       )}
       style={{ height: TOPBAT_HEIGHT }}

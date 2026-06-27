@@ -22,11 +22,10 @@ import {
   type Logger,
   type LogLevel,
 } from '@/modules/kernel';
-import { DEMO_MODE_ERROR, ServerFnError } from '@/modules/kernel/client';
+import { ServerFnError } from '@/modules/kernel/client';
 import type { UserId } from '@/modules/kernel/domain/ids';
 import { toRequestId } from '@/modules/kernel/domain/ids';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
-import { envClient } from '@/platform/env/client';
 import { cachePrivateNoStore } from '@/platform/http/cache-control';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 import { createNoOpTelemetry } from '@/platform/telemetry';
@@ -129,12 +128,6 @@ const handleError = (error: unknown, procedureLogger: ProcedureLogger) => {
 
   const logLevel: LogLevel = (() => {
     if (!(mappedError instanceof Error)) return 'error';
-    if (
-      mappedError instanceof ServerFnError &&
-      mappedError.data?.reason === DEMO_MODE_ERROR
-    ) {
-      return 'info';
-    }
     if (mappedError instanceof ServerFnError) {
       if (mappedError.status >= 500) return 'error';
       if (mappedError.status >= 400) return 'warn';
@@ -178,15 +171,6 @@ function mapTransportError(error: unknown): unknown {
     message: 'Unhandled error',
   });
 }
-
-const assertNotDemoMode = () => {
-  if (envClient.VITE_IS_DEMO) {
-    throw new ServerFnError('METHOD_NOT_SUPPORTED', {
-      message: 'Demo mode prevents mutations',
-      data: { reason: DEMO_MODE_ERROR },
-    });
-  }
-};
 
 const getStartRequestContext = (): AppStartRequestContextLike | undefined => {
   try {
@@ -313,7 +297,6 @@ export const createServerContextTools = ({
     fn: (ctx: ProtectedContext) => Promise<T>
   ): Promise<T> => {
     return withProtectedContext(async (ctx) => {
-      assertNotDemoMode();
       return fn(ctx);
     });
   };

@@ -14,7 +14,7 @@ export const DataList = ({
   return (
     <div
       className={cn(
-        'relative flex w-full flex-col overflow-x-auto overflow-y-hidden rounded-sm border bg-white dark:bg-neutral-900',
+        'relative flex w-full flex-col overflow-x-auto overflow-y-hidden rounded-sm border bg-card',
         className
       )}
       {...props}
@@ -31,7 +31,7 @@ export const DataListRow = ({
     <div
       className={cn(
         'relative flex min-w-0 border-b px-1.5 transition duration-200 last:border-none',
-        withHover && 'hover:bg-neutral-50 dark:hover:bg-white/5',
+        withHover && 'hover:bg-accent hover:text-accent-foreground',
         className
       )}
       {...props}

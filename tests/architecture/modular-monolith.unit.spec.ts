@@ -240,13 +240,7 @@ describe('strict modular monolith layout', () => {
     expect(fs.existsSync(path.join(root, 'src/emails'))).toBe(false);
     expect(fs.existsSync(path.join(root, 'src/platform'))).toBe(true);
     expect(fs.existsSync(path.join(root, 'src/app'))).toBe(true);
-    for (const appSupportRoot of [
-      'build-info',
-      'demo',
-      'devtools',
-      'i18n',
-      'shell',
-    ]) {
+    for (const appSupportRoot of ['build-info', 'devtools', 'i18n', 'shell']) {
       expect(fs.existsSync(path.join(root, 'src/app', appSupportRoot))).toBe(
         true
       );

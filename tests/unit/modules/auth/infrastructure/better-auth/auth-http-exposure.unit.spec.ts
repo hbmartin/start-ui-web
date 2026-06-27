@@ -38,28 +38,16 @@ describe('isBlockedBetterAuthHttpPath', () => {
     ).toBe(false);
   });
 
-  it('blocks admin endpoints in demo mode even when explicitly enabled', () => {
-    expect(
-      isBlockedBetterAuthHttpPath('/api/auth/admin/remove-user', {
-        adminEndpointsEnabled: true,
-        isDemo: true,
-        openApiEnabled: true,
-      })
-    ).toBe(true);
-  });
-
   it('allows OpenAPI endpoints when explicitly enabled', () => {
     expect(
       isBlockedBetterAuthHttpPath('/api/auth/open-api/generate-schema', {
         adminEndpointsEnabled: false,
-        isDemo: true,
         openApiEnabled: true,
       })
     ).toBe(false);
     expect(
       isBlockedBetterAuthHttpPath('/api/auth/reference', {
         adminEndpointsEnabled: false,
-        isDemo: true,
         openApiEnabled: true,
       })
     ).toBe(false);

@@ -4,7 +4,7 @@ import { theme } from '@/modules/email/presentation/theme';
 
 export const styles = {
   main: {
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     fontFamily: theme.fontFamily.sans,
   },
   container: {
@@ -15,7 +15,7 @@ export const styles = {
     margin: '16px 0',
   },
   h1: {
-    color: theme.colors.text,
+    color: theme.colors.foreground,
     fontFamily: theme.fontFamily.sans,
     fontSize: '24px',
     fontWeight: 'bold',
@@ -31,20 +31,20 @@ export const styles = {
   button: {
     fontSize: '14px',
     backgroundColor: theme.colors.primary,
-    color: theme.colors.white,
+    color: theme.colors.primaryForeground,
     lineHeight: 1.5,
     borderRadius: '0.5em',
     padding: '0.75em 1.5em',
   },
   text: {
-    color: theme.colors.text,
+    color: theme.colors.foreground,
     fontFamily: theme.fontFamily.sans,
     fontSize: '16px',
     margin: '8px 0',
     lineHeight: '1.5',
   },
   textMuted: {
-    color: theme.colors.textMuted,
+    color: theme.colors.mutedForeground,
     fontFamily: theme.fontFamily.sans,
     fontSize: '14px',
     margin: '8px 0',
@@ -60,10 +60,10 @@ export const styles = {
     fontFamily: theme.fontFamily.code,
     backgroundColor: theme.colors.primary,
     borderRadius: '5px',
-    color: theme.colors.white,
+    color: theme.colors.primaryForeground,
   },
   footer: {
-    color: theme.colors.textMuted,
+    color: theme.colors.mutedForeground,
     fontFamily: theme.fontFamily.sans,
     fontSize: '12px',
     lineHeight: '22px',

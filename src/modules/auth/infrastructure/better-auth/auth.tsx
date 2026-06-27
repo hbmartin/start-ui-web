@@ -5,13 +5,8 @@ import { admin, emailOTP, openAPI } from 'better-auth/plugins';
 import { tanstackStartCookies } from 'better-auth/tanstack-start';
 import { match } from 'ts-pattern';
 
-import {
-  AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES,
-  AUTH_EMAIL_OTP_MOCKED,
-  isAuthSignupEnabled,
-} from '@/modules/auth';
+import { AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES } from '@/modules/auth';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import { DEMO_MODE_ERROR } from '@/modules/kernel/domain/errors/demo-mode';
 import {
   toEmailAddress,
   toLanguageCode,
@@ -50,9 +45,7 @@ export function createAuth(input?: Database | CreateAuthOptions) {
   const database = options.database ?? getDefaultDbClient();
   const authEmailPort = options.authEmailPort ?? missingAuthEmailPort;
   const authConfig = getBetterAuthConfig();
-  const authSignupEnabled = isAuthSignupEnabled({
-    isDemo: envClient.VITE_IS_DEMO,
-  });
+  const authSignupEnabled = envClient.VITE_AUTH_SIGNUP_ENABLED;
 
   return betterAuth({
     secret: authConfig.secret,
@@ -106,10 +99,6 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       emailOTP({
         disableSignUp: !authSignupEnabled,
         expiresIn: AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES * 60,
-        // Use predictable mocked code in dev and demo
-        ...(envClient.DEV || envClient.VITE_IS_DEMO
-          ? { generateOTP: () => AUTH_EMAIL_OTP_MOCKED }
-          : undefined),
         async sendVerificationOTP({ email, otp, type }) {
           await match(type)
             .with('sign-in', async () => {
@@ -152,36 +141,6 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       }),
       tanstackStartCookies(),
     ],
-    databaseHooks: {
-      user: {
-        create: {
-          before: async (user) => {
-            if (envClient.VITE_IS_DEMO) {
-              throw new AppError({
-                code: DEMO_MODE_ERROR,
-                category: 'bad_request',
-                status: 405,
-                message: 'DEMO MODE',
-              });
-            }
-            return { data: user };
-          },
-        },
-        update: {
-          before: async (user) => {
-            if (envClient.VITE_IS_DEMO) {
-              throw new AppError({
-                code: DEMO_MODE_ERROR,
-                category: 'bad_request',
-                status: 405,
-                message: 'DEMO MODE',
-              });
-            }
-            return { data: user };
-          },
-        },
-      },
-    },
   });
 }
 

@@ -8,7 +8,6 @@ const config: RuntimeConfig = {
   name: 'TEST',
   color: 'gold',
   emoji: 'T',
-  isDemo: false,
   isDev: true,
 };
 
@@ -21,7 +20,6 @@ describe('runtime-config use cases', () => {
     expect(Object.keys(useCases.get()).sort()).toEqual([
       'color',
       'emoji',
-      'isDemo',
       'isDev',
       'name',
     ]);
@@ -32,13 +30,13 @@ describe('runtime-config use cases', () => {
     const source: RuntimeConfigSource = {
       read: () => {
         calls += 1;
-        return { ...config, isDemo: calls % 2 === 0 };
+        return { ...config, isDev: calls % 2 === 0 };
       },
     };
     const useCases = createRuntimeConfigUseCases({ source });
 
-    expect(useCases.get().isDemo).toBe(false);
-    expect(useCases.get().isDemo).toBe(true);
+    expect(useCases.get().isDev).toBe(false);
+    expect(useCases.get().isDev).toBe(true);
     expect(calls).toBe(2);
   });
 });

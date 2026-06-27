@@ -33,16 +33,6 @@ describe('Better Auth HTTP exposure (default-off posture)', () => {
     }
   });
 
-  it('forces Better Auth admin HTTP endpoints closed in demo mode', () => {
-    expect(
-      isBlockedBetterAuthHttpPath('/api/auth/admin/remove-user', {
-        adminEndpointsEnabled: true,
-        isDemo: true,
-        openApiEnabled: true,
-      })
-    ).toBe(true);
-  });
-
   it('ships both exposure flags disabled by default in config/auth.ts', () => {
     const source = fs.readFileSync(
       path.join(root, 'src/modules/kernel/infrastructure/config/auth.ts'),

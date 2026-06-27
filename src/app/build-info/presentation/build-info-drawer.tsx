@@ -43,7 +43,7 @@ export const BuildInfoDrawer = ({
           </ResponsiveDrawerTitle>
           <ResponsiveDrawerDescription className="flex min-h-6 items-center">
             {isCopied ? (
-              <span className="flex items-center gap-1 rounded-md bg-positive-100 px-1.5 py-1 text-xs font-medium text-positive-800 max-sm:mx-auto dark:bg-positive-600/30 dark:text-positive-100">
+              <span className="flex items-center gap-1 rounded-md bg-status-positive px-1.5 py-1 text-xs font-medium text-status-positive-foreground max-sm:mx-auto">
                 <CheckCircle2Icon className="size-3" />{' '}
                 {t('buildInfo:copiedToClipboard')}
               </span>

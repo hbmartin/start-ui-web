@@ -45,8 +45,8 @@ vi.mock('@/modules/kernel/infrastructure/config/auth', () => ({
 vi.mock('@/platform/env/client', () => ({
   envClient: {
     DEV: false,
+    VITE_AUTH_SIGNUP_ENABLED: true,
     VITE_BASE_URL: 'https://app.example',
-    VITE_IS_DEMO: false,
   },
 }));
 

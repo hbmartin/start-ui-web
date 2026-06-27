@@ -259,7 +259,7 @@ export const UploadInput = ({
         uploadInputVariants({ size }),
         ui.is('empty')
           ? cn(
-              'border-dashed border-input bg-neutral-50 dark:bg-input/30',
+              'border-dashed border-input bg-muted/50 dark:bg-input/30',
               uploadInputEmptyVariants({ size })
             )
           : cn(

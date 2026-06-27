@@ -4,7 +4,7 @@ const Default = () => {
 };
 
 const Color = () => {
-  return <Logo className="w-32 text-neutral-400" />;
+  return <Logo className="w-32 text-muted-foreground" />;
 };
 
 export default {

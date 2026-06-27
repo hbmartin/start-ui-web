@@ -22,7 +22,6 @@ describe('runtime-config service', () => {
     const source: RuntimeConfigSource = {
       read: () => ({
         name: 'TEST',
-        isDemo: false,
         isDev: true,
       }),
     };
@@ -33,7 +32,6 @@ describe('runtime-config service', () => {
     expect(second).not.toBe(first);
     expect(first.get()).toEqual({
       name: 'TEST',
-      isDemo: false,
       isDev: true,
     });
   });

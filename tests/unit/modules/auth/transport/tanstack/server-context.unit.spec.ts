@@ -11,12 +11,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createServerContextTools,
-  withProtectedMutation,
   withPublicContext,
 } from '@/modules/auth/backend';
 import { toUserId } from '@/modules/kernel';
 import { ServerFnError } from '@/modules/kernel/client';
-import { envClient } from '@/platform/env/client';
 import { createNoOpTelemetry } from '@/platform/telemetry';
 
 const getGlobalStartContextMock = vi.mocked(getGlobalStartContext);
@@ -268,30 +266,6 @@ describe('server function middleware', () => {
         event: 'server_fn.error.mapped',
       })
     );
-  });
-
-  it('runs demo-mode mutation checks inside protected middleware handling', async () => {
-    vi.mocked(envClient).VITE_IS_DEMO = true;
-
-    try {
-      await expect(
-        withProtectedMutation(async () => 'ok')
-      ).rejects.toMatchObject({
-        code: 'METHOD_NOT_SUPPORTED',
-      });
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.objectContaining({
-          details: expect.objectContaining({
-            code: 'METHOD_NOT_SUPPORTED',
-            data: { reason: 'DEMO_MODE_ENABLED' },
-          }),
-          error: 'Demo mode prevents mutations',
-          event: 'server_fn.error.mapped',
-        })
-      );
-    } finally {
-      vi.mocked(envClient).VITE_IS_DEMO = false;
-    }
   });
 
   it('logs expected transport errors at warning level', async () => {

@@ -31,10 +31,7 @@ import {
 } from './form-book';
 import { FormBookCover } from './form-book-cover';
 
-export const PageBookUpdate = (props: {
-  onDemoUploadBlocked?: () => void;
-  params: { id: string };
-}) => {
+export const PageBookUpdate = (props: { params: { id: string } }) => {
   const { t } = useTranslation(['book']);
   const { navigateBack } = useNavigateBack();
   const queryClient = useQueryClient();
@@ -145,10 +142,7 @@ export const PageBookUpdate = (props: {
               <div className="flex-2">
                 <Card>
                   <CardContent>
-                    <FormBook
-                      form={form}
-                      onDemoUploadBlocked={props.onDemoUploadBlocked}
-                    />
+                    <FormBook form={form} />
                   </CardContent>
                 </Card>
               </div>

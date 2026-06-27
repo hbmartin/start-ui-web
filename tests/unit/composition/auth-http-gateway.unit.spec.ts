@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => {
       trustedOrigins: undefined as string[] | undefined,
     },
     createAuth: vi.fn(() => ({ handler })),
-    envClient: { VITE_IS_DEMO: false },
     handler,
   };
 });
@@ -30,10 +29,6 @@ vi.mock('@/modules/kernel/infrastructure/config/auth', () => ({
 
 vi.mock('@/modules/auth/infrastructure/better-auth/auth', () => ({
   createAuth: mocks.createAuth,
-}));
-
-vi.mock('@/platform/env/client', () => ({
-  envClient: mocks.envClient,
 }));
 
 const authEmailPort = {
@@ -48,13 +43,11 @@ describe('auth HTTP gateway exposure policy', () => {
     vi.clearAllMocks();
     mocks.authConfig.adminEndpointsEnabled = false;
     mocks.authConfig.openApiEnabled = false;
-    mocks.envClient.VITE_IS_DEMO = false;
     mocks.handler.mockResolvedValue(new Response('provider'));
   });
 
-  it('returns 404 for admin HTTP endpoints in demo mode even when enabled', async () => {
-    mocks.authConfig.adminEndpointsEnabled = true;
-    mocks.envClient.VITE_IS_DEMO = true;
+  it('returns 404 for admin HTTP endpoints when admin endpoints are disabled', async () => {
+    mocks.authConfig.adminEndpointsEnabled = false;
     const { getAuthHttpGateway } = await import('@/composition/auth');
 
     const gateway = getAuthHttpGateway({ authEmailPort });
@@ -68,9 +61,8 @@ describe('auth HTTP gateway exposure policy', () => {
     expect(mocks.handler).not.toHaveBeenCalled();
   });
 
-  it('still forwards core auth endpoints in demo mode', async () => {
+  it('forwards core auth endpoints to the provider handler', async () => {
     mocks.authConfig.adminEndpointsEnabled = true;
-    mocks.envClient.VITE_IS_DEMO = true;
     const { getAuthHttpGateway } = await import('@/composition/auth');
 
     const gateway = getAuthHttpGateway({ authEmailPort });

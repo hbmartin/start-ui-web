@@ -36,6 +36,22 @@ export const shouldSkipEnvValidation = (source?: RuntimeEnv) => {
 export const isProductionSeedAllowed = (source?: RuntimeEnv) =>
   isTruthy((source ?? runtimeEnv()).ALLOW_PROD_SEED);
 
+/**
+ * Optional explicit seed-account emails (SEED_ADMIN_EMAIL / SEED_USER_EMAIL).
+ * When unset, the seed generates a fresh random local address per run (see
+ * `drizzle/seed/user.ts`) so seeded accounts are never predictable. Resolved
+ * here in kernel config so seed scripts avoid raw `process.env` access.
+ */
+export const getSeedAccountEmails = (source?: RuntimeEnv) => {
+  const env = source ?? runtimeEnv();
+  const read = (value: unknown) =>
+    typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  return {
+    adminEmail: read(env.SEED_ADMIN_EMAIL),
+    userEmail: read(env.SEED_USER_EMAIL),
+  };
+};
+
 export const zNonEmptyEnvString = () => z.string().trim().min(1);
 
 export const baseEnvSchema = z

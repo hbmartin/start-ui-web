@@ -19,7 +19,6 @@ import { type AuthSignInProvider, startSignIn } from '@/modules/auth/client';
 import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/presentation/config';
 import { useMascot } from '@/modules/auth/presentation/mascot';
 import { zFormFieldsLogin } from '@/modules/auth/presentation/schema';
-import { envClient } from '@/platform/env/client';
 
 import { authE2eDebug } from './e2e-debug';
 import { normalizeInternalRedirect } from './redirects';
@@ -177,7 +176,6 @@ export default function PageLogin({
         <Button
           className="w-full"
           variant="secondary"
-          disabled={envClient.VITE_IS_DEMO}
           loading={
             social.variables === 'github' &&
             (social.isPending || social.isSuccess)

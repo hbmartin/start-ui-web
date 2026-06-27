@@ -8,7 +8,6 @@ import { getKernel } from '@/composition/kernel';
 import { createBookCoverUploadRoute } from '@/modules/book/transport/upload/book-cover';
 import { getStorageConfig } from '@/modules/kernel/infrastructure/config/storage';
 import { getDefaultUploadClient } from '@/modules/kernel/infrastructure/storage/better-upload';
-import { envClient } from '@/platform/env/client';
 import { getTelemetry } from '@/platform/telemetry';
 
 import { createCachedFactory } from './shared/singleton';
@@ -60,9 +59,6 @@ export const handleBookUploadRequest = (request: Request) => {
       op: 'upload.http',
     },
     () => {
-      if (envClient.VITE_IS_DEMO) {
-        return new Response('Demo Mode', { status: 405 });
-      }
       return handleRequest(request, routerFactory.get());
     }
   );

@@ -1,5 +1,5 @@
 import { expect, test } from '@tests/e2e/utils';
-import { ADMIN_FILE, USER_FILE } from '@tests/e2e/utils/constants';
+import { ADMIN_EMAIL, ADMIN_FILE, USER_FILE } from '@tests/e2e/utils/constants';
 import { randomString } from 'remeda';
 
 import { DEFAULT_LANGUAGE_KEY } from '@/platform/lib/i18n/constants';
@@ -53,7 +53,7 @@ test.describe('User management as manager', () => {
   });
 
   test('Edit a user', async ({ page }) => {
-    await page.getByText('admin@admin.com').click({
+    await page.getByText(ADMIN_EMAIL).click({
       force: true,
     });
 
