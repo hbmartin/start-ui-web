@@ -294,3 +294,66 @@ describe('server function middleware', () => {
     expect(mockLogger.error).not.toHaveBeenCalled();
   });
 });
+
+describe('withFreshProtectedMutation (step-up re-authentication)', () => {
+  const NOW = Date.parse('2026-06-27T12:00:00.000Z');
+
+  const makeFreshTools = (
+    createdAt: Date | string | undefined,
+    opts: { freshAgeSeconds?: number; now?: number } = {}
+  ) => {
+    const getCurrentSession = vi.fn(async () =>
+      Result.Ok({
+        type: 'auth_session_found' as const,
+        session: {
+          user: mockUser,
+          session: { ...mockSession, createdAt },
+        },
+      })
+    );
+    return createServerContextTools({
+      getAuthUseCases: () =>
+        ({
+          getCurrentSession,
+          checkPermission: vi.fn(),
+        }) as ExplicitAny,
+      logger: mockLogger,
+      getSessionFreshAgeSeconds: () => opts.freshAgeSeconds ?? 900,
+      now: () => opts.now ?? NOW,
+    });
+  };
+
+  it('passes through when the session is fresh', async () => {
+    const tools = makeFreshTools(new Date(NOW - 5 * 60 * 1000)); // 5 min ago
+
+    await expect(
+      tools.withFreshProtectedMutation(async () => 'ok')
+    ).resolves.toBe('ok');
+  });
+
+  it('rejects a stale session with FORBIDDEN + reauth_required', async () => {
+    const tools = makeFreshTools(new Date(NOW - 60 * 60 * 1000)); // 60 min ago
+
+    await expect(
+      tools.withFreshProtectedMutation(async () => 'ok')
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      data: { reason: 'reauth_required' },
+    });
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'security.reauth_required' })
+    );
+  });
+
+  it('fails closed (reauth_required) when createdAt is missing', async () => {
+    const tools = makeFreshTools(undefined);
+
+    await expect(
+      tools.withFreshProtectedMutation(async () => 'ok')
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      data: { reason: 'reauth_required' },
+    });
+  });
+});

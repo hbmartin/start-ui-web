@@ -15,6 +15,15 @@ export const bookCoverAcceptedFileTypes = [
 
 export const bookCoverMaxFileSizeBytes = 1024 * 1024 * 10;
 
+/**
+ * Cache-Control pinned onto the presigned cover upload. Cover object keys are
+ * unique per upload (`books/<generatedId>.<ext>`) and never overwritten in
+ * place, so an immutable long-lived cache is safe. Pinning this server-side
+ * also prevents the client from choosing an arbitrary Cache-Control value on
+ * the presigned PUT. See `docs/security-upload.md`.
+ */
+export const bookCoverCacheControl = 'public, max-age=31536000, immutable';
+
 type BookCoverAcceptedFileType = (typeof bookCoverAcceptedFileTypes)[number];
 
 const bookCoverFileExtensionsByType: Record<BookCoverAcceptedFileType, string> =

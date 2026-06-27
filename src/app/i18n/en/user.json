@@ -51,6 +51,11 @@
       "sessionExpires": "Expires {{time}}",
       "editUser": "Edit user"
     },
+    "reauth": {
+      "title": "Re-authentication required",
+      "description": "Your session is no longer fresh. Sign in again to confirm this action.",
+      "action": "Sign in again"
+    },
     "form": {
       "emailAlreadyExist": "Email already used"
     },

@@ -183,11 +183,18 @@ function findPrivilegedServerFunctionRunnerViolations(
           : method === 'POST'
             ? [
                 {
-                  ok: source.includes('withProtectedMutation'),
+                  // `withFreshProtectedMutation` is a stricter protected
+                  // mutation runner (adds step-up freshness) and is equally
+                  // acceptable here.
+                  ok:
+                    source.includes('withProtectedMutation') ||
+                    source.includes('withFreshProtectedMutation'),
                   violation: `${relative}:${name}:missing mutation runner`,
                 },
                 {
-                  ok: usesRunner(declaration, 'runMutation'),
+                  ok:
+                    usesRunner(declaration, 'runMutation') ||
+                    usesRunner(declaration, 'runFreshMutation'),
                   violation: `${relative}:${name}:not using mutation runner`,
                 },
               ]

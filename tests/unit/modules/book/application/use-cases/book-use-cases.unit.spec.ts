@@ -1,5 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { BookRepository } from '@/modules/book/application/ports/book-repository';
 import type { BookUseCaseDeps } from '@/modules/book/application/use-cases/types';
@@ -126,16 +126,29 @@ describe('book use cases', () => {
     expect(getOk(missing)).toEqual({ type: 'book_not_found' });
   });
 
-  it('creates and maps duplicate conflicts', async () => {
-    const duplicateRepo = makeRepo({
-      create: async () => Result.Ok({ type: 'book_duplicate' }),
-    });
+  const emptyListPage = {
+    type: 'book_listed' as const,
+    page: { items: [], total: 0 },
+  };
 
-    const created = await createBookUseCases(makeDeps()).create({
+  it('creates when no existing book matches', async () => {
+    const repo = makeRepo({ list: async () => Result.Ok(emptyListPage) });
+
+    const created = await createBookUseCases(
+      makeDeps({ bookRepository: repo })
+    ).create({
       currentUserId: scope.userId,
       book,
     });
+
     expect(getOk(created)).toEqual({ type: 'book_created', book });
+  });
+
+  it('maps duplicate conflicts surfaced by the repository', async () => {
+    const duplicateRepo = makeRepo({
+      list: async () => Result.Ok(emptyListPage),
+      create: async () => Result.Ok({ type: 'book_duplicate' }),
+    });
 
     const duplicate = await createBookUseCases(
       makeDeps({ bookRepository: duplicateRepo })
@@ -145,6 +158,25 @@ describe('book use cases', () => {
     });
 
     expect(getOk(duplicate)).toEqual({ type: 'book_duplicate' });
+  });
+
+  it('rejects case-insensitive duplicates in the pre-check without inserting', async () => {
+    const create = vi.fn(async () =>
+      Result.Ok({ type: 'book_created' as const, book })
+    );
+    // The existing "Dune" / "Frank Herbert" book is returned by `list`; the new
+    // input differs only by casing and surrounding whitespace.
+    const repo = makeRepo({ create });
+
+    const duplicate = await createBookUseCases(
+      makeDeps({ bookRepository: repo })
+    ).create({
+      currentUserId: scope.userId,
+      book: { ...book, title: '  dune ', author: 'FRANK HERBERT' },
+    });
+
+    expect(getOk(duplicate)).toEqual({ type: 'book_duplicate' });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('updates and deletes with not_found branches', async () => {

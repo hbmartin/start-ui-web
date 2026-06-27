@@ -621,6 +621,48 @@ describe('server config accessors', () => {
     expect(() => getRedisConfig()).toThrow('UPSTASH_REDIS_REST_URL');
   });
 
+  it('defaults the trusted proxy depth to one hop', async () => {
+    vi.stubEnv('TRUSTED_PROXY_DEPTH', undefined);
+    const { getHttpConfig } =
+      await import('@/modules/kernel/infrastructure/config/http');
+
+    expect(getHttpConfig().trustedProxyDepth).toBe(1);
+  });
+
+  it('parses an explicit non-negative trusted proxy depth', async () => {
+    vi.stubEnv('TRUSTED_PROXY_DEPTH', '2');
+    const { getHttpConfig } =
+      await import('@/modules/kernel/infrastructure/config/http');
+
+    expect(getHttpConfig().trustedProxyDepth).toBe(2);
+  });
+
+  it('rejects a negative trusted proxy depth', async () => {
+    vi.stubEnv('TRUSTED_PROXY_DEPTH', '-1');
+    const { getHttpConfig } =
+      await import('@/modules/kernel/infrastructure/config/http');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getHttpConfig()).toThrow(ConfigurationError);
+  });
+
+  it('defaults telemetry proxy auth to disabled', async () => {
+    vi.stubEnv('TELEMETRY_REQUIRE_AUTH', undefined);
+    const { getTelemetryConfig } =
+      await import('@/modules/kernel/infrastructure/config/telemetry');
+
+    expect(getTelemetryConfig().requireAuth).toBe(false);
+  });
+
+  it('parses an explicit telemetry proxy auth requirement', async () => {
+    vi.stubEnv('TELEMETRY_REQUIRE_AUTH', 'true');
+    const { getTelemetryConfig } =
+      await import('@/modules/kernel/infrastructure/config/telemetry');
+
+    expect(getTelemetryConfig().requireAuth).toBe(true);
+  });
+
   it('rejects cleartext production Sentry DSNs outside localhost', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('OTEL_COLLECTOR_URL', 'https://collector.example/v1');
