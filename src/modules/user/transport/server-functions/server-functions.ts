@@ -26,13 +26,14 @@ type UserServerRuntimeDeps = {
   handlers: UserHandlers;
   withProtectedContext: ProtectedRunner;
   withProtectedMutation: ProtectedRunner;
+  withFreshProtectedMutation: ProtectedRunner;
 };
 
 const getDeps = createServerOnlyFn(async (): Promise<UserServerRuntimeDeps> => {
   const [
     { getUserUseCases },
     { getKernel },
-    { withProtectedContext, withProtectedMutation },
+    { withProtectedContext, withProtectedMutation, withFreshProtectedMutation },
   ] = await Promise.all([
     import('@/composition/user'),
     import('@/composition/kernel'),
@@ -48,6 +49,7 @@ const getDeps = createServerOnlyFn(async (): Promise<UserServerRuntimeDeps> => {
     }),
     withProtectedContext,
     withProtectedMutation,
+    withFreshProtectedMutation,
   };
 });
 
@@ -59,6 +61,13 @@ const runProtected = createServerFunctionInvoker({
 const runMutation = createServerFunctionInvoker({
   getDeps,
   selectRunner: (deps) => deps.withProtectedMutation,
+});
+
+// Destructive admin actions additionally require a fresh session (step-up
+// re-authentication). A stale session is rejected with `reauth_required`.
+const runFreshMutation = createServerFunctionInvoker({
+  getDeps,
+  selectRunner: (deps) => deps.withFreshProtectedMutation,
 });
 
 export const userGetAll = createServerFn({ method: 'GET' })
@@ -82,7 +91,7 @@ export const userGetById = createServerFn({ method: 'GET' })
 export const userUpdateById = createServerFn({ method: 'POST' })
   .inputValidator(zUpdateByIdInput())
   .handler(async ({ data }) =>
-    runMutation.withOperation('user.updateById')(
+    runFreshMutation.withOperation('user.updateById')(
       data,
       ({ handlers }, ctx, input) => handlers.updateById(ctx, input)
     )
@@ -99,7 +108,7 @@ export const userCreate = createServerFn({ method: 'POST' })
 export const userDeleteById = createServerFn({ method: 'POST' })
   .inputValidator(zDeleteByIdInput())
   .handler(async ({ data }) =>
-    runMutation.withOperation('user.deleteById')(
+    runFreshMutation.withOperation('user.deleteById')(
       data,
       ({ handlers }, ctx, input) => handlers.deleteById(ctx, input)
     )
@@ -117,7 +126,7 @@ export const userGetUserSessions = createServerFn({ method: 'GET' })
 export const userRevokeUserSessions = createServerFn({ method: 'POST' })
   .inputValidator(zRevokeUserSessionsInput())
   .handler(async ({ data }) =>
-    runMutation.withOperation('user.revokeUserSessions')(
+    runFreshMutation.withOperation('user.revokeUserSessions')(
       data,
       ({ handlers }, ctx, input) => handlers.revokeUserSessions(ctx, input)
     )
@@ -126,7 +135,7 @@ export const userRevokeUserSessions = createServerFn({ method: 'POST' })
 export const userRevokeUserSession = createServerFn({ method: 'POST' })
   .inputValidator(zRevokeUserSessionInput())
   .handler(async ({ data }) =>
-    runMutation.withOperation('user.revokeUserSession')(
+    runFreshMutation.withOperation('user.revokeUserSession')(
       data,
       ({ handlers }, ctx, input) => handlers.revokeUserSession(ctx, input)
     )

@@ -2,6 +2,7 @@ import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields'
 
 import { getAuthUseCases } from '@/composition/auth';
 import { getKernel } from '@/composition/kernel';
+import { getHttpConfig } from '@/modules/kernel/infrastructure/config/http';
 import { getTelemetryConfig } from '@/modules/kernel/infrastructure/config/telemetry';
 import {
   appendBrowserMutationVaryHeader,
@@ -128,13 +129,23 @@ const validateTelemetryMutationRequest = (
 /**
  * Best-effort per-IP rate limit. The same-origin guard is a CSRF control, not
  * authentication, so these endpoints still accept forgeable non-browser
- * traffic; this caps abuse/cost amplification per process. A platform/WAF limit
- * remains the primary control on serverless. `scope` keeps a single page's
- * traffic to one endpoint from starving the others.
+ * traffic; this caps abuse/cost amplification per process. The client IP is
+ * derived with the configured `TRUSTED_PROXY_DEPTH` so a spoofed leftmost
+ * `X-Forwarded-For` entry cannot mint a fresh per-IP bucket and bypass the cap.
+ *
+ * IMPORTANT: this limiter is in-memory and per-process, so on serverless /
+ * multi-instance deployments each instance counts independently. Durable,
+ * cross-instance rate limiting must be enforced at the edge/WAF (see
+ * `docs/security-rate-limiting.md`); `TELEMETRY_REQUIRE_AUTH=true` is the
+ * in-app lock-down that closes the anonymous proxy entirely. `scope` keeps a
+ * single page's traffic to one endpoint from starving the others.
  */
 const enforceTelemetryRateLimit = (request: Request, scope: string) => {
   const { rateLimitPerMinute } = getTelemetryConfig();
-  const ip = getClientIp(request) ?? 'unknown';
+  const ip =
+    getClientIp(request, {
+      trustedProxyDepth: getHttpConfig().trustedProxyDepth,
+    }) ?? 'unknown';
   const result = defaultRateLimiter.check(
     `telemetry:${scope}:${ip}`,
     rateLimitPerMinute,
@@ -150,6 +161,19 @@ const hasAuthenticatedSession = async (request: Request) => {
   });
   if (result.isError()) return false;
   return result.get().type === 'auth_session_found';
+};
+
+/**
+ * Optional auth lock-down for the anonymous telemetry proxies. When
+ * `TELEMETRY_REQUIRE_AUTH=true`, the OTLP and Sentry-tunnel proxies require an
+ * authenticated session before forwarding (mirroring the always-on gate on
+ * `/api/telemetry/logs`). Off by default so pre-login browser telemetry keeps
+ * working.
+ */
+const enforceTelemetryAuth = async (request: Request) => {
+  if (!getTelemetryConfig().requireAuth) return undefined;
+  if (await hasAuthenticatedSession(request)) return undefined;
+  return withTelemetryVary(unauthorized());
 };
 
 const readBoundedBody = async (request: Request) => {
@@ -290,6 +314,9 @@ export const handleOtlpProxyRequest = async (
   const rateLimited = enforceTelemetryRateLimit(request, signal);
   if (rateLimited) return rateLimited;
 
+  const unauthenticated = await enforceTelemetryAuth(request);
+  if (unauthenticated) return unauthenticated;
+
   const body = await readBoundedBody(request);
   if (!body.ok) return withTelemetryVary(body.response);
 
@@ -307,6 +334,9 @@ export const handleSentryTunnelRequest = async (request: Request) => {
 
   const rateLimited = enforceTelemetryRateLimit(request, 'sentry');
   if (rateLimited) return rateLimited;
+
+  const unauthenticated = await enforceTelemetryAuth(request);
+  if (unauthenticated) return unauthenticated;
 
   const body = await readBoundedBody(request);
   if (!body.ok) return withTelemetryVary(body.response);
@@ -361,9 +391,6 @@ const frontendTimestamp = (record: Record<string, unknown>) => {
   const timestamp = optionalString(record.timestamp);
   return timestamp ? new Date(timestamp) : undefined;
 };
-
-const frontendErrorMessage = (record: Record<string, unknown>, event: string) =>
-  optionalString(record.error) ?? optionalString(record.message) ?? event;
 
 const writeFrontendBackendLog = (
   logger: KernelLogger,
@@ -424,16 +451,13 @@ const recordFrontendLog = ({
     timestamp: frontendTimestamp(sanitized),
   });
 
-  if (level !== 'error') return;
-
-  telemetry.captureException(
-    new Error(frontendErrorMessage(sanitized, event)),
-    {
-      extra: { frontendLog: sanitized },
-      level: 'error',
-      tags: { event, source: 'frontend' },
-    }
-  );
+  // Frontend-origin records are recorded as logs (above) but intentionally do
+  // NOT call `telemetry.captureException`. This relay accepts user-supplied
+  // records, so auto-promoting `level:'error'` records into Sentry exceptions
+  // would let a low-privilege authenticated caller inflate the error stream and
+  // exhaust Sentry quota. The `level:'error'` signal is preserved on the emitted
+  // log (tagged `source:'frontend'`) for querying; genuine exceptions are
+  // captured by the server's own error paths.
 };
 
 const toFrontendLogBatch = async (request: Request) => {

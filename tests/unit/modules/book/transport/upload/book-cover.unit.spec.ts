@@ -57,7 +57,10 @@ describe('book cover upload transport', () => {
         { headers, fileType: 'image/webp' }
       )
     ).resolves.toEqual({
-      objectInfo: { key: 'books/generated.webp' },
+      objectInfo: {
+        key: 'books/generated.webp',
+        cacheControl: 'public, max-age=31536000, immutable',
+      },
     });
 
     expect(prepareCoverUpload).toHaveBeenCalledWith({

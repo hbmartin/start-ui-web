@@ -41,4 +41,5 @@ export type {
   AuthenticatedUser,
   AuthSession,
 } from './domain/session';
+export { AUTH_REAUTH_REQUIRED, isSessionFresh } from './domain/session-policy';
 export { type AuthUseCases, createAuthUseCases } from './factory';

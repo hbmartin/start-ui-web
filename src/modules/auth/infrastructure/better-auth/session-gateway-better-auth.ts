@@ -68,6 +68,7 @@ const toAuthenticatedSession = (
   id: toSessionId(session.id),
   userId: userId ? toUserId(userId) : undefined,
   expiresAt: session.expiresAt,
+  createdAt: session.createdAt,
 });
 
 export class SessionGatewayBetterAuth implements SessionGateway {

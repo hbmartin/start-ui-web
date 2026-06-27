@@ -51,6 +51,11 @@
       "sessionExpires": "Expire {{time}}",
       "editUser": "Modifier l'utilisateur"
     },
+    "reauth": {
+      "title": "Ré-authentification requise",
+      "description": "Votre session n'est plus récente. Reconnectez-vous pour confirmer cette action.",
+      "action": "Se reconnecter"
+    },
     "form": {
       "emailAlreadyExist": "Email déjà utilisé"
     },

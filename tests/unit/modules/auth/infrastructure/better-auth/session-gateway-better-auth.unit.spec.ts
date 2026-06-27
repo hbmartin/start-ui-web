@@ -213,6 +213,27 @@ describe('SessionGatewayBetterAuth', () => {
     });
   });
 
+  it('carries the provider session createdAt for the freshness policy', async () => {
+    const { SessionGatewayBetterAuth } = await loadGateway();
+    const createdAt = new Date('2026-06-10T09:00:00.000Z');
+    const clock = { now: () => new Date('2026-06-10T09:05:00.000Z') };
+    const gateway = new SessionGatewayBetterAuth(
+      makeAuth('admin', { createdAt }),
+      makeDb(),
+      clock
+    );
+
+    const session = await gateway.getSession({ headers: new Headers() });
+
+    expect(session).toMatchObject({
+      tag: 'Ok',
+      value: {
+        type: 'auth_session_found',
+        session: { session: { createdAt } },
+      },
+    });
+  });
+
   it('keeps sessions still within the absolute max age', async () => {
     const { SessionGatewayBetterAuth } = await loadGateway();
     const createdAt = new Date('2026-06-01T00:00:00.000Z');

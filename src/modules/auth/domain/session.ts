@@ -20,6 +20,11 @@ export type AuthenticatedSession = {
   id: SessionId;
   userId?: UserId;
   expiresAt?: Date | string;
+  /**
+   * Original sign-in time, carried from the provider session. Used by the
+   * freshness policy for step-up re-authentication on destructive actions.
+   */
+  createdAt?: Date | string;
 };
 
 export type AuthSession = {

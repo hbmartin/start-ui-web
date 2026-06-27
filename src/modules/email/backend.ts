@@ -16,7 +16,7 @@ const getDeps = createServerOnlyFn(
     const [
       { getEmailUseCases, getResendWebhookVerifier },
       { getKernel },
-      { getEmailConfig },
+      { getEmailConfig, getHttpConfig },
     ] = await Promise.all([
       import('@/composition/email'),
       import('@/composition/kernel'),
@@ -28,6 +28,7 @@ const getDeps = createServerOnlyFn(
         getUseCases: getEmailUseCases,
         logger: getKernel().logger,
         maxBodyBytes: getEmailConfig().resendWebhookMaxBytes,
+        trustedProxyDepth: getHttpConfig().trustedProxyDepth,
         verifier: getResendWebhookVerifier(),
       }),
     };

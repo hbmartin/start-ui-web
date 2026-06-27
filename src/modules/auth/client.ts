@@ -25,6 +25,7 @@ export {
   createAuthQueries,
   createAuthQueryHooks,
 } from './presentation/queries';
+export { isReauthRequiredError } from './presentation/reauth-error';
 export type {
   FormFieldsLogin,
   FormFieldsLoginVerify,

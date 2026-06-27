@@ -66,6 +66,8 @@ import {
 } from '@/modules/kernel/domain/ids';
 import { userQueries } from '@/modules/user/client';
 
+import { useReauthPrompt } from './use-reauth-prompt';
+
 const isNotFoundError = (error: unknown) =>
   isServerFnError(error) && error.code === 'NOT_FOUND';
 
@@ -75,6 +77,7 @@ export const PageUser = (props: { params: { id: string } }) => {
   const session = useAuthSession();
   const { t } = useTranslation(['user']);
   const scopeKey = useCurrentScopeKey();
+  const promptReauth = useReauthPrompt();
   const userId = toUserId(props.params.id);
   const userQuery = useQuery(userQueries.getById({ id: userId, scopeKey }));
 
@@ -95,7 +98,8 @@ export const PageUser = (props: { params: { id: string } }) => {
 
       // Redirect
       navigateBack();
-    } catch {
+    } catch (error) {
+      if (promptReauth(error)) return;
       toast.error(t('user:manager.detail.deleteError'));
     }
   };
@@ -371,6 +375,7 @@ const RevokeAllSessionsButton = (props: { userId: UserId }) => {
   const currentSession = useAuthSession();
   const scopeKey = useCurrentScopeKey();
   const { t } = useTranslation(['user']);
+  const promptReauth = useReauthPrompt();
   const revokeAllSessions = useMutation({
     ...userQueries.revokeUserSessions(),
     onSuccess: async () => {
@@ -378,7 +383,8 @@ const RevokeAllSessionsButton = (props: { userId: UserId }) => {
         queryKey: userQueries.getUserSessions(scopeKey),
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (promptReauth(error)) return;
       toast.error(t('user:manager.detail.revokeAllError'));
     },
   });
@@ -408,6 +414,7 @@ const RevokeSessionButton = (props: {
   const currentSession = useAuthSession();
   const scopeKey = useCurrentScopeKey();
   const { t } = useTranslation(['user']);
+  const promptReauth = useReauthPrompt();
   const revokeSession = useMutation({
     ...userQueries.revokeUserSession(),
     onSuccess: async () => {
@@ -415,7 +422,8 @@ const RevokeSessionButton = (props: {
         queryKey: userQueries.getUserSessions(scopeKey),
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (promptReauth(error)) return;
       toast.error(t('user:manager.detail.revokeError'));
     },
   });

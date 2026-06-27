@@ -16,7 +16,12 @@ import type {
   Permission,
   RequestScope,
 } from '@/modules/auth';
-import { scopeFromUser, scopeKeyFromScope } from '@/modules/auth';
+import {
+  AUTH_REAUTH_REQUIRED,
+  isSessionFresh,
+  scopeFromUser,
+  scopeKeyFromScope,
+} from '@/modules/auth';
 import {
   createRequestLogger,
   type Logger,
@@ -25,6 +30,7 @@ import {
 import { ServerFnError } from '@/modules/kernel/client';
 import type { UserId } from '@/modules/kernel/domain/ids';
 import { toRequestId } from '@/modules/kernel/domain/ids';
+import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
 import { cachePrivateNoStore } from '@/platform/http/cache-control';
 import type { TelemetryAdapter } from '@/platform/telemetry';
@@ -54,6 +60,16 @@ type ServerContextDeps = {
   getAuthUseCases: () => AuthUseCases;
   logger?: Logger;
   telemetry?: TelemetryAdapter;
+  /**
+   * Step-up freshness window in seconds. Defaults to the Better Auth config so
+   * production wiring stays a no-op; tests override it with a fixed value.
+   */
+  getSessionFreshAgeSeconds?: () => number;
+  /**
+   * Framework-boundary clock for the freshness check. AGENTS.md allows a direct
+   * `Date.now()` here; tests override it with a fixed instant.
+   */
+  now?: () => number;
 };
 
 type AppStartRequestContextLike = {
@@ -203,6 +219,9 @@ export const createServerContextTools = ({
   getAuthUseCases,
   logger = noOpLogger,
   telemetry = createNoOpTelemetry(),
+  getSessionFreshAgeSeconds = () =>
+    getBetterAuthConfig().sessionFreshAgeInSeconds,
+  now = () => Date.now(),
 }: ServerContextDeps) => {
   const getSession = async (timings: ServerTimingEntry[]) => {
     const authStart = performance.now();
@@ -301,6 +320,35 @@ export const createServerContextTools = ({
     });
   };
 
+  /**
+   * Like `withProtectedMutation`, but additionally requires a *fresh* session
+   * (recent original sign-in) before running destructive admin actions. A stale
+   * session is rejected with a recognizable `reauth_required` signal so the
+   * client can prompt a step-up re-authentication and retry. This never locks an
+   * admin out: re-authenticating mints a new session with a fresh `createdAt`.
+   */
+  const withFreshProtectedMutation = async <T>(
+    fn: (ctx: ProtectedContext) => Promise<T>
+  ): Promise<T> => {
+    return withProtectedMutation(async (ctx) => {
+      const fresh = isSessionFresh({
+        createdAt: ctx.session.createdAt,
+        freshAgeSeconds: getSessionFreshAgeSeconds(),
+        now: now(),
+      });
+      if (!fresh) {
+        ctx.logger.warn({
+          event: 'security.reauth_required',
+          direction: 'inbound',
+        });
+        throw new ServerFnError('FORBIDDEN', {
+          data: { reason: AUTH_REAUTH_REQUIRED },
+        });
+      }
+      return fn(ctx);
+    });
+  };
+
   const assertPermission = async (userId: UserId, permissions: Permission) => {
     const result = await getAuthUseCases().checkPermission({
       userId,
@@ -320,6 +368,7 @@ export const createServerContextTools = ({
 
   return {
     assertPermission,
+    withFreshProtectedMutation,
     withProtectedContext,
     withProtectedMutation,
     withPublicContext,

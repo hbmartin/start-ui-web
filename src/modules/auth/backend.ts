@@ -64,6 +64,8 @@ export const handleLogoutRequest = (request: Request) =>
       })
   );
 export const assertPermission = serverContextTools.assertPermission;
+export const withFreshProtectedMutation =
+  serverContextTools.withFreshProtectedMutation;
 export const withProtectedContext = serverContextTools.withProtectedContext;
 export const withProtectedMutation = serverContextTools.withProtectedMutation;
 export const withPublicContext = serverContextTools.withPublicContext;

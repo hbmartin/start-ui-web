@@ -11,6 +11,7 @@ import { getTelemetry } from '@/platform/telemetry';
 
 import {
   bookCoverAcceptedFileTypes,
+  bookCoverCacheControl,
   bookCoverMaxFileSizeBytes,
 } from '../../domain/book-policy';
 
@@ -28,6 +29,7 @@ type BookCoverUploadErrorKey =
 type BookCoverBeforeUploadResult = {
   objectInfo: {
     key: string;
+    cacheControl: string;
   };
 };
 
@@ -92,9 +94,18 @@ export const handleBookCoverBeforeUpload = async (
             type: 'book_cover_upload_prepared',
             upload: P.select(),
           }),
+          // better-upload pins the presigned PUT Content-Type to `file.type`,
+          // which it rejects unless it is in `fileTypes`
+          // (`bookCoverAcceptedFileTypes`), so the served Content-Type is
+          // always a server-validated image MIME. We additionally pin
+          // Cache-Control here so the client cannot choose its own value.
+          // Content-Disposition and `X-Content-Type-Options: nosniff` are not
+          // settable through better-upload's presign API and must be enforced
+          // by the public bucket policy. See `docs/security-upload.md`.
           (upload) => ({
             objectInfo: {
               key: upload.objectKey,
+              cacheControl: bookCoverCacheControl,
             },
           })
         )

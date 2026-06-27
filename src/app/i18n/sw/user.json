@@ -51,6 +51,11 @@
       "sessionExpires": "Kinaisha {{time}}",
       "editUser": "Hariri mtumiaji"
     },
+    "reauth": {
+      "title": "Uthibitishaji upya unahitajika",
+      "description": "Kikao chako si kipya tena. Ingia tena ili kuthibitisha hatua hii.",
+      "action": "Ingia tena"
+    },
     "form": {
       "emailAlreadyExist": "Barua pepe tayari imetumika"
     },

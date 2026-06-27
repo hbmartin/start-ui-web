@@ -45,6 +45,7 @@ vi.mock('@/composition/telemetry', () => ({
 vi.mock('@/modules/auth/transport/tanstack/server-context', () => ({
   createServerContextTools: vi.fn(() => ({
     assertPermission: vi.fn(),
+    withFreshProtectedMutation: vi.fn(),
     withProtectedContext: vi.fn(),
     withProtectedMutation: vi.fn(),
     withPublicContext: vi.fn(),

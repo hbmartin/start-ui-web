@@ -36,6 +36,7 @@ import {
   formUserDefaultValues,
   formUserValidators,
 } from './form-user';
+import { useReauthPrompt } from './use-reauth-prompt';
 
 const isNotFoundError = (error: unknown) =>
   isServerFnError(error) && error.code === 'NOT_FOUND';
@@ -47,6 +48,7 @@ export const PageUserUpdate = (props: { params: { id: string } }) => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const scopeKey = useCurrentScopeKey();
+  const promptReauth = useReauthPrompt();
   const userId = toUserId(props.params.id);
   const userDetailQuery = userQueries.getById({ id: userId, scopeKey });
   const userQuery = useQuery(userDetailQuery);
@@ -80,6 +82,8 @@ export const PageUserUpdate = (props: { params: { id: string } }) => {
       navigateBack({ ignoreBlocker: true });
     },
     onError: (error) => {
+      if (promptReauth(error)) return;
+
       if (
         isServerFnError(error) &&
         error.code === 'CONFLICT' &&
