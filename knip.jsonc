@@ -7,7 +7,10 @@
     "config": ["stryker.*.config.mjs"],
   },
   "ignoreDependencies": [
-    // Manual copy-paste detection; configured via the "jscpd" key in package.json.
-    "jscpd",
+    // Used via the eslint `-f` CLI flag in the `sarif:eslint` script, which knip
+    // cannot trace; resolving the scoped formatter also yields a phantom
+    // "eslint-formatter-" entry, so it is ignored here too.
+    "@microsoft/eslint-formatter-sarif",
+    "eslint-formatter-",
   ],
 }

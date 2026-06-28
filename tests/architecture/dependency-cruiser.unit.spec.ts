@@ -30,3 +30,40 @@ describe('dependency-cruiser architecture rules', () => {
     expect(config).toContain('(?!kernel/)');
   });
 });
+
+describe('dependency-cruiser folder metrics contract', () => {
+  it(
+    'exposes folder-level coupling metrics when metrics are enabled',
+    async () => {
+      const options = await extractDepcruiseOptions(
+        path.resolve(process.cwd(), '.dependency-cruiser.cjs')
+      );
+      const result = await cruise(['src/modules'], {
+        ...options,
+        metrics: true,
+      });
+      const output = result.output;
+
+      expect(typeof output).not.toBe('string');
+      if (typeof output === 'string') return;
+
+      const folders = (output as { folders?: Array<{ name: string }> }).folders;
+      expect(Array.isArray(folders)).toBe(true);
+
+      const bookFolder = folders?.find(
+        (folder) => folder.name === 'src/modules/book'
+      ) as
+        | {
+            afferentCouplings?: number;
+            efferentCouplings?: number;
+            instability?: number;
+          }
+        | undefined;
+      expect(bookFolder).toBeDefined();
+      expect(typeof bookFolder?.instability).toBe('number');
+      expect(typeof bookFolder?.afferentCouplings).toBe('number');
+      expect(typeof bookFolder?.efferentCouplings).toBe('number');
+    },
+    DEPCRUISE_TEST_TIMEOUT_MS
+  );
+});

@@ -1,0 +1,29 @@
+{
+  "distance": {
+    "ceiling": 0.7,
+    "regressionTolerance": 0.05
+  },
+  "instability": {
+    "regressionTolerance": 0.1
+  },
+  "cognitive_p90": {
+    "regressionTolerance": 2
+  },
+  "cyclomatic_p90": {
+    "regressionTolerance": 2
+  },
+  "duplication": {
+    "ceiling_percentage": 5,
+    "regressionTolerance": 0.5
+  },
+  "circular": {
+    "ceiling": 0
+  },
+  "sheriff": {
+    "regressionTolerance": 0
+  },
+  "bundle": {
+    "regressionBytesTolerance": 5120,
+    "regressionRatioTolerance": 0.03
+  }
+}

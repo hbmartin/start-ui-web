@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "modules": {
+    "account": {
+      "instability": 0.9474,
+      "abstractness": 0.6429,
+      "distance": 0.5902,
+      "cyclomatic_p90": 3,
+      "cognitive_p90": 4,
+      "afferent": 2,
+      "efferent": 36
+    },
+    "auth": {
+      "instability": 0.8086,
+      "abstractness": 0.4382,
+      "distance": 0.2468,
+      "cyclomatic_p90": 5,
+      "cognitive_p90": 6,
+      "afferent": 31,
+      "efferent": 131
+    },
+    "book": {
+      "instability": 0.972,
+      "abstractness": 0.5867,
+      "distance": 0.5587,
+      "cyclomatic_p90": 3,
+      "cognitive_p90": 3,
+      "afferent": 4,
+      "efferent": 139
+    },
+    "email": {
+      "instability": 0.8696,
+      "abstractness": 0.5313,
+      "distance": 0.4008,
+      "cyclomatic_p90": 6,
+      "cognitive_p90": 7,
+      "afferent": 6,
+      "efferent": 40
+    },
+    "genre": {
+      "instability": 0.7419,
+      "abstractness": 0.6,
+      "distance": 0.3419,
+      "cyclomatic_p90": 4,
+      "cognitive_p90": 3,
+      "afferent": 8,
+      "efferent": 23
+    },
+    "kernel": {
+      "instability": 0.3649,
+      "abstractness": 0.3985,
+      "distance": 0.2366,
+      "cyclomatic_p90": 4,
+      "cognitive_p90": 3,
+      "afferent": 94,
+      "efferent": 54
+    },
+    "user": {
+      "instability": 0.9901,
+      "abstractness": 0.631,
+      "distance": 0.6211,
+      "cyclomatic_p90": 2,
+      "cognitive_p90": 1,
+      "afferent": 1,
+      "efferent": 100
+    }
+  },
+  "signals": {
+    "duplication_percentage": 3.97,
+    "circular": 0,
+    "sheriff_violations": 0
+  },
+  "bundle": {}
+}

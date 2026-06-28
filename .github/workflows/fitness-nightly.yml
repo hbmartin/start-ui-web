@@ -1,0 +1,59 @@
+name: 🧬 Fitness Nightly
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Distinct minute from semgrep (16 3) and codeql (37 4).
+    - cron: '23 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fitness-nightly:
+    name: Fitness Scorecard (full, with churn)
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      SKIP_ENV_VALIDATION: true
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Full history is required for churn / hotspot analysis.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: 24
+
+      - name: Generate dependency-cruiser report
+        run: |
+          mkdir -p test-results/dependency-cruiser
+          pnpm exec depcruise --config .dependency-cruiser.cjs --output-type json --output-to test-results/dependency-cruiser/dependency-cruiser.json src || true
+
+      - name: Record Sheriff signal
+        run: pnpm fitness:sheriff
+
+      - name: Generate duplication report
+        run: pnpm jscpd:json
+
+      - name: Collect full fitness metrics (incl. churn/hotspots)
+        run: pnpm fitness:nightly
+
+      - name: Publish scorecard summary
+        if: always()
+        run: cat test-results/fitness/fitness-scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload fitness scorecard
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fitness-scorecard-nightly
+          path: test-results/fitness/
+          retention-days: 30

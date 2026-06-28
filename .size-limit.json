@@ -1,0 +1,14 @@
+[
+  {
+    "name": "client JS (total, gzip)",
+    "path": ".output/public/**/*.js",
+    "limit": "3 MB",
+    "gzip": true
+  },
+  {
+    "name": "client CSS (total, gzip)",
+    "path": ".output/public/**/*.css",
+    "limit": "300 kB",
+    "gzip": true
+  }
+]

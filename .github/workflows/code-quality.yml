@@ -218,6 +218,9 @@ jobs:
       - name: Run test layering check
         run: pnpm check:test-layering
 
+      - name: Run Sheriff boundary verification
+        run: pnpm lint:sheriff
+
       - name: Run architecture tests
         run: |
           mkdir -p test-results/architecture
@@ -368,10 +371,88 @@ jobs:
           set -o pipefail
           pnpm build 2>&1 | tee test-results/build/build.log
 
+      - name: Check bundle size budgets
+        if: always()
+        continue-on-error: true
+        run: pnpm size-limit
+
+      - name: Record bundle sizes
+        if: always()
+        run: pnpm size-limit:json || true
+
+      - name: Upload bundle size report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bundle-size-report
+          path: test-results/fitness/size-limit.json
+          retention-days: 30
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: build-log
           path: test-results/build/build.log
+          retention-days: 30
+
+  fitness:
+    name: Fitness Scorecard
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      SKIP_ENV_VALIDATION: true
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: 24
+
+      - name: Generate dependency-cruiser report
+        run: |
+          mkdir -p test-results/dependency-cruiser
+          pnpm exec depcruise --config .dependency-cruiser.cjs --output-type json --output-to test-results/dependency-cruiser/dependency-cruiser.json src || true
+
+      - name: Record Sheriff signal
+        run: pnpm fitness:sheriff
+
+      - name: Generate duplication report
+        run: pnpm jscpd:json
+
+      - name: Collect fitness metrics (ratchet gate)
+        run: pnpm fitness:metrics:check
+
+      - name: Generate SARIF reports
+        if: always()
+        run: |
+          mkdir -p test-results/sarif
+          pnpm sarif:eslint || true
+          pnpm sarif:depcruise
+          pnpm sarif:fitness
+          pnpm sarif:merge
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: test-results/sarif/combined.sarif
+          category: fitness
+
+      - name: Upload fitness artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fitness-scorecard
+          path: |
+            test-results/fitness/
+            test-results/sarif/
           retention-days: 30

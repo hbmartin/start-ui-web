@@ -3,5 +3,30 @@
   "attribution": {
     "commit": "Co-authored-by: Claude <noreply@anthropic.com>",
     "pr": "Generated with [Claude](https://claude.ai)"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/fitness/claude-architecture-hook.mjs --event post-tool-use",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/fitness/claude-architecture-hook.mjs --event stop",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
   }
 }
