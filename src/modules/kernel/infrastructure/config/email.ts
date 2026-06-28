@@ -19,16 +19,40 @@ const PLACEHOLDER_EMAIL_SECRET_VALUES = new Set([
 const isPlaceholderEmailSecret = (value: string) =>
   PLACEHOLDER_EMAIL_SECRET_VALUES.has(value.trim().toLowerCase());
 
+const isSupportedEmailServer = (value: string) => {
+  try {
+    return new URL(value).protocol === 'smtp:';
+  } catch {
+    return false;
+  }
+};
+
 const emailEnvSchema = baseEnvSchema
   .extend({
     RESEND_API_KEY: zNonEmptyEnvString(),
     RESEND_WEBHOOK_SECRET: z.string().trim().optional(),
     RESEND_WEBHOOK_MAX_BYTES: z.coerce.number().int().positive().optional(),
+    EMAIL_SERVER: z
+      .string()
+      .trim()
+      .min(1)
+      .refine(isSupportedEmailServer, {
+        message: 'EMAIL_SERVER must use the smtp:// protocol',
+      })
+      .optional(),
     EMAIL_FROM: zNonEmptyEnvString(),
     EMAIL_DELIVERY_DISABLED: z.stringbool().default(false),
   })
   .superRefine((env, ctx) => {
     if (!isProdRuntimeEnvironment(env)) return;
+
+    if (env.EMAIL_SERVER) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['EMAIL_SERVER'],
+        message: 'EMAIL_SERVER is only supported for local and test delivery',
+      });
+    }
 
     if (isPlaceholderEmailSecret(env.RESEND_API_KEY)) {
       ctx.addIssue({
@@ -55,6 +79,7 @@ export type EmailConfig = {
   resendApiKey: string;
   resendWebhookSecret?: string;
   resendWebhookMaxBytes: number;
+  server?: string;
   from: string;
   deliveryDisabled: boolean;
 };
@@ -69,6 +94,7 @@ export function getEmailConfig(): EmailConfig {
     resendApiKey: env.RESEND_API_KEY,
     resendWebhookSecret: env.RESEND_WEBHOOK_SECRET,
     resendWebhookMaxBytes: env.RESEND_WEBHOOK_MAX_BYTES ?? 1_000_000,
+    server: env.EMAIL_SERVER,
     from: env.EMAIL_FROM,
     deliveryDisabled: env.EMAIL_DELIVERY_DISABLED,
   };

@@ -338,7 +338,7 @@ module.exports = {
         'React Email rendering stays in email infrastructure or local email preview composition.',
       from: {
         pathNot:
-          '^src/(modules/email/infrastructure/resend/|composition/email-preview\\.tsx$)',
+          '^src/(modules/email/infrastructure/(resend|smtp)/|composition/email-preview\\.tsx$)',
       },
       to: { path: 'node_modules/@react-email/render/' },
     },

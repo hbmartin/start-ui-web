@@ -2,6 +2,7 @@ import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SecondaryStore } from '@/modules/auth';
+import { AppError } from '@/modules/kernel';
 
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(() => ({ id: 'admin-plugin' })),
@@ -139,5 +140,43 @@ describe('Better Auth security configuration', () => {
     )?.[0] as ExplicitAny;
     expect(emailOtpOptions.allowedAttempts).toBe(3);
     expect(emailOtpOptions.rateLimit).toEqual({ window: 60, max: 3 });
+  });
+
+  it('propagates secondary storage failures to Better Auth', async () => {
+    const { createAuth } = await vi.importActual<
+      typeof import('@/modules/auth/infrastructure/better-auth/auth')
+    >('@/modules/auth/infrastructure/better-auth/auth');
+    const storeError = new AppError({
+      code: 'AUTH_SECONDARY_STORE_TEST_FAILURE',
+      category: 'system',
+      status: 503,
+      message: 'secondary storage unavailable',
+    });
+    const secondaryStore = {
+      get: vi.fn(async () => Result.Error(storeError)),
+      set: vi.fn(async () => Result.Error(storeError)),
+      delete: vi.fn(async () => Result.Error(storeError)),
+    } satisfies SecondaryStore;
+
+    createAuth({
+      authEmailPort: {
+        sendSignInOtp: vi.fn(async () =>
+          Result.Ok({ type: 'auth_sign_in_otp_sent' as const })
+        ),
+      },
+      secondaryStore,
+    });
+
+    const options = mocks.betterAuth.mock.calls.at(-1)?.[0] as ExplicitAny;
+
+    await expect(options.secondaryStorage.get('key-1')).rejects.toBe(
+      storeError
+    );
+    await expect(
+      options.secondaryStorage.set('key-1', 'value-1', 60)
+    ).rejects.toBe(storeError);
+    await expect(options.secondaryStorage.delete('key-1')).rejects.toBe(
+      storeError
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { Result } from '@bloodyowl/boxed';
 
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
+import { AppError } from '@/modules/kernel';
 
 import type { SecondaryStore } from '../../application/ports/secondary-store';
 
@@ -59,10 +59,11 @@ export class InMemorySecondaryStore implements SecondaryStore {
   }
 
   private sweep(currentTime: number): void {
-    let inspected = 0;
-    for (const [key, entry] of this.entries) {
-      if (inspected >= this.sweepMaxEntries) break;
-      inspected += 1;
+    const sweepWindow = [...this.entries.entries()].slice(
+      0,
+      this.sweepMaxEntries
+    );
+    for (const [key, entry] of sweepWindow) {
       this.entries.delete(key);
       if (!this.isExpired(entry, currentTime)) this.entries.set(key, entry);
     }

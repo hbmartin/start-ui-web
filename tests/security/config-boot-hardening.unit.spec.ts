@@ -26,9 +26,8 @@ describe('validateServerConfig fails closed on insecure production config', () =
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('AUTH_SECRET', undefined);
 
+    const { ConfigurationError } = await import('@/modules/kernel');
     const { validateServerConfig } = await import('@/modules/kernel/backend');
-    const { ConfigurationError } =
-      await import('@/modules/kernel/domain/errors/configuration-error');
 
     expect(() => validateServerConfig()).toThrow(ConfigurationError);
   });
@@ -38,9 +37,8 @@ describe('validateServerConfig fails closed on insecure production config', () =
     vi.stubEnv('AUTH_SECRET', makeStrongTestSecret('auth'));
     vi.stubEnv('DATABASE_URL', makeTestDatabaseUrl({ host: 'db.example.com' }));
 
+    const { ConfigurationError } = await import('@/modules/kernel');
     const { validateServerConfig } = await import('@/modules/kernel/backend');
-    const { ConfigurationError } =
-      await import('@/modules/kernel/domain/errors/configuration-error');
 
     expect(() => validateServerConfig()).toThrow(ConfigurationError);
     expect(() => validateServerConfig()).toThrow('DATABASE_URL');
@@ -76,8 +74,7 @@ describe('Better Auth OTP attempt cap default', () => {
   it('defaults otpAllowedAttempts to the hardened value of 3', async () => {
     vi.stubEnv('AUTH_OTP_ALLOWED_ATTEMPTS', undefined);
 
-    const { getBetterAuthConfig } =
-      await import('@/modules/kernel/infrastructure/config/auth');
+    const { getBetterAuthConfig } = await import('@/modules/kernel/backend');
     const config = getBetterAuthConfig();
 
     expect(config).toHaveProperty('otpAllowedAttempts', 3);
@@ -87,8 +84,7 @@ describe('Better Auth OTP attempt cap default', () => {
   it('wires otpAllowedAttempts from AUTH_OTP_ALLOWED_ATTEMPTS', async () => {
     vi.stubEnv('AUTH_OTP_ALLOWED_ATTEMPTS', '5');
 
-    const { getBetterAuthConfig } =
-      await import('@/modules/kernel/infrastructure/config/auth');
+    const { getBetterAuthConfig } = await import('@/modules/kernel/backend');
 
     expect(getBetterAuthConfig().otpAllowedAttempts).toBe(5);
   });

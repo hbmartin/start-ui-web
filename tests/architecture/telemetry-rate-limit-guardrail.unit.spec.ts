@@ -19,11 +19,15 @@ const TRANSPORT_PATH = path.resolve(
 );
 const source = readFileSync(TRANSPORT_PATH, 'utf8');
 
-const RATE_LIMITED_HANDLERS = [
-  'handleOtlpProxyRequest',
-  'handleSentryTunnelRequest',
-  'handleFrontendLogsRequest',
-] as const;
+const TELEMETRY_HANDLER_EXPORT_PATTERN =
+  /^export const (handle[A-Za-z0-9]+Request)\b/gm;
+
+const rateLimitedHandlers = [
+  ...source.matchAll(TELEMETRY_HANDLER_EXPORT_PATTERN),
+]
+  .map((match) => match[1])
+  .filter((name): name is string => name !== undefined)
+  .sort();
 
 const handlerBody = (name: string) => {
   const marker = `export const ${name}`;
@@ -34,11 +38,7 @@ const handlerBody = (name: string) => {
   return nextExport === -1 ? rest : rest.slice(0, nextExport);
 };
 
-const missingHandlers = RATE_LIMITED_HANDLERS.filter(
-  (name) => handlerBody(name) === ''
-);
-
-const handlersMissingThrottle = RATE_LIMITED_HANDLERS.filter(
+const handlersMissingThrottle = rateLimitedHandlers.filter(
   (name) => !handlerBody(name).includes('enforceTelemetryRateLimit')
 );
 
@@ -53,8 +53,12 @@ describe('telemetry transport rate limiting (regression guardrail)', () => {
     expect(source).toContain('defaultRateLimiter');
   });
 
-  it('defines every telemetry ingest handler it guards', () => {
-    expect(missingHandlers).toEqual([]);
+  it('discovers every exported telemetry ingest handler', () => {
+    expect(rateLimitedHandlers).toEqual([
+      'handleFrontendLogsRequest',
+      'handleOtlpProxyRequest',
+      'handleSentryTunnelRequest',
+    ]);
   });
 
   it('enforces the telemetry rate limit in every ingest handler', () => {

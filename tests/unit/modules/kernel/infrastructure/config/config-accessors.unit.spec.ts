@@ -314,6 +314,18 @@ describe('server config accessors', () => {
     expect(() => getRedisConfig()).toThrow('UPSTASH_REDIS_REST_TOKEN');
   });
 
+  it('throws ConfigurationError when Redis token is present without URL', async () => {
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', undefined);
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', makeTestSecret('redis'));
+    const { getRedisConfig } =
+      await import('@/modules/kernel/infrastructure/config/redis');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getRedisConfig()).toThrow(ConfigurationError);
+    expect(() => getRedisConfig()).toThrow('UPSTASH_REDIS_REST_URL');
+  });
+
   it('returns Redis config when both required values are present', async () => {
     const redisToken = makeTestSecret('redis');
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
@@ -535,6 +547,43 @@ describe('server config accessors', () => {
       await import('@/modules/kernel/infrastructure/config/email');
 
     expect(getEmailConfig().resendWebhookMaxBytes).toBe(4096);
+  });
+
+  it('parses an explicit SMTP email server', async () => {
+    vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    vi.stubEnv('EMAIL_SERVER', 'smtp://127.0.0.1:1025');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+
+    expect(getEmailConfig().server).toBe('smtp://127.0.0.1:1025');
+  });
+
+  it('rejects unsupported email server protocols', async () => {
+    vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    vi.stubEnv('EMAIL_SERVER', 'https://mail.example.com');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getEmailConfig()).toThrow(ConfigurationError);
+    expect(() => getEmailConfig()).toThrow('EMAIL_SERVER');
+  });
+
+  it('rejects SMTP email server configuration in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    vi.stubEnv('EMAIL_SERVER', 'smtp://127.0.0.1:1025');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getEmailConfig()).toThrow(ConfigurationError);
+    expect(() => getEmailConfig()).toThrow('EMAIL_SERVER');
   });
 
   it('rejects placeholder production Resend webhook secrets', async () => {

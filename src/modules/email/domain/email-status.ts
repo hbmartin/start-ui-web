@@ -9,8 +9,11 @@ import type {
 } from '@/modules/kernel/domain/ids';
 
 export const EMAIL_PROVIDER_RESEND = 'resend' as const;
+export const EMAIL_PROVIDER_SMTP = 'smtp' as const;
 
-export type EmailProvider = typeof EMAIL_PROVIDER_RESEND;
+export type EmailProvider =
+  | typeof EMAIL_PROVIDER_RESEND
+  | typeof EMAIL_PROVIDER_SMTP;
 
 export const emailStatusValues = [
   'send_attempted',

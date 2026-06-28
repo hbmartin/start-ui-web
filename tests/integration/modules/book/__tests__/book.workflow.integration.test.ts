@@ -6,6 +6,7 @@ import {
   type BookRepository,
   type BookWriteInput,
   createBookUseCases,
+  isDuplicateBookCandidate,
 } from '@/modules/book';
 import {
   type ApplicationResult,
@@ -66,10 +67,8 @@ class InMemoryBookRepository implements BookRepository {
   async findDuplicateCandidate(
     input: Pick<BookWriteInput, 'title' | 'author'>
   ) {
-    const duplicate = [...this.books.values()].find(
-      (book) =>
-        book.title.trim().toLowerCase() === input.title.trim().toLowerCase() &&
-        book.author.trim().toLowerCase() === input.author.trim().toLowerCase()
+    const duplicate = [...this.books.values()].find((book) =>
+      isDuplicateBookCandidate(book, input)
     );
 
     return Result.Ok(
@@ -136,10 +135,7 @@ class InMemoryBookRepository implements BookRepository {
 
   #isDuplicate(input: BookWriteInput, currentId?: BookId) {
     const duplicate = [...this.books.values()].find(
-      (book) =>
-        book.id !== currentId &&
-        book.title.toLowerCase() === input.title.toLowerCase() &&
-        book.author.toLowerCase() === input.author.toLowerCase()
+      (book) => book.id !== currentId && isDuplicateBookCandidate(book, input)
     );
 
     return duplicate !== undefined;

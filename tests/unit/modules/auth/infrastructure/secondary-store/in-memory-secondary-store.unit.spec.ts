@@ -20,6 +20,10 @@ const expectHit = async (
   });
 };
 
+const entryKeys = (store: InMemorySecondaryStore) => [
+  ...(store as unknown as { entries: Map<string, unknown> }).entries.keys(),
+];
+
 describe('InMemorySecondaryStore', () => {
   it('round-trips values and deletes them', async () => {
     const store = new InMemorySecondaryStore();
@@ -108,6 +112,21 @@ describe('InMemorySecondaryStore', () => {
     await expectMiss(store.get('a'));
     await expectMiss(store.get('b'));
     await expectHit(store.get('c'), '3');
+  });
+
+  it('does not revisit live entries while sweeping', async () => {
+    const store = new InMemorySecondaryStore({
+      sweepThreshold: 3,
+      sweepIntervalMs: 0,
+      sweepMaxEntries: 8,
+    });
+
+    await store.set('a', '1');
+    await store.set('b', '2');
+    await store.set('c', '3');
+    await store.set('d', '4');
+
+    expect(entryKeys(store)).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('rejects invalid ttl values instead of creating persistent entries', async () => {
