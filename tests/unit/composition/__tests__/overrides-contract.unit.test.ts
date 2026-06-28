@@ -46,9 +46,9 @@ describe('composition override contract', () => {
     expect(overridden).not.toBe(singleton);
     expect(overridden.logger).toBe(logger);
     expect(overridden.cacheGateway).toBe(singleton.cacheGateway);
-    await expect(overridden.cacheGateway.get(cacheKey)).resolves.toEqual([
-      'cached',
-    ]);
+    expect((await overridden.cacheGateway.get(cacheKey)).toUndefined()).toEqual(
+      ['cached']
+    );
   });
 
   it('preserves defaults when kernel overrides contain explicit undefined', () => {
@@ -85,10 +85,14 @@ describe('composition override contract', () => {
     const cacheKey = toCacheKey('short-lived');
     await kernel.cacheGateway.set(cacheKey, 'value', { ttlMs: 100 });
     nowMs = 99;
-    await expect(kernel.cacheGateway.get(cacheKey)).resolves.toBe('value');
+    expect((await kernel.cacheGateway.get(cacheKey)).toUndefined()).toBe(
+      'value'
+    );
 
     nowMs = 100;
-    await expect(kernel.cacheGateway.get(cacheKey)).resolves.toBeUndefined();
+    expect(
+      (await kernel.cacheGateway.get(cacheKey)).toUndefined()
+    ).toBeUndefined();
   });
 
   it('uses singleton services with no overrides and fresh services with overrides', () => {
