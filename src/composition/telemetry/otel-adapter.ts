@@ -6,6 +6,7 @@ import {
   TraceFlags,
 } from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
+import { isNonNullish, pickBy } from 'remeda';
 
 import type {
   TelemetryAdapter,
@@ -107,12 +108,7 @@ const safeJson = (value: unknown) => {
 const compactAttributes = (
   attributes: TelemetryAttributes | undefined
 ): Record<string, string | number | boolean> =>
-  Object.fromEntries(
-    Object.entries(attributes ?? {}).filter(
-      (entry): entry is [string, string | number | boolean] =>
-        entry[1] !== undefined
-    )
-  );
+  pickBy(attributes ?? {}, isNonNullish);
 
 const metricAttributes = (
   attributes: TelemetryAttributes | undefined,
