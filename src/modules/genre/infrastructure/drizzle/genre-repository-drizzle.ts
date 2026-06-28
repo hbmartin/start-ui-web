@@ -1,5 +1,6 @@
 import { Result } from '@swan-io/boxed';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { match, P } from 'ts-pattern';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { toGenreId } from '@/modules/kernel/domain/ids';
@@ -29,30 +30,38 @@ function toDomain(row: typeof genreTable.$inferSelect): Genre {
   };
 }
 
-function mapDbError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
-
-  if (
+function isGenreDuplicateError(error: unknown) {
+  return (
     isUniqueConstraintViolation(error) &&
     getConstraintName(error) === 'genre_name_key'
-  ) {
-    return new AppError({
-      code: 'GENRE_DUPLICATE',
-      category: 'conflict',
-      status: 409,
-      message: 'Genre already exists',
-      details: { target: ['name'] },
-      cause: error,
-    });
-  }
+  );
+}
 
-  return new AppError({
-    code: 'GENRE_REPOSITORY_ERROR',
-    category: 'system',
-    status: 500,
-    message: 'Genre repository error',
-    cause: error,
-  });
+function mapDbError(error: unknown): AppError {
+  return match(error)
+    .with(P.instanceOf(AppError), (appError) => appError)
+    .when(
+      isGenreDuplicateError,
+      () =>
+        new AppError({
+          code: 'GENRE_DUPLICATE',
+          category: 'conflict',
+          status: 409,
+          message: 'Genre already exists',
+          details: { target: ['name'] },
+          cause: error,
+        })
+    )
+    .otherwise(
+      () =>
+        new AppError({
+          code: 'GENRE_REPOSITORY_ERROR',
+          category: 'system',
+          status: 500,
+          message: 'Genre repository error',
+          cause: error,
+        })
+    );
 }
 
 export class GenreRepositoryDrizzle implements GenreRepository {

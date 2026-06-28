@@ -1,5 +1,4 @@
 import { Result } from '@swan-io/boxed';
-import { match, P } from 'ts-pattern';
 
 import type { UserId } from '@/modules/kernel/domain/ids';
 
@@ -22,47 +21,18 @@ export async function updateUser(
     input.currentUserId,
     { user: ['update'] }
   );
-  const permission = match(allowed)
-    .with(Result.P.Error(P.select()), (error) => ({
-      type: 'error' as const,
-      error,
-    }))
-    .with(Result.P.Ok({ type: 'permission_denied' }), () => ({
-      type: 'denied' as const,
-    }))
-    .with(Result.P.Ok({ type: 'permission_granted' }), () => ({
-      type: 'granted' as const,
-    }))
-    .exhaustive();
-  if (permission.type === 'error') return Result.Error(permission.error);
-  if (permission.type === 'denied') {
+  if (allowed.isError()) return Result.Error(allowed.getError());
+  if (allowed.get().type === 'permission_denied') {
     return Result.Ok({ type: 'user_forbidden' });
   }
 
   const currentResult = await deps.userRepository.getUpdateSnapshot(input.id);
-  const currentSnapshot = match(currentResult)
-    .with(Result.P.Error(P.select()), (error) => ({
-      type: 'error' as const,
-      error,
-    }))
-    .with(Result.P.Ok({ type: 'user_not_found' }), () => ({
-      type: 'not-found' as const,
-    }))
-    .with(
-      Result.P.Ok({
-        type: 'user_update_snapshot_found',
-        snapshot: P.select(),
-      }),
-      (snapshot) => ({ type: 'found' as const, snapshot })
-    )
-    .exhaustive();
-  if (currentSnapshot.type === 'error') {
-    return Result.Error(currentSnapshot.error);
-  }
-  if (currentSnapshot.type === 'not-found') {
+  if (currentResult.isError()) return Result.Error(currentResult.getError());
+  const snapshotOutcome = currentResult.get();
+  if (snapshotOutcome.type === 'user_not_found') {
     return Result.Ok({ type: 'user_not_found' });
   }
-  const current = currentSnapshot.snapshot;
+  const current = snapshotOutcome.snapshot;
 
   const nextRole =
     input.currentUserId === input.id
@@ -81,22 +51,8 @@ export async function updateUser(
       input.currentUserId,
       { user: ['set-role'] }
     );
-    const setRolePermission = match(canSetRole)
-      .with(Result.P.Error(P.select()), (error) => ({
-        type: 'error' as const,
-        error,
-      }))
-      .with(Result.P.Ok({ type: 'permission_denied' }), () => ({
-        type: 'denied' as const,
-      }))
-      .with(Result.P.Ok({ type: 'permission_granted' }), () => ({
-        type: 'granted' as const,
-      }))
-      .exhaustive();
-    if (setRolePermission.type === 'error') {
-      return Result.Error(setRolePermission.error);
-    }
-    if (setRolePermission.type === 'denied') {
+    if (canSetRole.isError()) return Result.Error(canSetRole.getError());
+    if (canSetRole.get().type === 'permission_denied') {
       return Result.Ok({ type: 'user_forbidden' });
     }
   }
@@ -116,8 +72,6 @@ export async function updateUser(
   const result = await deps.userRepository.update(input.id, {
     ...update,
   });
-  return match(result)
-    .with(Result.P.Error(P.select()), (error) => Result.Error(error))
-    .with(Result.P.Ok(P.select()), (outcome) => Result.Ok(outcome))
-    .exhaustive();
+  if (result.isError()) return Result.Error(result.getError());
+  return Result.Ok(result.get());
 }

@@ -1,5 +1,6 @@
 import { Result } from '@swan-io/boxed';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { match, P } from 'ts-pattern';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import type { SessionId, UserId } from '@/modules/kernel/domain/ids';
@@ -68,39 +69,41 @@ function isUserDuplicateError(error: unknown) {
 }
 
 function mapDbError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
-
-  if (isUserDuplicateError(error)) {
-    return new AppError({
-      code: 'USER_DUPLICATE',
-      category: 'conflict',
-      status: 409,
-      message: 'User already exists',
-      details: { target: ['email'] },
-      cause: error,
-    });
-  }
-
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code;
-    if (code === '23503') {
-      return new AppError({
-        code: 'USER_FOREIGN_KEY',
-        category: 'bad_request',
-        status: 400,
-        message: 'Invalid user relationship',
-        cause: error,
-      });
-    }
-  }
-
-  return new AppError({
-    code: 'USER_REPOSITORY_ERROR',
-    category: 'system',
-    status: 500,
-    message: 'User repository error',
-    cause: error,
-  });
+  return match(error)
+    .with(P.instanceOf(AppError), (appError) => appError)
+    .when(
+      isUserDuplicateError,
+      () =>
+        new AppError({
+          code: 'USER_DUPLICATE',
+          category: 'conflict',
+          status: 409,
+          message: 'User already exists',
+          details: { target: ['email'] },
+          cause: error,
+        })
+    )
+    .with(
+      { code: '23503' },
+      () =>
+        new AppError({
+          code: 'USER_FOREIGN_KEY',
+          category: 'bad_request',
+          status: 400,
+          message: 'Invalid user relationship',
+          cause: error,
+        })
+    )
+    .otherwise(
+      () =>
+        new AppError({
+          code: 'USER_REPOSITORY_ERROR',
+          category: 'system',
+          status: 500,
+          message: 'User repository error',
+          cause: error,
+        })
+    );
 }
 
 export class UserRepositoryDrizzle implements UserRepository {
