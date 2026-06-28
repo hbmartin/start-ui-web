@@ -114,6 +114,29 @@ describe('Resend webhook HTTP handlers', () => {
     );
   });
 
+  it('does not collapse missing client IPs into a shared rate-limit bucket', async () => {
+    const verifier = { verify: vi.fn(() => makeEmailEvent()) };
+    const processStatusEvent = vi.fn(async () =>
+      Result.Ok({
+        type: 'email_status_event_processed' as const,
+        record: {} as ExplicitAny,
+      })
+    );
+    const handlers = createResendWebhookHandlers({
+      getUseCases: () => ({ processStatusEvent }),
+      rateLimiter: createRateLimiter(),
+      rateLimitPerMinute: 1,
+      verifier,
+    });
+
+    const first = await handlers.receive(makeRequest());
+    const second = await handlers.receive(makeRequest());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(verifier.verify).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects requests missing Svix signature headers before reading the body', async () => {
     const request = new Request('https://example.test/api/webhooks/resend', {
       method: 'POST',

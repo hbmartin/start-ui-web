@@ -28,20 +28,36 @@ describe('getClientIp', () => {
     expect(ip).toBe('203.0.113.7');
   });
 
-  it('clamps to the leftmost entry when depth meets or exceeds the hop count', () => {
+  it('fails closed when the configured trusted hop is missing', () => {
     const ip = getClientIp(
       requestWith({ 'X-Forwarded-For': '203.0.113.7, 10.0.0.1' }),
       { trustedProxyDepth: 5 }
     );
-    expect(ip).toBe('203.0.113.7');
+    expect(ip).toBeUndefined();
   });
 
-  it('returns the single entry regardless of depth', () => {
+  it('fails closed for a single entry when depth requires more trusted hops', () => {
     expect(
       getClientIp(requestWith({ 'X-Forwarded-For': '203.0.113.7' }), {
         trustedProxyDepth: 3,
       })
-    ).toBe('203.0.113.7');
+    ).toBeUndefined();
+  });
+
+  it('fails closed when trustedProxyDepth is zero', () => {
+    expect(
+      getClientIp(requestWith({ 'X-Forwarded-For': '203.0.113.7' }), {
+        trustedProxyDepth: 0,
+      })
+    ).toBeUndefined();
+  });
+
+  it('fails closed when trustedProxyDepth is not a safe integer', () => {
+    expect(
+      getClientIp(requestWith({ 'X-Forwarded-For': '203.0.113.7' }), {
+        trustedProxyDepth: 1.5,
+      })
+    ).toBeUndefined();
   });
 
   it('falls back to X-Real-IP when no X-Forwarded-For is present', () => {

@@ -26,6 +26,7 @@ import type {
 
 import type { BookRepository } from '../../application/ports/book-repository';
 import type { Book, BookWriteInput } from '../../domain/book';
+import { normalizeBookDuplicateKeyPart } from '../../domain/book-policy';
 
 type BookRow = typeof bookTable.$inferSelect & {
   genre?: {
@@ -214,6 +215,33 @@ export class BookRepositoryDrizzle implements BookRepository {
           total: total[0]?.count ?? 0,
         },
       });
+    } catch (error) {
+      return Result.Error(mapDbError(error));
+    }
+  }
+
+  async findDuplicateCandidate(
+    input: Parameters<BookRepository['findDuplicateCandidate']>[0]
+  ) {
+    try {
+      const titleKey = normalizeBookDuplicateKeyPart(input.title);
+      const authorKey = normalizeBookDuplicateKeyPart(input.author);
+      const row = await this.db.query.book.findFirst({
+        where: and(
+          eq(sql<string>`lower(trim(${bookTable.title}))`, titleKey),
+          eq(sql<string>`lower(trim(${bookTable.author}))`, authorKey)
+        ),
+        with: { genre: true },
+      });
+
+      return Result.Ok(
+        row
+          ? {
+              type: 'book_duplicate_candidate_found' as const,
+              book: toDomain(row),
+            }
+          : { type: 'book_duplicate_candidate_not_found' as const }
+      );
     } catch (error) {
       return Result.Error(mapDbError(error));
     }

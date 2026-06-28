@@ -26,6 +26,7 @@ import {
   normalizeCreateAuthInput,
 } from './create-auth-options';
 import { betterAuthPermissions } from './permissions';
+import { createBetterAuthSecondaryStorage } from './secondary-storage-adapter';
 import { InMemorySecondaryStore } from '../secondary-store/in-memory-secondary-store';
 
 const missingAuthEmailPort = {
@@ -45,8 +46,8 @@ export function createAuth(input?: Database | CreateAuthOptions) {
   const options = normalizeCreateAuthInput(input);
   const database = options.database ?? getDefaultDbClient();
   const authEmailPort = options.authEmailPort ?? missingAuthEmailPort;
-  const secondaryStorage =
-    options.secondaryStore ?? new InMemorySecondaryStore();
+  const secondaryStore = options.secondaryStore ?? new InMemorySecondaryStore();
+  const secondaryStorage = createBetterAuthSecondaryStorage(secondaryStore);
   const authConfig = getBetterAuthConfig();
   const authSignupEnabled = envClient.VITE_AUTH_SIGNUP_ENABLED;
 

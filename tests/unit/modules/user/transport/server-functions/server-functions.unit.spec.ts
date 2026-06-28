@@ -34,8 +34,7 @@ vi.mock('@/platform/lib/tanstack-start/server-function-handler', () => {
   };
 });
 
-const loadServerFunctions = () =>
-  import('@/modules/user/transport/server-functions/server-functions');
+const loadServerFunctions = () => import('@/modules/user/server');
 
 describe('user server functions runner wiring', () => {
   it('runs destructive actions through the fresh (step-up) mutation runner', async () => {

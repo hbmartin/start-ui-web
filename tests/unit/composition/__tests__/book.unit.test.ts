@@ -24,6 +24,8 @@ const makeBookRepository = (
 ): BookRepository => ({
   list: async () =>
     Result.Ok({ type: 'book_listed', page: { items: [book], total: 1 } }),
+  findDuplicateCandidate: async () =>
+    Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
   getById: async () => Result.Ok({ type: 'book_found', book }),
   create: async () => Result.Ok({ type: 'book_created', book }),
   update: async () => Result.Ok({ type: 'book_updated', book }),

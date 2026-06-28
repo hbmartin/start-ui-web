@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { LoginEmailOtpHint } from '@/app/devtools/presentation';
 import { PageLoginVerify } from '@/modules/auth/presentation';
 
+const loginEmailStateSchema = z.email();
+
 // The email being verified is passed through router navigation `state` (not the
 // URL) so it never lands in browser history, server logs, or referrer headers.
 declare module '@tanstack/react-router' {
@@ -28,13 +30,20 @@ export const Route = createFileRoute('/login/verify/')({
 
 function RouteComponent() {
   const search = Route.useSearch();
-  const email = useRouterState({
-    select: (state) => state.location.state.loginEmail,
+  const loginEmail = useRouterState({
+    select: (state) => {
+      const locationState = state.location.state as
+        | { loginEmail?: unknown }
+        | null
+        | undefined;
+      return locationState?.loginEmail;
+    },
   });
+  const parsedLoginEmail = loginEmailStateSchema.safeParse(loginEmail);
 
   // On a direct load / refresh there is no navigation state, so we have no
   // email to verify. Bounce back to the email step instead of crashing.
-  if (!email) {
+  if (!parsedLoginEmail.success) {
     return (
       <Navigate to="/login" search={{ redirect: search.redirect }} replace />
     );
@@ -44,7 +53,7 @@ function RouteComponent() {
     <PageLoginVerify
       emailOtpHint={<LoginEmailOtpHint />}
       search={search}
-      email={email}
+      email={parsedLoginEmail.data}
     />
   );
 }

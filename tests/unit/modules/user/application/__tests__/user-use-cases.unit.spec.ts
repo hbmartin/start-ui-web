@@ -512,7 +512,7 @@ describe('user use cases', () => {
         expectOk(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('member@example.com'), role: 'user' },
+            user: { email: toEmailAddress('member@example.com') },
           })
         )
       ).resolves.toMatchObject({
@@ -525,7 +525,9 @@ describe('user use cases', () => {
         adminId,
         userCreatePermission
       );
-      expect(repo.create).toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith({
+        email: toEmailAddress('member@example.com'),
+      });
     });
   });
 

@@ -2,7 +2,7 @@ import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields'
 
 import { getAuthUseCases } from '@/composition/auth';
 import { getKernel } from '@/composition/kernel';
-import { getHttpConfig } from '@/modules/kernel/infrastructure/config/http';
+import { getHttpConfig } from '@/modules/kernel/backend';
 import { getTelemetryConfig } from '@/modules/kernel/infrastructure/config/telemetry';
 import {
   appendBrowserMutationVaryHeader,

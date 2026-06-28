@@ -100,8 +100,10 @@ digraph ModuleLayerDependencies {
   "auth/infrastructure" -> "kernel/infrastructure" [style="solid"];
   "auth/infrastructure" -> "kernel/transport" [style="solid"];
   "auth/presentation" -> "account/public" [style="solid"];
+  "auth/presentation" -> "auth/domain" [style="solid"];
   "auth/presentation" -> "auth/public" [style="solid"];
   "auth/presentation" -> "kernel/domain" [style="solid"];
+  "auth/presentation" -> "kernel/public" [style="solid"];
   "auth/public" -> "auth/application" [style="solid"];
   "auth/public" -> "auth/domain" [style="dotted"];
   "auth/public" -> "auth/infrastructure" [style="solid"];
@@ -115,6 +117,7 @@ digraph ModuleLayerDependencies {
   "book/application" -> "book/domain" [style="solid"];
   "book/application" -> "kernel/domain" [style="solid"];
   "book/domain" -> "kernel/domain" [style="solid"];
+  "book/infrastructure" -> "book/domain" [style="solid"];
   "book/infrastructure" -> "genre/infrastructure" [style="solid"];
   "book/infrastructure" -> "kernel/domain" [style="solid"];
   "book/infrastructure" -> "kernel/infrastructure" [style="solid"];

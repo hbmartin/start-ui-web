@@ -116,6 +116,7 @@ export const mockUser = {
 export const mockSession = {
   id: toSessionId('session-1'),
   token: 'session-token-1',
+  createdAt: new Date(),
   expiresAt: new Date('2099-01-02T00:00:00.000Z'),
 };
 

@@ -1,3 +1,7 @@
+import { Result } from '@bloodyowl/boxed';
+
+import { AppError } from '@/modules/kernel/domain/errors/app-error';
+
 import type { SecondaryStore } from '../../application/ports/secondary-store';
 
 /**
@@ -22,6 +26,7 @@ type Entry = {
 /** Above this many tracked keys, prune expired entries to bound memory. */
 const SWEEP_THRESHOLD = 10_000;
 const SWEEP_INTERVAL_MS = 30_000;
+const SWEEP_MAX_ENTRIES = 250;
 
 export type InMemorySecondaryStoreOptions = {
   /** Clock seam for tests. */
@@ -30,6 +35,8 @@ export type InMemorySecondaryStoreOptions = {
   sweepThreshold?: number;
   /** Minimum time between pruning passes. */
   sweepIntervalMs?: number;
+  /** Maximum entries to inspect during one request-path pruning pass. */
+  sweepMaxEntries?: number;
 };
 
 export class InMemorySecondaryStore implements SecondaryStore {
@@ -37,12 +44,14 @@ export class InMemorySecondaryStore implements SecondaryStore {
   private readonly now: () => number;
   private readonly sweepThreshold: number;
   private readonly sweepIntervalMs: number;
+  private readonly sweepMaxEntries: number;
   private lastSweepAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: InMemorySecondaryStoreOptions = {}) {
     this.now = options.now ?? Date.now;
     this.sweepThreshold = options.sweepThreshold ?? SWEEP_THRESHOLD;
     this.sweepIntervalMs = options.sweepIntervalMs ?? SWEEP_INTERVAL_MS;
+    this.sweepMaxEntries = options.sweepMaxEntries ?? SWEEP_MAX_ENTRIES;
   }
 
   private isExpired(entry: Entry, currentTime: number): boolean {
@@ -50,22 +59,47 @@ export class InMemorySecondaryStore implements SecondaryStore {
   }
 
   private sweep(currentTime: number): void {
+    let inspected = 0;
     for (const [key, entry] of this.entries) {
-      if (this.isExpired(entry, currentTime)) this.entries.delete(key);
+      if (inspected >= this.sweepMaxEntries) break;
+      inspected += 1;
+      this.entries.delete(key);
+      if (!this.isExpired(entry, currentTime)) this.entries.set(key, entry);
     }
   }
 
-  async get(key: string): Promise<string | null> {
+  private invalidTtlError(ttlSeconds: number) {
+    return new AppError({
+      code: 'AUTH_SECONDARY_STORE_INVALID_TTL',
+      category: 'system',
+      status: 500,
+      message: 'Secondary store ttlSeconds must be a finite positive number.',
+      details: { ttlSeconds },
+    });
+  }
+
+  async get(key: string): ReturnType<SecondaryStore['get']> {
     const entry = this.entries.get(key);
-    if (!entry) return null;
+    if (!entry) return Result.Ok({ type: 'secondary_store_miss' });
     if (this.isExpired(entry, this.now())) {
       this.entries.delete(key);
-      return null;
+      return Result.Ok({ type: 'secondary_store_miss' });
     }
-    return entry.value;
+    return Result.Ok({ type: 'secondary_store_hit', value: entry.value });
   }
 
-  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  async set(
+    key: string,
+    value: string,
+    ttlSeconds?: number
+  ): ReturnType<SecondaryStore['set']> {
+    if (
+      ttlSeconds !== undefined &&
+      (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0)
+    ) {
+      return Result.Error(this.invalidTtlError(ttlSeconds));
+    }
+
     const currentTime = this.now();
     if (
       this.entries.size >= this.sweepThreshold &&
@@ -79,9 +113,11 @@ export class InMemorySecondaryStore implements SecondaryStore {
       expiresAt:
         ttlSeconds !== undefined ? currentTime + ttlSeconds * 1000 : undefined,
     });
+    return Result.Ok({ type: 'secondary_store_set' });
   }
 
-  async delete(key: string): Promise<void> {
+  async delete(key: string): ReturnType<SecondaryStore['delete']> {
     this.entries.delete(key);
+    return Result.Ok({ type: 'secondary_store_deleted' });
   }
 }

@@ -16,13 +16,14 @@
  * abuse logging) only. It MUST NOT be used for authorization decisions, and it
  * is only trustworthy when a known edge/proxy sets these headers and
  * `trustedProxyDepth` matches that topology. Returns `undefined` when no
- * candidate header is present.
+ * candidate header is present or the configured trusted hop cannot be verified.
  */
 export function getClientIp(
   request: Request,
   options: { trustedProxyDepth?: number } = {}
 ): string | undefined {
   const depth = options.trustedProxyDepth ?? 1;
+  if (!Number.isSafeInteger(depth) || depth < 1) return undefined;
 
   const forwardedFor = request.headers.get('X-Forwarded-For');
   if (forwardedFor) {
@@ -34,11 +35,11 @@ export function getClientIp(
     if (parts.length > 0) {
       // Walk `depth` hops back from the end. With one trusted proxy (depth=1)
       // that is the rightmost entry, which only the immediate trusted proxy can
-      // append; entries to its left are attacker-supplied and ignored. Clamp to
-      // the leftmost entry when the configured depth meets or exceeds the number
-      // of hops (misconfiguration or a request that skipped a proxy).
-      const index = depth >= parts.length ? 0 : parts.length - depth;
-      return parts[index] ?? parts[0];
+      // append; entries to its left are attacker-supplied and ignored. If the
+      // configured hop is missing, fail closed instead of trusting the leftmost
+      // value.
+      if (parts.length < depth) return undefined;
+      return parts[parts.length - depth];
     }
   }
 

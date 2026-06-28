@@ -30,7 +30,7 @@ export const useReauthPrompt = () => {
         action: {
           label: t('user:manager.reauth.action'),
           onClick: () => {
-            router.navigate({ to: '/login', search: { redirect } });
+            void router.navigate({ to: '/login', search: { redirect } });
           },
         },
       });

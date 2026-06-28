@@ -47,6 +47,7 @@ rules:
         - src/platform/components/**/*.css
         - src/platform/components/**/*.ts
         - src/platform/components/**/*.tsx
+        - src/platform/styles/**/*.css
         - src/app/**/*.css
         - src/app/**/*.ts
         - src/app/**/*.tsx
@@ -64,6 +65,7 @@ rules:
         - src/platform/components/**/*.css
         - src/platform/components/**/*.ts
         - src/platform/components/**/*.tsx
+        - src/platform/styles/**/*.css
         - src/app/**/*.css
         - src/app/**/*.ts
         - src/app/**/*.tsx
@@ -71,6 +73,7 @@ rules:
         - src/modules/**/presentation/**/*.ts
         - src/modules/**/presentation/**/*.tsx
       exclude:
+        - src/platform/styles/app.css
         - src/modules/email/presentation/theme.ts
 
   - id: app-seed-use-kernel-public-gates
@@ -1271,3 +1274,30 @@ rules:
         - .github/workflows/*.yml
         - .github/workflows/*.yaml
     pattern-regex: '(?s)-\s+name:\s*Upload coverage to Codecov(?!(?:(?!\n\s*-\s+name:).)*\n\s*if:\s*(?:\$\{\{\s*)?(?:secrets|env)\.CODECOV_TOKEN)(?:(?!\n\s*-\s+name:).)*\n\s*uses:\s*codecov/codecov-action@(?:(?!\n\s*-\s+name:).)*\n\s*fail_ci_if_error:\s*true'
+
+  - id: no-demo-mode-resurrection
+    message: Demo mode was removed for security (predictable OTP/accounts); do not reintroduce it.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?:VITE_IS_DEMO|AUTH_EMAIL_OTP_MOCKED|DEMO_MODE|@/app/demo)'
+    paths:
+      include:
+        - src/**
+        - drizzle/**
+      exclude:
+        - .semgrep.yml
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'
+
+  - id: no-spoofable-client-ip
+    message: Derive client IP only via getClientIp() (src/platform/http/get-client-ip.ts); never parse X-Forwarded-For directly (spoofable).
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)[''"]x-forwarded-for\b'
+    paths:
+      include:
+        - src/**
+      exclude:
+        - src/platform/http/get-client-ip.ts
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'

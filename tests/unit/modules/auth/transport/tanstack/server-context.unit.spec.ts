@@ -331,6 +331,14 @@ describe('withFreshProtectedMutation (step-up re-authentication)', () => {
     ).resolves.toBe('ok');
   });
 
+  it('parses provider ISO session timestamps at the transport boundary', async () => {
+    const tools = makeFreshTools(new Date(NOW - 5 * 60 * 1000).toISOString());
+
+    await expect(
+      tools.withFreshProtectedMutation(async () => 'ok')
+    ).resolves.toBe('ok');
+  });
+
   it('rejects a stale session with FORBIDDEN + reauth_required', async () => {
     const tools = makeFreshTools(new Date(NOW - 60 * 60 * 1000)); // 60 min ago
 
@@ -348,6 +356,17 @@ describe('withFreshProtectedMutation (step-up re-authentication)', () => {
 
   it('fails closed (reauth_required) when createdAt is missing', async () => {
     const tools = makeFreshTools(undefined);
+
+    await expect(
+      tools.withFreshProtectedMutation(async () => 'ok')
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      data: { reason: 'reauth_required' },
+    });
+  });
+
+  it('fails closed (reauth_required) when createdAt is unparseable', async () => {
+    const tools = makeFreshTools('not-a-date');
 
     await expect(
       tools.withFreshProtectedMutation(async () => 'ok')

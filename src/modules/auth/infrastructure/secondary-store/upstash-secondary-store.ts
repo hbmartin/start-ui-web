@@ -1,3 +1,5 @@
+import { type Result as BoxedResult, Result } from '@bloodyowl/boxed';
+
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { ConfigurationError } from '@/modules/kernel/domain/errors/configuration-error';
 import {
@@ -24,26 +26,27 @@ const upstashError = (message: string, cause?: unknown) =>
  * `["SET", key, value, "EX", ttl]` / `["GET", key]` / `["DEL", key]` body and
  * `Authorization: Bearer <restToken>`), and the `{ result }` envelope is parsed
  * back out. A Redis/network outage must not hard-fail authentication, so
- * transport failures degrade gracefully: reads are treated as a miss and
- * writes/deletes are swallowed — but every failure is reported to telemetry so
- * the degradation is observable rather than silent.
+ * transport failures are returned as Result errors and reported to telemetry.
+ * The Better Auth adapter decides how to degrade those failures for the
+ * framework's nullable/void secondary-storage contract.
  */
 
 type UpstashCommand = (string | number)[];
+type CommandOutcome = BoxedResult<unknown, AppError>;
 
-type CommandOutcome =
-  | { ok: true; result: unknown }
-  | { ok: false; error: unknown };
+const DEFAULT_TIMEOUT_MS = 2_000;
 
 export type UpstashSecondaryStoreOptions = {
   config?: RedisConfig;
   fetchFn?: typeof fetch;
+  timeoutMs?: number;
 };
 
 export class UpstashSecondaryStore implements SecondaryStore {
   private readonly restUrl: string;
   private readonly restToken: string;
   private readonly fetchFn: typeof fetch;
+  private readonly timeoutMs: number;
 
   constructor(options: UpstashSecondaryStoreOptions = {}) {
     const config = options.config ?? getRedisConfig();
@@ -55,6 +58,7 @@ export class UpstashSecondaryStore implements SecondaryStore {
     this.restUrl = config.restUrl;
     this.restToken = config.restToken;
     this.fetchFn = options.fetchFn ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   private reportFailure(operation: string, error: unknown): void {
@@ -64,7 +68,20 @@ export class UpstashSecondaryStore implements SecondaryStore {
     });
   }
 
+  private invalidTtlError(ttlSeconds: number) {
+    return new AppError({
+      code: 'AUTH_SECONDARY_STORE_INVALID_TTL',
+      category: 'system',
+      status: 500,
+      message: 'Secondary store ttlSeconds must be a finite positive number.',
+      details: { ttlSeconds },
+    });
+  }
+
   private async command(args: UpstashCommand): Promise<CommandOutcome> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
       const response = await this.fetchFn(this.restUrl, {
         method: 'POST',
@@ -73,49 +90,70 @@ export class UpstashSecondaryStore implements SecondaryStore {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(args),
+        signal: controller.signal,
       });
       if (!response.ok) {
-        return {
-          ok: false,
-          error: upstashError(
-            `Upstash request failed with status ${response.status}`
-          ),
-        };
+        return Result.Error(
+          upstashError(`Upstash request failed with status ${response.status}`)
+        );
       }
       const body = (await response.json()) as {
         result?: unknown;
         error?: string;
       };
       if (typeof body.error === 'string') {
-        return { ok: false, error: upstashError(body.error) };
+        return Result.Error(upstashError(body.error));
       }
-      return { ok: true, result: body.result ?? null };
+      return Result.Ok(body.result ?? null);
     } catch (error) {
-      return { ok: false, error };
+      return Result.Error(upstashError('Upstash request failed', error));
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
-  async get(key: string): Promise<string | null> {
+  async get(key: string): ReturnType<SecondaryStore['get']> {
     const outcome = await this.command(['GET', key]);
-    if (!outcome.ok) {
-      // A Redis outage is treated as a cache miss so auth keeps working.
-      this.reportFailure('get', outcome.error);
-      return null;
+    if (outcome.isError()) {
+      this.reportFailure('get', outcome.getError());
+      return Result.Error(outcome.getError());
     }
-    return typeof outcome.result === 'string' ? outcome.result : null;
+    const value = outcome.get();
+    return typeof value === 'string'
+      ? Result.Ok({ type: 'secondary_store_hit', value })
+      : Result.Ok({ type: 'secondary_store_miss' });
   }
 
-  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  async set(
+    key: string,
+    value: string,
+    ttlSeconds?: number
+  ): ReturnType<SecondaryStore['set']> {
+    if (
+      ttlSeconds !== undefined &&
+      (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0)
+    ) {
+      return Result.Error(this.invalidTtlError(ttlSeconds));
+    }
+
     const args: UpstashCommand =
       ttlSeconds !== undefined
         ? ['SET', key, value, 'EX', ttlSeconds]
         : ['SET', key, value];
     const outcome = await this.command(args);
-    if (!outcome.ok) this.reportFailure('set', outcome.error);
+    if (outcome.isError()) {
+      this.reportFailure('set', outcome.getError());
+      return Result.Error(outcome.getError());
+    }
+    return Result.Ok({ type: 'secondary_store_set' });
   }
 
-  async delete(key: string): Promise<void> {
+  async delete(key: string): ReturnType<SecondaryStore['delete']> {
     const outcome = await this.command(['DEL', key]);
-    if (!outcome.ok) this.reportFailure('delete', outcome.error);
+    if (outcome.isError()) {
+      this.reportFailure('delete', outcome.getError());
+      return Result.Error(outcome.getError());
+    }
+    return Result.Ok({ type: 'secondary_store_deleted' });
   }
 }
