@@ -694,4 +694,65 @@ describe('strict modular monolith layout', () => {
       [...transactionApplicationErrorBoundaryFiles].sort()
     );
   });
+
+  it('keeps application ports on tagged Result outcomes, not nullable or boolean', () => {
+    const portFiles = fs
+      .readdirSync(path.join(root, 'src/modules'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((entry) =>
+        listSourceFiles(
+          path.join(root, 'src/modules', entry.name, 'application', 'ports')
+        )
+      );
+
+    const violations = portFiles.flatMap((file) => {
+      const source = readSource(file);
+      const offenders: string[] = [];
+      if (/:\s*Promise<[^>]*\|\s*null>/.test(source))
+        offenders.push('nullable');
+      if (/:\s*Promise<[^>]*\|\s*undefined>/.test(source)) {
+        offenders.push('optional');
+      }
+      if (/:\s*Promise<boolean>/.test(source)) offenders.push('boolean');
+      return offenders.length
+        ? [`${relativePath(file)} (${offenders.join(', ')})`]
+        : [];
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps application use cases free of match-then-if intermediate error objects', () => {
+    const applicationFiles = fs
+      .readdirSync(path.join(root, 'src/modules'), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((entry) =>
+        listSourceFiles(
+          path.join(root, 'src/modules', entry.name, 'application')
+        )
+      );
+
+    // The match-then-if anti-pattern mapped a Result.Error into a throwaway
+    // tagged object (`(error) => ({ type: 'error' as const, error })`) and then
+    // re-inspected it with `if (x.type === 'error')`, defeating ts-pattern's
+    // exhaustiveness. Return Result.Error(x.getError()) or match the Result
+    // directly instead.
+    const violations = findImportViolations(
+      applicationFiles,
+      /type:\s*'error'\s+as\s+const/g
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps Boxed values out of route modules', () => {
+    const routeFiles = listSourceFiles(path.join(root, 'src/routes'));
+
+    const violations = findImportViolations(
+      routeFiles,
+      /from\s+['"]@swan-io\/boxed['"]/g
+    );
+
+    expect(violations).toEqual([]);
+  });
 });
