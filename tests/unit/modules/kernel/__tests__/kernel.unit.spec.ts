@@ -1,3 +1,4 @@
+import { Option } from '@swan-io/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cacheAside } from '@/modules/kernel/application/cache/cache-aside';
@@ -106,7 +107,8 @@ describe('kernel primitives', () => {
     );
 
     const cache = {
-      get: async <T>(key: string) => store.get(key) as T | undefined,
+      get: async <T>(key: string) =>
+        Option.fromNullable(store.get(key) as T | undefined),
       set: set as CacheGateway['set'],
       delete: async (key: string) => {
         store.delete(key);

@@ -8,7 +8,7 @@ export async function cacheAside<T>(options: {
   ttlMs?: number;
 }): Promise<T> {
   const cached = await options.cache.get<T>(options.key);
-  if (cached !== undefined) return cached;
+  if (cached.isSome()) return cached.get();
 
   const value = await options.load();
   await options.cache.set(options.key, value, { ttlMs: options.ttlMs });

@@ -1,4 +1,4 @@
-import { Result } from '@swan-io/boxed';
+import { Option, Result } from '@swan-io/boxed';
 
 import type { Kernel } from '@/composition/kernel';
 import { toGeneratedId } from '@/modules/kernel/domain/ids';
@@ -23,7 +23,7 @@ export function makeTestKernel(overrides: Partial<Kernel> = {}): Kernel {
     },
     cacheGateway: {
       async get<T>(key: string) {
-        return cache.get(key) as T | undefined;
+        return Option.fromNullable(cache.get(key) as T | undefined);
       },
       async set<T>(key: string, value: T) {
         cache.set(key, value);
