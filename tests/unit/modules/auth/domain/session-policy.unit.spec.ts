@@ -7,40 +7,35 @@ const freshAgeSeconds = 900; // 15 minutes
 
 describe('isSessionFresh', () => {
   it('is fresh when createdAt is within the window', () => {
-    const createdAt = new Date(now - 5 * 60 * 1000); // 5 min ago
-    expect(isSessionFresh({ createdAt, freshAgeSeconds, now })).toBe(true);
+    const createdAtMs = now - 5 * 60 * 1000; // 5 min ago
+    expect(isSessionFresh({ createdAtMs, freshAgeSeconds, now })).toBe(true);
   });
 
   it('is fresh exactly at the window boundary', () => {
-    const createdAt = new Date(now - freshAgeSeconds * 1000); // 15 min ago
-    expect(isSessionFresh({ createdAt, freshAgeSeconds, now })).toBe(true);
+    const createdAtMs = now - freshAgeSeconds * 1000; // 15 min ago
+    expect(isSessionFresh({ createdAtMs, freshAgeSeconds, now })).toBe(true);
   });
 
   it('is stale when createdAt is older than the window', () => {
-    const createdAt = new Date(now - 16 * 60 * 1000); // 16 min ago
-    expect(isSessionFresh({ createdAt, freshAgeSeconds, now })).toBe(false);
-  });
-
-  it('accepts ISO string createdAt values', () => {
-    const createdAt = new Date(now - 60 * 1000).toISOString(); // 1 min ago
-    expect(isSessionFresh({ createdAt, freshAgeSeconds, now })).toBe(true);
+    const createdAtMs = now - 16 * 60 * 1000; // 16 min ago
+    expect(isSessionFresh({ createdAtMs, freshAgeSeconds, now })).toBe(false);
   });
 
   it('fails closed when createdAt is missing (undefined)', () => {
-    expect(isSessionFresh({ createdAt: undefined, freshAgeSeconds, now })).toBe(
-      false
-    );
+    expect(
+      isSessionFresh({ createdAtMs: undefined, freshAgeSeconds, now })
+    ).toBe(false);
   });
 
   it('fails closed when createdAt is null', () => {
-    expect(isSessionFresh({ createdAt: null, freshAgeSeconds, now })).toBe(
+    expect(isSessionFresh({ createdAtMs: null, freshAgeSeconds, now })).toBe(
       false
     );
   });
 
-  it('fails closed when createdAt is unparseable', () => {
+  it('fails closed when createdAtMs is invalid', () => {
     expect(
-      isSessionFresh({ createdAt: 'not-a-date', freshAgeSeconds, now })
+      isSessionFresh({ createdAtMs: Number.NaN, freshAgeSeconds, now })
     ).toBe(false);
   });
 });

@@ -53,12 +53,17 @@ export const createBookCoverObjectKey = (input: {
   return toBookCoverObjectKey(`books/${input.fileId}.${extension}`);
 };
 
+export const normalizeBookDuplicateKeyPart = (value: string) =>
+  value.trim().toLowerCase();
+
 export function isDuplicateBookCandidate(
   left: Pick<BookWriteInput, 'title' | 'author'>,
   right: Pick<BookWriteInput, 'title' | 'author'>
 ) {
   return (
-    left.title.trim().toLowerCase() === right.title.trim().toLowerCase() &&
-    left.author.trim().toLowerCase() === right.author.trim().toLowerCase()
+    normalizeBookDuplicateKeyPart(left.title) ===
+      normalizeBookDuplicateKeyPart(right.title) &&
+    normalizeBookDuplicateKeyPart(left.author) ===
+      normalizeBookDuplicateKeyPart(right.author)
   );
 }

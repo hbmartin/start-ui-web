@@ -71,6 +71,7 @@ vi.mock('@/modules/kernel/infrastructure/db/client', () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('AUTH_SECRET', 'unit-test-auth-secret-12345678901234567890');
   resetMockDb();
   setupAuthenticatedUser();
 });

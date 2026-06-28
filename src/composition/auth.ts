@@ -22,7 +22,7 @@ import {
   getAuthProviderConfig,
   getBetterAuthConfig,
 } from '@/modules/kernel/infrastructure/config/auth';
-import { isRedisConfigured } from '@/modules/kernel/infrastructure/config/redis';
+import { getRedisConfig } from '@/modules/kernel/infrastructure/config/redis';
 
 import { AuthEmailPortEmailGateway } from './auth-email-port';
 import { getEmailGateway } from './email';
@@ -52,10 +52,12 @@ const buildAuthEmailPort = (overrides?: AuthInstanceOverrides) =>
  * map is fine for single-instance deploys; multi-instance/serverless needs the
  * shared Redis backend (or an edge/WAF control) for cross-instance rate limits.
  */
-const buildSecondaryStore = (): SecondaryStore =>
-  isRedisConfigured()
-    ? new UpstashSecondaryStore()
+const buildSecondaryStore = (): SecondaryStore => {
+  const redisConfig = getRedisConfig();
+  return redisConfig
+    ? new UpstashSecondaryStore({ config: redisConfig })
     : new InMemorySecondaryStore();
+};
 
 const secondaryStoreFactory = createCachedFactory<SecondaryStore, never>(
   buildSecondaryStore

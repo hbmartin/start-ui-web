@@ -27,10 +27,16 @@ import {
   type Logger,
   type LogLevel,
 } from '@/modules/kernel';
-import { ServerFnError } from '@/modules/kernel/client';
+import { getBetterAuthConfig } from '@/modules/kernel/backend';
+import {
+  isServerFnError,
+  SERVER_FN_ERROR_CODES,
+  ServerFnError,
+  type ServerFnErrorCode,
+  type ServerFnErrorData,
+} from '@/modules/kernel/client';
 import type { UserId } from '@/modules/kernel/domain/ids';
 import { toRequestId } from '@/modules/kernel/domain/ids';
-import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
 import { cachePrivateNoStore } from '@/platform/http/cache-control';
 import type { TelemetryAdapter } from '@/platform/telemetry';
@@ -181,8 +187,39 @@ const handleError = (error: unknown, procedureLogger: ProcedureLogger) => {
   return mappedError;
 };
 
+const serverFnErrorCodes = new Set<ServerFnErrorCode>(SERVER_FN_ERROR_CODES);
+
+const isServerFnErrorCode = (code: unknown): code is ServerFnErrorCode =>
+  typeof code === 'string' && serverFnErrorCodes.has(code as ServerFnErrorCode);
+
+const getServerFnErrorCode = (
+  error: unknown
+): ServerFnErrorCode | undefined => {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return isServerFnErrorCode(code) ? code : undefined;
+};
+
+const getServerFnErrorData = (error: unknown) => {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const data = (error as { data?: unknown }).data;
+  return typeof data === 'object' && data !== null
+    ? (data as ServerFnErrorData)
+    : undefined;
+};
+
 function mapTransportError(error: unknown): unknown {
   if (error instanceof ServerFnError) return error;
+  const code =
+    isServerFnError(error) && isServerFnErrorCode(error.code)
+      ? error.code
+      : getServerFnErrorCode(error);
+  if (code) {
+    return new ServerFnError(code, {
+      data: getServerFnErrorData(error),
+      message: error instanceof Error ? error.message : code,
+    });
+  }
   return new ServerFnError('INTERNAL_SERVER_ERROR', {
     message: 'Unhandled error',
   });
@@ -213,6 +250,15 @@ const getStartRequestId = () => {
 const getStartAuthSession = () => {
   const auth = getStartRequestContext()?.auth;
   return typeof auth?.getSession === 'function' ? auth.getSession() : undefined;
+};
+
+const getSessionCreatedAtMs = (
+  createdAt: AuthenticatedSession['createdAt']
+) => {
+  if (createdAt === undefined) return undefined;
+  const createdAtMs =
+    createdAt instanceof Date ? createdAt.getTime() : Date.parse(createdAt);
+  return Number.isFinite(createdAtMs) ? createdAtMs : undefined;
 };
 
 export const createServerContextTools = ({
@@ -332,7 +378,7 @@ export const createServerContextTools = ({
   ): Promise<T> => {
     return withProtectedMutation(async (ctx) => {
       const fresh = isSessionFresh({
-        createdAt: ctx.session.createdAt,
+        createdAtMs: getSessionCreatedAtMs(ctx.session.createdAt),
         freshAgeSeconds: getSessionFreshAgeSeconds(),
         now: now(),
       });

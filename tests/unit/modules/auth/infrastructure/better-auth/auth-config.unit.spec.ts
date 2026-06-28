@@ -1,6 +1,8 @@
 import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { SecondaryStore } from '@/modules/auth';
+
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(() => ({ id: 'admin-plugin' })),
   betterAuth: vi.fn<(options: ExplicitAny) => ExplicitAny>(() => ({
@@ -87,10 +89,16 @@ describe('Better Auth security configuration', () => {
     >('@/modules/auth/infrastructure/better-auth/auth');
 
     const secondaryStore = {
-      get: vi.fn(async () => null),
-      set: vi.fn(async () => {}),
-      delete: vi.fn(async () => {}),
-    };
+      get: vi.fn(async () =>
+        Result.Ok({ type: 'secondary_store_miss' as const })
+      ),
+      set: vi.fn(async () =>
+        Result.Ok({ type: 'secondary_store_set' as const })
+      ),
+      delete: vi.fn(async () =>
+        Result.Ok({ type: 'secondary_store_deleted' as const })
+      ),
+    } satisfies SecondaryStore;
 
     createAuth({
       authEmailPort: {
@@ -103,7 +111,17 @@ describe('Better Auth security configuration', () => {
 
     const options = mocks.betterAuth.mock.calls.at(-1)?.[0] as ExplicitAny;
 
-    expect(options.secondaryStorage).toBe(secondaryStore);
+    expect(options.secondaryStorage).not.toBe(secondaryStore);
+    await expect(options.secondaryStorage.get('key-1')).resolves.toBeNull();
+    await expect(
+      options.secondaryStorage.set('key-1', 'value-1', 60)
+    ).resolves.toBeUndefined();
+    await expect(
+      options.secondaryStorage.delete('key-1')
+    ).resolves.toBeUndefined();
+    expect(secondaryStore.get).toHaveBeenCalledWith('key-1');
+    expect(secondaryStore.set).toHaveBeenCalledWith('key-1', 'value-1', 60);
+    expect(secondaryStore.delete).toHaveBeenCalledWith('key-1');
     expect(options.rateLimit).toEqual({
       enabled: true,
       storage: 'secondary-storage',

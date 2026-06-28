@@ -302,13 +302,16 @@ describe('server config accessors', () => {
     expect(getRedisConfig()).toBeNull();
   });
 
-  it('returns null for partial optional Redis config', async () => {
+  it('throws ConfigurationError for partial optional Redis config', async () => {
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', undefined);
     const { getRedisConfig } =
       await import('@/modules/kernel/infrastructure/config/redis');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
 
-    expect(getRedisConfig()).toBeNull();
+    expect(() => getRedisConfig()).toThrow(ConfigurationError);
+    expect(() => getRedisConfig()).toThrow('UPSTASH_REDIS_REST_TOKEN');
   });
 
   it('returns Redis config when both required values are present', async () => {
@@ -344,22 +347,26 @@ describe('server config accessors', () => {
     expect(isRedisConfigured()).toBe(true);
   });
 
-  it('reports Redis as not configured when a value is missing', async () => {
+  it('throws ConfigurationError when checking partial Redis config', async () => {
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://redis.example.com');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', undefined);
     const { isRedisConfigured } =
       await import('@/modules/kernel/infrastructure/config/redis');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
 
-    expect(isRedisConfigured()).toBe(false);
+    expect(() => isRedisConfigured()).toThrow(ConfigurationError);
   });
 
-  it('reports Redis as not configured (without throwing) for a malformed URL', async () => {
+  it('throws ConfigurationError when checking a malformed Redis URL', async () => {
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'not-a-url');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', makeTestSecret('redis'));
     const { isRedisConfigured } =
       await import('@/modules/kernel/infrastructure/config/redis');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
 
-    expect(isRedisConfigured()).toBe(false);
+    expect(() => isRedisConfigured()).toThrow(ConfigurationError);
   });
 
   it('accepts LOGGER_PRETTY as a legacy console mirror alias', async () => {
@@ -629,12 +636,30 @@ describe('server config accessors', () => {
     expect(getHttpConfig().trustedProxyDepth).toBe(1);
   });
 
-  it('parses an explicit non-negative trusted proxy depth', async () => {
+  it('parses an explicit positive trusted proxy depth', async () => {
     vi.stubEnv('TRUSTED_PROXY_DEPTH', '2');
     const { getHttpConfig } =
       await import('@/modules/kernel/infrastructure/config/http');
 
     expect(getHttpConfig().trustedProxyDepth).toBe(2);
+  });
+
+  it('treats an empty trusted proxy depth as unset', async () => {
+    vi.stubEnv('TRUSTED_PROXY_DEPTH', '   ');
+    const { getHttpConfig } =
+      await import('@/modules/kernel/infrastructure/config/http');
+
+    expect(getHttpConfig().trustedProxyDepth).toBe(1);
+  });
+
+  it('rejects zero as a trusted proxy depth', async () => {
+    vi.stubEnv('TRUSTED_PROXY_DEPTH', '0');
+    const { getHttpConfig } =
+      await import('@/modules/kernel/infrastructure/config/http');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getHttpConfig()).toThrow(ConfigurationError);
   });
 
   it('rejects a negative trusted proxy depth', async () => {

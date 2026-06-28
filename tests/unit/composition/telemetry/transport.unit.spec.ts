@@ -35,7 +35,7 @@ vi.mock('@/modules/kernel/infrastructure/config/telemetry', () => ({
   getTelemetryConfig: () => configMock,
 }));
 
-vi.mock('@/modules/kernel/infrastructure/config/http', () => ({
+vi.mock('@/modules/kernel/backend', () => ({
   getHttpConfig: () => ({ trustedProxyDepth: 1 }),
 }));
 

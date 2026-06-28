@@ -128,7 +128,8 @@ vi.mock('@/modules/auth/client', () => ({
   useCurrentScopeKey: () => 'scope-a',
 }));
 
-vi.mock('@/modules/kernel/client', () => ({
+vi.mock('@/modules/kernel/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/kernel/client')>()),
   isServerFnError: () => false,
 }));
 

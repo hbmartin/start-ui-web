@@ -214,7 +214,9 @@ export const createResendWebhookHandlers = ({
       : DEFAULT_RESEND_WEBHOOK_RATE_LIMIT_PER_MINUTE;
 
   const enforceRateLimit = (request: Request) => {
-    const ip = getClientIp(request, { trustedProxyDepth }) ?? 'unknown';
+    const ip = getClientIp(request, { trustedProxyDepth });
+    if (!ip) return undefined;
+
     const result = rateLimiter.check(
       `webhook:resend:${ip}`,
       boundedRateLimitPerMinute,

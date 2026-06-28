@@ -63,6 +63,22 @@ class InMemoryBookRepository implements BookRepository {
     });
   }
 
+  async findDuplicateCandidate(
+    input: Pick<BookWriteInput, 'title' | 'author'>
+  ) {
+    const duplicate = [...this.books.values()].find(
+      (book) =>
+        book.title.trim().toLowerCase() === input.title.trim().toLowerCase() &&
+        book.author.trim().toLowerCase() === input.author.trim().toLowerCase()
+    );
+
+    return Result.Ok(
+      duplicate
+        ? { type: 'book_duplicate_candidate_found' as const, book: duplicate }
+        : { type: 'book_duplicate_candidate_not_found' as const }
+    );
+  }
+
   async getById(id: BookId) {
     const book = this.books.get(id);
     return Result.Ok(

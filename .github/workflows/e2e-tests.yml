@@ -311,7 +311,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.update-baselines }}" == "true" ]]; then
             pnpm test:visual:update
           else
-            pnpm test:visual
+            pnpm verify:task -- --visual
           fi
 
       - name: Upload visual reports and baselines

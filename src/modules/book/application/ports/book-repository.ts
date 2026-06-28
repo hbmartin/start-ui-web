@@ -12,6 +12,10 @@ export type BookGetRepositoryOutcome =
   | { type: 'book_found'; book: Book }
   | { type: 'book_not_found' };
 
+export type BookDuplicateCandidateRepositoryOutcome =
+  | { type: 'book_duplicate_candidate_found'; book: Book }
+  | { type: 'book_duplicate_candidate_not_found' };
+
 export type BookCreateRepositoryOutcome =
   | { type: 'book_created'; book: Book }
   | { type: 'book_duplicate' };
@@ -31,6 +35,9 @@ export interface BookRepository {
     limit: number;
     searchTerm: string;
   }): Promise<ApplicationResult<BookListRepositoryOutcome>>;
+  findDuplicateCandidate(
+    input: Pick<BookWriteInput, 'title' | 'author'>
+  ): Promise<ApplicationResult<BookDuplicateCandidateRepositoryOutcome>>;
   getById(id: BookId): Promise<ApplicationResult<BookGetRepositoryOutcome>>;
   create(
     input: BookWriteInput

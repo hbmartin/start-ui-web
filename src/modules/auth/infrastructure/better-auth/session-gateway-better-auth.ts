@@ -80,14 +80,14 @@ export class SessionGatewayBetterAuth implements SessionGateway {
 
   /**
    * True when a session has lived past the absolute cap, regardless of how
-   * often it was refreshed (`updateAge` keeps sliding `expiresAt` forward). A
-   * missing `createdAt` is treated as not-expired so we never lock out a valid
-   * session on incomplete provider data.
+   * often it was refreshed (`updateAge` keeps sliding `expiresAt` forward).
+   * Missing or malformed `createdAt` fails closed because it cannot prove the
+   * session is still inside the hard cap.
    */
   private isPastAbsoluteMax(createdAt: Date | string | null | undefined) {
-    if (createdAt === null || createdAt === undefined) return false;
+    if (createdAt === null || createdAt === undefined) return true;
     const createdAtMs = new Date(createdAt).getTime();
-    if (Number.isNaN(createdAtMs)) return false;
+    if (Number.isNaN(createdAtMs)) return true;
     const ageSeconds = (this.clock.now().getTime() - createdAtMs) / 1000;
     return ageSeconds > getBetterAuthConfig().sessionAbsoluteMaxInSeconds;
   }

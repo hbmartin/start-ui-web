@@ -52,6 +52,8 @@ function makeRepo(overrides: Partial<BookRepository> = {}): BookRepository {
         type: 'book_listed',
         page: { items: [book], total: 1 },
       }),
+    findDuplicateCandidate: async () =>
+      Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
     getById: async () => Result.Ok({ type: 'book_found', book }),
     create: async () => Result.Ok({ type: 'book_created', book }),
     update: async () => Result.Ok({ type: 'book_updated', book }),
@@ -132,7 +134,10 @@ describe('book use cases', () => {
   };
 
   it('creates when no existing book matches', async () => {
-    const repo = makeRepo({ list: async () => Result.Ok(emptyListPage) });
+    const repo = makeRepo({
+      findDuplicateCandidate: async () =>
+        Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
+    });
 
     const created = await createBookUseCases(
       makeDeps({ bookRepository: repo })
@@ -146,8 +151,9 @@ describe('book use cases', () => {
 
   it('maps duplicate conflicts surfaced by the repository', async () => {
     const duplicateRepo = makeRepo({
-      list: async () => Result.Ok(emptyListPage),
       create: async () => Result.Ok({ type: 'book_duplicate' }),
+      findDuplicateCandidate: async () =>
+        Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
     });
 
     const duplicate = await createBookUseCases(
@@ -164,9 +170,13 @@ describe('book use cases', () => {
     const create = vi.fn(async () =>
       Result.Ok({ type: 'book_created' as const, book })
     );
-    // The existing "Dune" / "Frank Herbert" book is returned by `list`; the new
-    // input differs only by casing and surrounding whitespace.
-    const repo = makeRepo({ create });
+    const list = vi.fn(async () => Result.Ok(emptyListPage));
+    const repo = makeRepo({
+      create,
+      list,
+      findDuplicateCandidate: async () =>
+        Result.Ok({ type: 'book_duplicate_candidate_found', book }),
+    });
 
     const duplicate = await createBookUseCases(
       makeDeps({ bookRepository: repo })
@@ -177,6 +187,7 @@ describe('book use cases', () => {
 
     expect(getOk(duplicate)).toEqual({ type: 'book_duplicate' });
     expect(create).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('updates and deletes with not_found branches', async () => {

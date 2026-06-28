@@ -48,10 +48,10 @@ const isAddressedTo = (
 
 const messageTimestamp = (message: MaildevMessage) => {
   const dateText = message.date ?? message.time;
-  if (!dateText) return 0;
+  if (!dateText) return undefined;
 
   const timestamp = Date.parse(dateText);
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+  return Number.isNaN(timestamp) ? undefined : timestamp;
 };
 
 const fetchMessages = async (): Promise<MaildevMessage[]> => {
@@ -75,12 +75,14 @@ export const readLatestOtp = async (
   do {
     try {
       const otp = (await fetchMessages())
-        .filter(
-          (message) =>
+        .filter((message) => {
+          const timestamp = messageTimestamp(message);
+          return (
             isAddressedTo(message, email) &&
-            messageTimestamp(message) >= afterMs
-        )
-        .sort((a, b) => messageTimestamp(b) - messageTimestamp(a))
+            (timestamp === undefined || timestamp >= afterMs)
+          );
+        })
+        .sort((a, b) => (messageTimestamp(b) ?? 0) - (messageTimestamp(a) ?? 0))
         .map(extractOtp)
         .find((value): value is string => Boolean(value));
       if (otp) return otp;

@@ -125,4 +125,38 @@ describe('BookRepositoryDrizzle integration', () => {
       genre: { id: 'genre-2', name: 'Two' },
     });
   });
+
+  it('finds duplicate candidates by normalized title and author', async () => {
+    const repository = createBookRepository({ db: database.db });
+    await database.db
+      .insert(genreTable)
+      .values(makeGenreRow({ id: 'genre-1', name: 'One' }));
+    await database.db.insert(bookTable).values(
+      makeBookRow({
+        id: 'book-a',
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genreId: 'genre-1',
+      })
+    );
+
+    const duplicate = getOk(
+      await repository.findDuplicateCandidate({
+        title: '  dune ',
+        author: 'FRANK HERBERT',
+      })
+    );
+    expect(duplicate).toMatchObject({
+      type: 'book_duplicate_candidate_found',
+      book: { id: 'book-a' },
+    });
+
+    const missing = getOk(
+      await repository.findDuplicateCandidate({
+        title: 'Dune',
+        author: 'Someone Else',
+      })
+    );
+    expect(missing).toEqual({ type: 'book_duplicate_candidate_not_found' });
+  });
 });

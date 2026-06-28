@@ -1,3 +1,4 @@
+export { getBetterAuthConfig } from './infrastructure/config/auth';
 export { getEmailConfig } from './infrastructure/config/email';
 export {
   getSeedAccountEmails,

@@ -31,7 +31,7 @@ const makeAuth = (
   overrides: {
     userId?: string;
     email?: string;
-    createdAt?: Date;
+    createdAt?: Date | string | null;
   } = {}
 ): Auth =>
   ({
@@ -49,7 +49,8 @@ const makeAuth = (
         session: {
           id: 'session-1',
           userId: overrides.userId ?? 'user-1',
-          createdAt: overrides.createdAt,
+          createdAt:
+            'createdAt' in overrides ? overrides.createdAt : new Date(),
           expiresAt: new Date('2026-12-31'),
         },
       })),
@@ -270,4 +271,24 @@ describe('SessionGatewayBetterAuth', () => {
       value: { type: 'auth_session_missing' },
     });
   });
+
+  it.each([null, 'not-a-date'])(
+    'treats invalid session createdAt as unauthenticated: %s',
+    async (createdAt) => {
+      const { SessionGatewayBetterAuth } = await loadGateway();
+      const clock = { now: () => new Date('2026-06-01T00:00:00.000Z') };
+      const gateway = new SessionGatewayBetterAuth(
+        makeAuth('admin', { createdAt }),
+        makeDb(),
+        clock
+      );
+
+      const session = await gateway.getSession({ headers: new Headers() });
+
+      expect(session).toMatchObject({
+        tag: 'Ok',
+        value: { type: 'auth_session_missing' },
+      });
+    }
+  );
 });
