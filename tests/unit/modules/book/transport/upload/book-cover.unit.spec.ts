@@ -10,7 +10,6 @@ import {
   bookCoverUploadConstraints,
   handleBookCoverBeforeUpload,
 } from '@/modules/book/transport/upload/book-cover';
-import { UploadRejectedError } from '@/modules/kernel';
 import { toBookCoverObjectKey } from '@/modules/kernel/testing';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 
@@ -147,6 +146,9 @@ describe('book cover upload transport', () => {
       { headers, fileType: 'text/plain' }
     );
 
-    expect(expectErr(invalidTypeResult)).toBeInstanceOf(UploadRejectedError);
+    expect(expectErr(invalidTypeResult)).toMatchObject({
+      name: 'UploadRejectedError',
+      messageKey: 'book:manager.uploadErrors.invalid_file_type',
+    });
   });
 });

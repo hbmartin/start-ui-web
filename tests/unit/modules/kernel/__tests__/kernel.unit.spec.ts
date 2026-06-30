@@ -108,7 +108,7 @@ describe('kernel primitives', () => {
 
     const cache = {
       get: async <T>(key: string) =>
-        Option.fromNullable(store.get(key) as T | undefined),
+        store.has(key) ? Option.Some(store.get(key) as T) : Option.None<T>(),
       set: set as CacheGateway['set'],
       delete: async (key: string) => {
         store.delete(key);

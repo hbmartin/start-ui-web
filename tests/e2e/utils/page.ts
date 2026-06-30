@@ -400,7 +400,7 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
         AUTH_SIGNUP_ENABLED ? 'pageLoginWithSignUp' : 'pageLogin'
       ].loginWithEmail,
     });
-    const otpRequestedAfterMs = Date.now();
+    const otpRequestedAfterMs = Date.now() - 5_000;
 
     diagnostics.log('login.email.submit.ready', {
       buttonEnabled: await submitButton.isEnabled(),

@@ -25,7 +25,9 @@ export function makeTestKernel(overrides: Partial<Kernel> = {}): Kernel {
     },
     cacheGateway: {
       async get<T>(key: string) {
-        return Option.fromNullable(cache.get(key) as T | undefined);
+        return cache.has(key)
+          ? Option.Some(cache.get(key) as T)
+          : Option.None<T>();
       },
       async set<T>(key: string, value: T) {
         cache.set(key, value);

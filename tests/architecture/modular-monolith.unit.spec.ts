@@ -2,6 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
@@ -42,6 +43,9 @@ const protectedRouteGuardSpecs = [
     guard: 'redirectAuthenticatedRoute',
   },
 ];
+const portOutcomeOffenderOrder = ['nullable', 'optional', 'boolean'] as const;
+
+type PortOutcomeOffender = (typeof portOutcomeOffenderOrder)[number];
 
 function listSourceFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
@@ -89,6 +93,64 @@ function readSource(file: string) {
 
 function relativePath(file: string) {
   return path.relative(root, file);
+}
+
+function findPortPromiseOutcomeOffenders(source: string, fileName = 'port.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+  const offenders = new Set<PortOutcomeOffender>();
+
+  const inspectPayload = (node: ts.TypeNode): void => {
+    if (node.kind === ts.SyntaxKind.BooleanKeyword) {
+      offenders.add('boolean');
+      return;
+    }
+    if (node.kind === ts.SyntaxKind.UndefinedKeyword) {
+      offenders.add('optional');
+      return;
+    }
+    if (ts.isLiteralTypeNode(node)) {
+      if (node.literal.kind === ts.SyntaxKind.NullKeyword) {
+        offenders.add('nullable');
+      }
+      return;
+    }
+    if (ts.isUnionTypeNode(node)) {
+      node.types.forEach(inspectPayload);
+      return;
+    }
+    if (ts.isArrayTypeNode(node)) {
+      inspectPayload(node.elementType);
+      return;
+    }
+    if (ts.isParenthesizedTypeNode(node)) {
+      inspectPayload(node.type);
+      return;
+    }
+    if (ts.isTypeReferenceNode(node)) {
+      node.typeArguments?.forEach(inspectPayload);
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isTypeReferenceNode(node) &&
+      node.typeName.getText(sourceFile) === 'Promise'
+    ) {
+      const [payload] = node.typeArguments ?? [];
+      if (payload !== undefined) inspectPayload(payload);
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+
+  return portOutcomeOffenderOrder.filter((offender) => offenders.has(offender));
 }
 
 function findServerFunctionExports(files: string[]) {
@@ -705,6 +767,23 @@ describe('strict modular monolith layout', () => {
     );
   });
 
+  it('detects nested nullable, optional, and boolean port Promise payloads', () => {
+    const source = `
+      interface ExamplePort {
+        directBoolean(): Promise<boolean>;
+        nestedBoolean(): Promise<Result<boolean, AppError>>;
+        nestedNullable(): Promise<Result<User | null, AppError>>;
+        nestedOptional(): Promise<Result<Option<User | undefined>, AppError>>;
+      }
+    `;
+
+    expect(findPortPromiseOutcomeOffenders(source)).toEqual([
+      'nullable',
+      'optional',
+      'boolean',
+    ]);
+  });
+
   it('keeps application ports on tagged Result outcomes, not nullable or boolean', () => {
     const portFiles = fs
       .readdirSync(path.join(root, 'src/modules'), { withFileTypes: true })
@@ -717,13 +796,7 @@ describe('strict modular monolith layout', () => {
 
     const violations = portFiles.flatMap((file) => {
       const source = readSource(file);
-      const offenders: string[] = [];
-      if (/:\s*Promise<[^>]*\|\s*null>/.test(source))
-        offenders.push('nullable');
-      if (/:\s*Promise<[^>]*\|\s*undefined>/.test(source)) {
-        offenders.push('optional');
-      }
-      if (/:\s*Promise<boolean>/.test(source)) offenders.push('boolean');
+      const offenders = findPortPromiseOutcomeOffenders(source, file);
       return offenders.length
         ? [`${relativePath(file)} (${offenders.join(', ')})`]
         : [];

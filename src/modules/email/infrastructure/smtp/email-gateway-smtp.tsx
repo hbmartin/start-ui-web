@@ -209,7 +209,7 @@ const smtpErrorDiagnostics = (error: unknown) => {
   if (error instanceof AppError) {
     return {
       category: error.category,
-      code: error.code,
+      errorCode: error.code,
       message: error.message,
       status: error.status,
     };
