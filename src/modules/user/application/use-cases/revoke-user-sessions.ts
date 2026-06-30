@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { match, P } from 'ts-pattern';
 
 import type { UserId } from '@/modules/kernel/domain/ids';
 
@@ -22,10 +23,14 @@ export async function revokeUserSessions(
     input.currentUserId,
     { session: ['revoke'] }
   );
-  if (allowed.isError()) return Result.Error(allowed.getError());
-  if (allowed.get().type === 'permission_denied') {
-    return Result.Ok({ type: 'user_forbidden' });
-  }
+  const permissionResult = match(allowed)
+    .with(Result.P.Error(P.select()), (error) => Result.Error(error))
+    .with(Result.P.Ok({ type: 'permission_denied' }), () =>
+      Result.Ok({ type: 'user_forbidden' as const })
+    )
+    .with(Result.P.Ok({ type: 'permission_granted' }), () => undefined)
+    .exhaustive();
+  if (permissionResult !== undefined) return permissionResult;
   if (isSelfTarget(input.currentUserId, input.id)) {
     return Result.Ok({ type: 'user_self' });
   }

@@ -87,6 +87,17 @@ const messageTimestamp = (message: MaildevMessage) => {
 const isoTimestamp = (timestamp: number | undefined) =>
   timestamp === undefined ? undefined : new Date(timestamp).toISOString();
 
+const formatUnknownError = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+};
+
 const summarizeMessages = (
   messages: MaildevMessage[],
   input: { email: string; hasAfterGate: boolean; afterMs: number }
@@ -222,7 +233,7 @@ export const readLatestOtp = async (
     } catch (error) {
       lastError = error;
       emitPoll('maildev.poll.error', {
-        error: error instanceof Error ? error.message : String(error),
+        error: formatUnknownError(error),
       });
     }
 
@@ -233,14 +244,13 @@ export const readLatestOtp = async (
     'maildev.poll.timeout',
     lastError
       ? {
-          error:
-            lastError instanceof Error ? lastError.message : String(lastError),
+          error: formatUnknownError(lastError),
         }
       : undefined
   );
 
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for an OTP email to ${email}` +
-      (lastError ? `: ${String(lastError)}` : '')
+      (lastError ? `: ${formatUnknownError(lastError)}` : '')
   );
 };

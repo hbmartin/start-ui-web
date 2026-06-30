@@ -346,7 +346,7 @@ rules:
           }
       - metavariable-regex:
           metavariable: $ERROR
-          regex: '(?i).*\berror$'
+          regex: '(?i).*error$'
 
   - id: no-id-only-session-cursor-lookup
     message: Session cursor lookups must scope by both session.id and session.userId so one user's cursor cannot affect another user's page.
