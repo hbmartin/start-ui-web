@@ -17,12 +17,12 @@ import { SessionGatewayBetterAuth } from '@/modules/auth/infrastructure/better-a
 import { UserAdminGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/user-admin-gateway-better-auth';
 import { InMemorySecondaryStore } from '@/modules/auth/infrastructure/secondary-store/in-memory-secondary-store';
 import { UpstashSecondaryStore } from '@/modules/auth/infrastructure/secondary-store/upstash-secondary-store';
-import { ConfigurationError } from '@/modules/kernel/domain/errors/configuration-error';
+import { ConfigurationError } from '@/modules/kernel';
 import {
   getAuthProviderConfig,
   getBetterAuthConfig,
-} from '@/modules/kernel/infrastructure/config/auth';
-import { getRedisConfig } from '@/modules/kernel/infrastructure/config/redis';
+  getRedisConfig,
+} from '@/modules/kernel/backend';
 
 import { AuthEmailPortEmailGateway } from './auth-email-port';
 import { getEmailGateway } from './email';

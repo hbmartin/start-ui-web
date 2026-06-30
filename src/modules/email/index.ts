@@ -11,6 +11,7 @@ export type {
 export type { EmailTransactionContext } from './application/use-cases/types';
 export {
   EMAIL_PROVIDER_RESEND,
+  EMAIL_PROVIDER_SMTP,
   type EmailMetadata,
   type EmailProvider,
   type EmailStatus,

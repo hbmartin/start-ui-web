@@ -34,7 +34,7 @@ import {
   ServerFnError,
   type ServerFnErrorCode,
   type ServerFnErrorData,
-} from '@/modules/kernel/client';
+} from '@/modules/kernel/backend';
 import type { UserId } from '@/modules/kernel/domain/ids';
 import { toRequestId } from '@/modules/kernel/domain/ids';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
@@ -253,9 +253,9 @@ const getStartAuthSession = () => {
 };
 
 const getSessionCreatedAtMs = (
-  createdAt: AuthenticatedSession['createdAt']
+  createdAt: AuthenticatedSession['createdAt'] | null
 ) => {
-  if (createdAt === undefined) return undefined;
+  if (createdAt === undefined || createdAt === null) return undefined;
   const createdAtMs =
     createdAt instanceof Date ? createdAt.getTime() : Date.parse(createdAt);
   return Number.isFinite(createdAtMs) ? createdAtMs : undefined;

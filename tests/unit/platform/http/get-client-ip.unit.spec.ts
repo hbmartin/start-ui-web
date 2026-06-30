@@ -58,6 +58,11 @@ describe('getClientIp', () => {
         trustedProxyDepth: 1.5,
       })
     ).toBeUndefined();
+    expect(
+      getClientIp(requestWith({ 'X-Forwarded-For': '203.0.113.7' }), {
+        trustedProxyDepth: Number.MAX_SAFE_INTEGER + 1,
+      })
+    ).toBeUndefined();
   });
 
   it('falls back to X-Real-IP when no X-Forwarded-For is present', () => {

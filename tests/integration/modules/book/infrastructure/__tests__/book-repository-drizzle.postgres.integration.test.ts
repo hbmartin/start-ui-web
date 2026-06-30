@@ -5,6 +5,7 @@ import { POSTGRES_TESTCONTAINER_IMAGE } from '@tests/server/docker-images';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createBookRepository } from '@/modules/book/infrastructure/drizzle/book-repository-drizzle';
+import type { AppError } from '@/modules/kernel';
 import { toBookId, toGenreId } from '@/modules/kernel/domain/ids';
 import {
   createDbClient,
@@ -24,6 +25,9 @@ type TableRow = {
   schemaname: string;
   tablename: string;
 };
+
+const getResultError = (result: unknown) =>
+  (result as { getError: () => AppError }).getError();
 
 const quoteIdentifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
@@ -117,6 +121,37 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
     ).resolves.toMatchObject({
       title: 'Original Title',
       author: 'Original Author',
+    });
+  });
+
+  it('maps normalized duplicate insert conflicts to a book duplicate error', async () => {
+    const initializedDb = getInitializedDb(db);
+    const repository = createBookRepository({ db: initializedDb });
+
+    await initializedDb
+      .insert(genreTable)
+      .values(makeGenreRow({ id: 'genre-1', name: 'Original Genre' }));
+    await initializedDb.insert(bookTable).values(
+      makeBookRow({
+        id: 'book-1',
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genreId: 'genre-1',
+      })
+    );
+
+    const result = await repository.create({
+      title: '  dune ',
+      author: 'FRANK HERBERT',
+      genreId: toGenreId('genre-1'),
+      publisher: null,
+      coverId: null,
+    });
+
+    expect(result.isError()).toBe(true);
+    expect(getResultError(result)).toMatchObject({
+      code: 'BOOK_DUPLICATE',
+      status: 409,
     });
   });
 });

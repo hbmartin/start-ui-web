@@ -1,4 +1,4 @@
-import type { ApplicationResult } from '@/modules/kernel/application/result';
+import type { ApplicationResult } from '@/modules/kernel';
 
 export type SecondaryStoreGetOutcome =
   | { type: 'secondary_store_hit'; value: string }

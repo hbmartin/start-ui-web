@@ -66,6 +66,7 @@ export const readLatestOtp = async (
   email: string,
   options: { afterMs?: number; timeoutMs?: number; intervalMs?: number } = {}
 ): Promise<string> => {
+  const hasAfterGate = options.afterMs !== undefined;
   const afterMs = options.afterMs ?? 0;
   const timeoutMs = options.timeoutMs ?? 15_000;
   const intervalMs = options.intervalMs ?? 500;
@@ -79,7 +80,7 @@ export const readLatestOtp = async (
           const timestamp = messageTimestamp(message);
           return (
             isAddressedTo(message, email) &&
-            (timestamp === undefined || timestamp >= afterMs)
+            (!hasAfterGate || (timestamp !== undefined && timestamp >= afterMs))
           );
         })
         .sort((a, b) => (messageTimestamp(b) ?? 0) - (messageTimestamp(a) ?? 0))

@@ -63,7 +63,9 @@ function toDomain(row: BookRow): Book {
 function isBookDuplicateError(error: unknown) {
   return (
     isUniqueConstraintViolation(error) &&
-    getConstraintName(error) === 'book_title_author_key'
+    ['book_title_author_key', 'book_normalized_title_author_key'].includes(
+      getConstraintName(error) ?? ''
+    )
   );
 }
 

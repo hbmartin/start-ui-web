@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "book_normalized_title_author_key" ON "book" USING btree (lower(trim("title")),lower(trim("author")));

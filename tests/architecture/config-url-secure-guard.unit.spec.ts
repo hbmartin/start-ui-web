@@ -29,9 +29,18 @@ const URL_FIELD_PATTERN = /\.url\s*\(/;
 const SECURE_URL_GUARD_PATTERN =
   /assertSecureUrlInProduction|isSecureUrlForProduction|assertDatabaseUrlTls|secureUrl/;
 
-const configFiles = readdirSync(CONFIG_DIR)
-  .filter((name) => name.endsWith('.ts'))
-  .filter((name) => !name.endsWith('.unit.spec.ts'));
+const listConfigFiles = (directory: string): string[] =>
+  readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return listConfigFiles(entryPath);
+    if (!entry.isFile()) return [];
+    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.unit.spec.ts')) {
+      return [];
+    }
+    return [path.relative(CONFIG_DIR, entryPath)];
+  });
+
+const configFiles = listConfigFiles(CONFIG_DIR);
 
 const declaresUrlField = (name: string) =>
   URL_FIELD_PATTERN.test(readFileSync(path.join(CONFIG_DIR, name), 'utf8'));

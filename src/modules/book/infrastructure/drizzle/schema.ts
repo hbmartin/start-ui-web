@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, pgTable, text, uniqueIndex } from 'drizzle-orm/pg-core';
 
 import { genre } from '@/modules/genre/infrastructure/drizzle/schema';
@@ -23,6 +24,10 @@ export const book = pgTable(
   },
   (table) => [
     uniqueIndex('book_title_author_key').on(table.title, table.author),
+    uniqueIndex('book_normalized_title_author_key').on(
+      sql`lower(trim(${table.title}))`,
+      sql`lower(trim(${table.author}))`
+    ),
     index('book_genre_id_idx').on(table.genreId),
   ]
 );

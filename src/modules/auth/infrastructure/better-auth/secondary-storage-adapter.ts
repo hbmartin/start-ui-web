@@ -11,15 +11,17 @@ export const createBetterAuthSecondaryStorage = (
 ): BetterAuthSecondaryStorage => ({
   async get(key) {
     const result = await store.get(key);
-    if (result.isError()) return null;
+    if (result.isError()) throw result.getError();
 
     const outcome = result.get();
     return outcome.type === 'secondary_store_hit' ? outcome.value : null;
   },
   async set(key, value, ttlSeconds) {
-    await store.set(key, value, ttlSeconds);
+    const result = await store.set(key, value, ttlSeconds);
+    if (result.isError()) throw result.getError();
   },
   async delete(key) {
-    await store.delete(key);
+    const result = await store.delete(key);
+    if (result.isError()) throw result.getError();
   },
 });

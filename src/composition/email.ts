@@ -8,7 +8,9 @@ import {
 import { createEmailStatusRepository } from '@/modules/email/infrastructure/drizzle/email-status-repository-drizzle';
 import { EmailGatewayResend } from '@/modules/email/infrastructure/resend/email-gateway-resend';
 import { ResendWebhookVerifier } from '@/modules/email/infrastructure/resend/resend-webhook-verifier';
+import { EmailGatewaySmtp } from '@/modules/email/infrastructure/smtp/email-gateway-smtp';
 import type { TransactionRunner } from '@/modules/kernel';
+import { getEmailConfig } from '@/modules/kernel/backend';
 import {
   createTransactionRunner,
   type Database,
@@ -65,6 +67,17 @@ const createEmailKernel = (db: Database): EmailKernel => ({
 const getDefaultEmailKernel = (): EmailKernel =>
   createEmailKernel(getDefaultDbClient());
 
+const createConfiguredEmailGateway = (
+  statusTransactionRunner: TransactionRunner<EmailTransactionContext>
+): EmailGateway => ({
+  sendEmail(input) {
+    const Gateway = getEmailConfig().server
+      ? EmailGatewaySmtp
+      : EmailGatewayResend;
+    return new Gateway({ statusTransactionRunner }).sendEmail(input);
+  },
+});
+
 const buildEmailServices = (overrides?: EmailOverrides): EmailServices => {
   const kernel =
     overrides?.kernel ??
@@ -79,9 +92,7 @@ const buildEmailServices = (overrides?: EmailOverrides): EmailServices => {
 
   const gateway =
     overrides?.emailGateway ??
-    new EmailGatewayResend({
-      statusTransactionRunner,
-    });
+    createConfiguredEmailGateway(statusTransactionRunner);
 
   return {
     gateway,
