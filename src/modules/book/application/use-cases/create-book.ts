@@ -43,6 +43,18 @@ export async function createBook(
     return Result.Ok({ type: 'book_duplicate' });
   }
 
+  // A submitted cover must be a key this caller was issued (and not yet used).
+  if (book.coverId) {
+    const consumed = await deps.coverStorage.consumeUpload(
+      book.coverId,
+      input.currentUserId
+    );
+    if (consumed.isError()) return Result.Error(consumed.getError());
+    if (consumed.get().type === 'cover_upload_unowned') {
+      return Result.Ok({ type: 'book_cover_unowned' });
+    }
+  }
+
   deps.logger.info({ event: 'book.create' });
   const result = await deps.bookRepository.create(book);
   if (result.isError()) return Result.Error(result.getError());

@@ -8,6 +8,8 @@ import {
   zUserId,
 } from '@/modules/kernel/domain/ids';
 
+import { USER_NAME_MAX_LENGTH } from '../domain/user-policy';
+
 export type User = z.infer<ReturnType<typeof zUser>>;
 export const zRole = () => z.enum(['admin', 'user']);
 
@@ -38,7 +40,7 @@ export const zSession = () =>
 export type FormFieldsUser = z.infer<ReturnType<typeof zFormFieldsUser>>;
 export const zFormFieldsUser = () =>
   z.object({
-    name: zu.fieldText.nullish(),
+    name: zu.fieldText.nullish({ max: USER_NAME_MAX_LENGTH }),
     email: zu.fieldText.required({ error: 'user:common.email.required' }).pipe(
       z.email({
         error: (issue) =>

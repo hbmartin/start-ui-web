@@ -7,6 +7,7 @@ import type {
 } from '@/modules/kernel';
 import type { BookCoverObjectKey } from '@/modules/kernel/domain/ids';
 
+import type { BookCoverStorage } from '../ports/book-cover-storage';
 import type {
   BookCreateRepositoryOutcome,
   BookDeleteRepositoryOutcome,
@@ -25,10 +26,17 @@ export type BookUseCaseDeps = {
   transactionRunner: TransactionRunner<BookTransactionContext>;
   idGenerator: IdGenerator;
   permissionChecker: PermissionChecker;
+  coverStorage: BookCoverStorage;
   logger: Logger;
 };
 
 export type BookForbiddenOutcome = { type: 'book_forbidden' };
+
+/**
+ * The submitted `coverId` was not a key issued to this caller (or its short
+ * binding window expired) — the caller must re-upload the cover.
+ */
+export type BookCoverUnownedOutcome = { type: 'book_cover_unowned' };
 
 export type BookListOutcome = BookListRepositoryOutcome | BookForbiddenOutcome;
 
@@ -36,11 +44,13 @@ export type BookGetOutcome = BookGetRepositoryOutcome | BookForbiddenOutcome;
 
 export type BookCreateOutcome =
   | BookCreateRepositoryOutcome
-  | BookForbiddenOutcome;
+  | BookForbiddenOutcome
+  | BookCoverUnownedOutcome;
 
 export type BookUpdateOutcome =
   | BookUpdateRepositoryOutcome
-  | BookForbiddenOutcome;
+  | BookForbiddenOutcome
+  | BookCoverUnownedOutcome;
 
 export type BookDeleteOutcome =
   | BookDeleteRepositoryOutcome

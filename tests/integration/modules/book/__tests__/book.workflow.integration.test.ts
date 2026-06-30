@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type Book,
+  type BookCoverStorage,
   type BookRepository,
   type BookWriteInput,
   createBookUseCases,
@@ -31,6 +32,13 @@ const logger: Logger = {
 };
 const permissionChecker: PermissionChecker = {
   hasPermission: async () => Result.Ok({ type: 'permission_granted' }),
+};
+// Permissive binding store: this workflow test exercises book CRUD, not the
+// cover upload-key binding (covered in the book use-case unit tests).
+const coverStorage: BookCoverStorage = {
+  rememberUpload: async () => Result.Ok({ type: 'cover_upload_remembered' }),
+  consumeUpload: async () => Result.Ok({ type: 'cover_upload_consumed' }),
+  deleteObject: async () => Result.Ok({ type: 'cover_object_deleted' }),
 };
 
 class InMemoryBookRepository implements BookRepository {
@@ -160,6 +168,7 @@ describe('book public workflow integration', () => {
       idGenerator: { createId: () => toGeneratedId('cover-id') },
       logger,
       permissionChecker,
+      coverStorage,
     });
 
     const created = await useCases.create({

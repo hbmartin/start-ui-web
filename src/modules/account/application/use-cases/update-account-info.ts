@@ -8,7 +8,7 @@ import type {
   AccountUseCaseDeps,
 } from './types';
 import { normalizeAccountName } from '../../domain/account';
-import { isAccountNamePresent } from '../../domain/account-policy';
+import { isAccountNameValid } from '../../domain/account-policy';
 
 export type UpdateAccountInfoInput = {
   currentUserId: UserId;
@@ -28,7 +28,7 @@ export async function updateAccountInfo(
     return Result.Ok({ type: 'account_forbidden' });
   }
 
-  if (!isAccountNamePresent(input.name)) {
+  if (!isAccountNameValid(input.name)) {
     return Result.Ok({ type: 'account_invalid' });
   }
 

@@ -25,7 +25,6 @@ type ProtectedRunner = ServerFnContextRunner<ProtectedContext>;
 type UserServerRuntimeDeps = {
   handlers: UserHandlers;
   withProtectedContext: ProtectedRunner;
-  withProtectedMutation: ProtectedRunner;
   withFreshProtectedMutation: ProtectedRunner;
 };
 
@@ -33,7 +32,7 @@ const getDeps = createServerOnlyFn(async (): Promise<UserServerRuntimeDeps> => {
   const [
     { getUserUseCases },
     { getKernel },
-    { withProtectedContext, withProtectedMutation, withFreshProtectedMutation },
+    { withProtectedContext, withFreshProtectedMutation },
   ] = await Promise.all([
     import('@/composition/user'),
     import('@/composition/kernel'),
@@ -48,7 +47,6 @@ const getDeps = createServerOnlyFn(async (): Promise<UserServerRuntimeDeps> => {
         }),
     }),
     withProtectedContext,
-    withProtectedMutation,
     withFreshProtectedMutation,
   };
 });
@@ -58,13 +56,9 @@ const runProtected = createServerFunctionInvoker({
   selectRunner: (deps) => deps.withProtectedContext,
 });
 
-const runMutation = createServerFunctionInvoker({
-  getDeps,
-  selectRunner: (deps) => deps.withProtectedMutation,
-});
-
-// Destructive admin actions additionally require a fresh session (step-up
-// re-authentication). A stale session is rejected with `reauth_required`.
+// Destructive or privilege-granting admin actions additionally require a fresh
+// session (step-up re-authentication). A stale session is rejected with
+// `reauth_required`.
 const runFreshMutation = createServerFunctionInvoker({
   getDeps,
   selectRunner: (deps) => deps.withFreshProtectedMutation,
@@ -97,11 +91,16 @@ export const userUpdateById = createServerFn({ method: 'POST' })
     )
   );
 
+// Creating a user is privilege-granting (it can mint an admin when the actor
+// holds `user:set-role`), so it requires a fresh session for parity with the
+// other destructive admin mutations — otherwise a stale/hijacked admin session
+// could provision a durable backdoor account. (CWE-287 / CWE-269.)
 export const userCreate = createServerFn({ method: 'POST' })
   .inputValidator(zCreateInput())
   .handler(async ({ data }) =>
-    runMutation.withOperation('user.create')(data, ({ handlers }, ctx, input) =>
-      handlers.create(ctx, input)
+    runFreshMutation.withOperation('user.create')(
+      data,
+      ({ handlers }, ctx, input) => handlers.create(ctx, input)
     )
   );
 

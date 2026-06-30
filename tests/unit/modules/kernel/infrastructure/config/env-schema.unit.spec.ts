@@ -7,6 +7,7 @@ import { ConfigurationError } from '@/modules/kernel/domain/errors/configuration
 import {
   baseEnvSchema,
   getSeedAccountEmails,
+  isProdRuntimeEnvironment,
   parseEnv,
 } from '@/modules/kernel/infrastructure/config/env-schema';
 
@@ -67,6 +68,39 @@ describe('server env parser', () => {
     });
     expect((error as Error).message).not.toContain(secret);
     expect((error as Error).cause).toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe('isProdRuntimeEnvironment (fail-closed production detection)', () => {
+  it('treats a production build artifact as production', () => {
+    expect(isProdRuntimeEnvironment({ PROD: true })).toBe(true);
+    expect(isProdRuntimeEnvironment({ NODE_ENV: 'production' })).toBe(true);
+  });
+
+  it('does NOT let a non-allowlisted NODE_ENV downgrade a production build', () => {
+    // The split-brain bug: a prod build run with NODE_ENV=staging must still be
+    // treated as production so DB-TLS / secret guards stay enforced.
+    expect(isProdRuntimeEnvironment({ NODE_ENV: 'staging', PROD: true })).toBe(
+      true
+    );
+    expect(isProdRuntimeEnvironment({ NODE_ENV: 'preview', PROD: true })).toBe(
+      true
+    );
+  });
+
+  it('only downgrades to non-production via the explicit development/test allowlist', () => {
+    expect(
+      isProdRuntimeEnvironment({ NODE_ENV: 'development', PROD: true })
+    ).toBe(false);
+    expect(isProdRuntimeEnvironment({ NODE_ENV: 'test', PROD: true })).toBe(
+      false
+    );
+  });
+
+  it('is non-production when there is no production signal at all', () => {
+    expect(isProdRuntimeEnvironment({})).toBe(false);
+    expect(isProdRuntimeEnvironment({ PROD: false })).toBe(false);
+    expect(isProdRuntimeEnvironment({ NODE_ENV: 'staging' })).toBe(false);
   });
 });
 

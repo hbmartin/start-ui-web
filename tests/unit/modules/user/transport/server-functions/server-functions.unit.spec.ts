@@ -37,7 +37,7 @@ vi.mock('@/platform/lib/tanstack-start/server-function-handler', () => {
 const loadServerFunctions = () => import('@/modules/user/server');
 
 describe('user server functions runner wiring', () => {
-  it('runs destructive actions through the fresh (step-up) mutation runner', async () => {
+  it('runs destructive and privilege-granting actions through the fresh (step-up) mutation runner', async () => {
     const fns = await loadServerFunctions();
 
     await expect(
@@ -52,14 +52,16 @@ describe('user server functions runner wiring', () => {
     await expect(
       (fns.userRevokeUserSession as ExplicitAny)({ data: {} })
     ).resolves.toBe('fresh');
+    // Creating a user can mint an admin (with `user:set-role`), so it requires
+    // a fresh session for parity with the other destructive admin mutations.
+    await expect((fns.userCreate as ExplicitAny)({ data: {} })).resolves.toBe(
+      'fresh'
+    );
   });
 
-  it('keeps create on the standard mutation runner and reads on the protected runner', async () => {
+  it('runs reads on the protected (non-step-up) runner', async () => {
     const fns = await loadServerFunctions();
 
-    await expect((fns.userCreate as ExplicitAny)({ data: {} })).resolves.toBe(
-      'mutation'
-    );
     await expect((fns.userGetAll as ExplicitAny)({ data: {} })).resolves.toBe(
       'protected'
     );

@@ -34,4 +34,22 @@ describe('zod form utilities', () => {
     expect(schema.parse(undefined)).toBeUndefined();
     expect(schema.parse('  visible  ')).toBe('visible');
   });
+
+  it('rejects required text past the configured max with the maxLength key', () => {
+    const schema = zu.fieldText.required({ max: 5 });
+
+    expect(schema.parse('  abc  ')).toBe('abc');
+    expect(schema.safeParse('abcdef')).toMatchObject({
+      success: false,
+      error: { issues: [{ message: 'common:errors.maxLength' }] },
+    });
+  });
+
+  it('applies max to nullish text while preserving null normalization', () => {
+    const schema = zu.fieldText.nullish({ max: 3 });
+
+    expect(schema.parse('  ab  ')).toBe('ab');
+    expect(schema.parse('   ')).toBeNull();
+    expect(schema.safeParse('abcd')).toMatchObject({ success: false });
+  });
 });

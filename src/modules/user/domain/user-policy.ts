@@ -6,6 +6,13 @@ import type { UserRole } from './user';
 export const DEFAULT_USER_ROLE: UserRole = 'user';
 
 /**
+ * Maximum stored length of a user display name. Shared by the presentation form
+ * schema and the server-side transport validator so the bound is enforced at
+ * both tiers (A04 "plausibility checks at each tier"). (CWE-1284 / CWE-770.)
+ */
+export const USER_NAME_MAX_LENGTH = 200;
+
+/**
  * True when `role` is an explicitly-requested, non-default (privileged) role.
  * Assigning such a role is a privilege assignment that must be gated behind the
  * dedicated `user:set-role` permission, both on create and update.

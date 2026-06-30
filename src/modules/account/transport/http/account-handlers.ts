@@ -4,10 +4,13 @@ import type { AccountUseCases } from '@/modules/account';
 import type { ProtectedContext } from '@/modules/auth/backend';
 import { unwrapApplicationResult } from '@/modules/kernel/transport/tanstack/result-mapper';
 
-export const zSubmitOnboardingInput = () =>
-  z.object({ name: z.string().trim().min(1) });
-export const zUpdateInfoInput = () =>
-  z.object({ name: z.string().trim().min(1) });
+import { ACCOUNT_NAME_MAX_LENGTH } from '../../domain/account-policy';
+
+const zAccountName = () =>
+  z.string().trim().min(1).max(ACCOUNT_NAME_MAX_LENGTH);
+
+export const zSubmitOnboardingInput = () => z.object({ name: zAccountName() });
+export const zUpdateInfoInput = () => z.object({ name: zAccountName() });
 
 type AccountHandlerDeps = {
   getUseCases: (ctx: ProtectedContext) => AccountUseCases;

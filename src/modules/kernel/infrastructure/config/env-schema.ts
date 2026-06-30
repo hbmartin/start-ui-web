@@ -32,9 +32,29 @@ const DEFAULT_SEED_ACCOUNT_EMAILS = {
   userEmail: 'user@e2e.local',
 } as const;
 
+/**
+ * Canonical, fail-closed "is this a production runtime" check. Every
+ * security-relevant guard (DB/URL TLS enforcement, secret-placeholder
+ * rejection, secure cookies, HSTS, telemetry transport) MUST derive
+ * "is production" from here so there is a single, consistent notion of prod.
+ *
+ * A production build artifact (`import.meta.env.PROD === true`) is
+ * authoritative. `NODE_ENV` may only DOWNGRADE it to non-prod, and only via an
+ * explicit `development`/`test` allowlist. Any other `NODE_ENV` value (e.g.
+ * `staging`, `preview`) must NOT silently disable production guards, so an
+ * unrecognized value falls back to the build-time `PROD` signal rather than
+ * being treated as non-prod. This prevents the split-brain where a prod build
+ * run with `NODE_ENV=staging` kept HSTS on but dropped DB-TLS verification.
+ */
 export const isProdRuntimeEnvironment = (source?: RuntimeEnv) => {
   const env = source ?? runtimeEnv();
-  return env.NODE_ENV ? env.NODE_ENV === 'production' : isTruthy(env.PROD);
+  const nodeEnv =
+    typeof env.NODE_ENV === 'string'
+      ? env.NODE_ENV.trim().toLowerCase()
+      : undefined;
+  if (nodeEnv === 'development' || nodeEnv === 'test') return false;
+  if (nodeEnv === 'production') return true;
+  return isTruthy(env.PROD);
 };
 
 export const isDevRuntimeEnvironment = (source?: RuntimeEnv) => {
