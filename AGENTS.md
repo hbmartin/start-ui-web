@@ -16,6 +16,10 @@ Use these commands instead of invoking underlying tools directly.
 | `pnpm test` | Vitest unit and browser projects. |
 | `pnpm test:affected:list` | List tests associated with changed files. |
 | `pnpm test:affected` | Run tests associated with changed files. |
+| `pnpm fitness:quick` | Collect deterministic architecture fitness metrics and fail on hard findings. |
+| `pnpm fitness:collect` | Write JSON, Markdown, and SARIF fitness reports under `test-results/fitness/`. |
+| `pnpm fitness:ratchet --base <sha>` | Compare current fitness metrics against a base revision. |
+| `pnpm fitness:agent` | Emit blocking/approval JSON for local or agent hooks. |
 | `pnpm test:e2e:visual` | Local Chromium visual regression check for stable critical screens. |
 | `pnpm test:e2e:visual:auth` | Local Chromium visual regression check for login and verification screens. |
 | `pnpm test:e2e:visual:app-shell` | Local Chromium visual regression check for the authenticated app shell. |
@@ -28,6 +32,8 @@ Use these commands instead of invoking underlying tools directly.
 | `pnpm check:migrations` | Guard against invalid manual migration edits. |
 
 After code changes, run `pnpm format:changed && pnpm check && pnpm test:affected`. Before merge, run `pnpm verify`.
+
+Fitness reports are generated under `test-results/fitness/` and are intentionally not committed. The ratchet gate compares the current revision to a supplied base SHA, blocks new or increased zero-tolerance findings, requires `policyScore` to stay at 100, and blocks material evolvability regressions. `testStrengthScore` and `operationsScore` are reported in v1 and block only when both base and current artifacts are available.
 
 ## Task Verification Loop
 
@@ -46,6 +52,8 @@ Use a layered verification loop rather than relying on one broad command.
 Local full-stack verification with seeded data, Maildev, MinIO, and the local database is the default realism level for agent work. Production smoke testing is out of scope unless read-only routes, credentials, and data safety rules are explicitly provided.
 
 Task verification artifacts should be grouped under `test-results/task-verification/<timestamp>/` when using `pnpm verify:task`. Keep Playwright traces, screenshots, videos, and failure attachments in their default `test-results/` locations and link or summarize the relevant paths in the final handoff. Visual test baselines are reviewed repo artifacts; do not silently update them without saying why.
+
+Fitness artifacts should be grouped under `test-results/fitness/`. The JSON report is the stable machine-readable contract, the Markdown report is the human handoff, and `fitness.sarif` is the agent/code-scanning feedback channel.
 
 ## Public Gates
 

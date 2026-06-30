@@ -1,7 +1,7 @@
 const isFastMode = process.env.STRYKER_FAST === '1';
 
-const normalReporters = ['progress', 'clear-text', 'html'];
-const fastReporters = ['progress-append-only', 'clear-text'];
+const normalReporters = ['progress', 'clear-text', 'html', 'json'];
+const fastReporters = ['progress-append-only', 'clear-text', 'json'];
 
 export function createScopedStrykerConfig({
   moduleName,
@@ -44,6 +44,9 @@ export function createScopedStrykerConfig({
     reporters: isFastMode ? fastReporters : normalReporters,
     htmlReporter: {
       fileName: `reports/mutation/${moduleName}/mutation.html`,
+    },
+    jsonReporter: {
+      fileName: `reports/mutation/${moduleName}/mutation.json`,
     },
   };
 }
