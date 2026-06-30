@@ -1,6 +1,7 @@
 import { type Result as BoxedResult, Result } from '@bloodyowl/boxed';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { pullObject } from 'remeda';
+import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 
 import type {
@@ -115,32 +116,39 @@ const toDomain = (
 const emailStatusIdempotencyKeyIsNotNull = sql`${emailStatusTable.idempotencyKey} is not null`;
 const emailStatusExternalIdIsNotNull = sql`${emailStatusTable.externalId} is not null`;
 
+function isEmailStatusDuplicateError(error: unknown) {
+  if (!isUniqueConstraintViolation(error)) return false;
+  const constraint = getConstraintName(error);
+  return (
+    constraint === 'email_status_provider_external_id_key' ||
+    constraint === 'email_status_provider_idempotency_key'
+  );
+}
+
 function mapDbError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
-
-  if (isUniqueConstraintViolation(error)) {
-    const constraint = getConstraintName(error);
-    if (
-      constraint === 'email_status_provider_external_id_key' ||
-      constraint === 'email_status_provider_idempotency_key'
-    ) {
-      return new AppError({
-        code: 'EMAIL_STATUS_DUPLICATE',
-        category: 'conflict',
-        status: 409,
-        message: 'Email status already exists',
-        cause: error,
-      });
-    }
-  }
-
-  return new AppError({
-    code: 'EMAIL_STATUS_REPOSITORY_ERROR',
-    category: 'system',
-    status: 500,
-    message: 'Email status repository error',
-    cause: error,
-  });
+  return match(error)
+    .with(P.instanceOf(AppError), (appError) => appError)
+    .when(
+      isEmailStatusDuplicateError,
+      () =>
+        new AppError({
+          code: 'EMAIL_STATUS_DUPLICATE',
+          category: 'conflict',
+          status: 409,
+          message: 'Email status already exists',
+          cause: error,
+        })
+    )
+    .otherwise(
+      () =>
+        new AppError({
+          code: 'EMAIL_STATUS_REPOSITORY_ERROR',
+          category: 'system',
+          status: 500,
+          message: 'Email status repository error',
+          cause: error,
+        })
+    );
 }
 
 export class EmailStatusRepositoryDrizzle implements EmailStatusRepository {

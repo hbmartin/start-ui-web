@@ -323,6 +323,31 @@ rules:
       - pattern: |
           if (!$INPUT.providerToken) return false;
 
+  - id: no-redacted-app-error-code-diagnostic
+    message: AppError diagnostics sanitized with code-sensitive redaction must use errorCode, not code, so the error identifier is preserved.
+    severity: ERROR
+    languages:
+      - typescript
+    paths:
+      include:
+        - /src/composition/**/*.ts
+        - /src/composition/**/*.tsx
+        - /src/modules/**/infrastructure/**/*.ts
+        - /src/modules/**/infrastructure/**/*.tsx
+    patterns:
+      - pattern-inside: |
+          import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields';
+          ...
+      - pattern: |
+          {
+            ...,
+            code: $ERROR.code,
+            ...
+          }
+      - metavariable-regex:
+          metavariable: $ERROR
+          regex: '(?i).*\berror$'
+
   - id: no-id-only-session-cursor-lookup
     message: Session cursor lookups must scope by both session.id and session.userId so one user's cursor cannot affect another user's page.
     severity: ERROR

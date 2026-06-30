@@ -1,5 +1,4 @@
 import { Result } from '@bloodyowl/boxed';
-import { match, P } from 'ts-pattern';
 
 import type { UserId } from '@/modules/kernel/domain/ids';
 
@@ -23,20 +22,8 @@ export async function revokeUserSessions(
     input.currentUserId,
     { session: ['revoke'] }
   );
-  const permission = match(allowed)
-    .with(Result.P.Error(P.select()), (error) => ({
-      type: 'error' as const,
-      error,
-    }))
-    .with(Result.P.Ok({ type: 'permission_denied' }), () => ({
-      type: 'denied' as const,
-    }))
-    .with(Result.P.Ok({ type: 'permission_granted' }), () => ({
-      type: 'granted' as const,
-    }))
-    .exhaustive();
-  if (permission.type === 'error') return Result.Error(permission.error);
-  if (permission.type === 'denied') {
+  if (allowed.isError()) return Result.Error(allowed.getError());
+  if (allowed.get().type === 'permission_denied') {
     return Result.Ok({ type: 'user_forbidden' });
   }
   if (isSelfTarget(input.currentUserId, input.id)) {
@@ -44,16 +31,7 @@ export async function revokeUserSessions(
   }
 
   const result = await deps.userAuthGateway.revokeUserSessions(input.id);
-  const revoked = match(result)
-    .with(Result.P.Error(P.select()), (error) => ({
-      type: 'error' as const,
-      error,
-    }))
-    .with(Result.P.Ok({ type: 'user_auth_sessions_revoked' }), () => ({
-      type: 'revoked' as const,
-    }))
-    .exhaustive();
-  if (revoked.type === 'error') return Result.Error(revoked.error);
+  if (result.isError()) return Result.Error(result.getError());
   deps.logger.warn({
     details: {
       mode: 'all',

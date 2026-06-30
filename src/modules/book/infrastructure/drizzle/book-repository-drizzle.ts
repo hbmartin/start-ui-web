@@ -1,5 +1,6 @@
 import { Result } from '@bloodyowl/boxed';
 import { and, asc, eq, sql } from 'drizzle-orm';
+import { match, P } from 'ts-pattern';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import type { BookId } from '@/modules/kernel/domain/ids';
@@ -70,39 +71,41 @@ function isBookDuplicateError(error: unknown) {
 }
 
 function mapDbError(error: unknown): AppError {
-  if (error instanceof AppError) return error;
-
-  if (isBookDuplicateError(error)) {
-    return new AppError({
-      code: 'BOOK_DUPLICATE',
-      category: 'conflict',
-      status: 409,
-      message: 'Book already exists',
-      details: { target: ['title', 'author'] },
-      cause: error,
-    });
-  }
-
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = (error as { code?: unknown }).code;
-    if (code === '23503') {
-      return new AppError({
-        code: 'BOOK_FOREIGN_KEY',
-        category: 'bad_request',
-        status: 400,
-        message: 'Invalid book relationship',
-        cause: error,
-      });
-    }
-  }
-
-  return new AppError({
-    code: 'BOOK_REPOSITORY_ERROR',
-    category: 'system',
-    status: 500,
-    message: 'Book repository error',
-    cause: error,
-  });
+  return match(error)
+    .with(P.instanceOf(AppError), (appError) => appError)
+    .when(
+      isBookDuplicateError,
+      () =>
+        new AppError({
+          code: 'BOOK_DUPLICATE',
+          category: 'conflict',
+          status: 409,
+          message: 'Book already exists',
+          details: { target: ['title', 'author'] },
+          cause: error,
+        })
+    )
+    .with(
+      { code: '23503' },
+      () =>
+        new AppError({
+          code: 'BOOK_FOREIGN_KEY',
+          category: 'bad_request',
+          status: 400,
+          message: 'Invalid book relationship',
+          cause: error,
+        })
+    )
+    .otherwise(
+      () =>
+        new AppError({
+          code: 'BOOK_REPOSITORY_ERROR',
+          category: 'system',
+          status: 500,
+          message: 'Book repository error',
+          cause: error,
+        })
+    );
 }
 
 export class BookRepositoryDrizzle implements BookRepository {

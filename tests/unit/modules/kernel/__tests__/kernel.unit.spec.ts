@@ -1,3 +1,4 @@
+import { Option } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cacheAside } from '@/modules/kernel/application/cache/cache-aside';
@@ -7,6 +8,10 @@ import { DomainError } from '@/modules/kernel/domain/errors/domain-error';
 import { toCacheKey } from '@/modules/kernel/domain/ids';
 import { escapeLikePattern } from '@/modules/kernel/infrastructure/db/like';
 import { appErrorToResponse } from '@/modules/kernel/transport/http/error-mapper';
+
+function getTestCacheEntry<T>(store: Map<string, unknown>, key: string) {
+  return store.has(key) ? Option.Some(store.get(key) as T) : Option.None<T>();
+}
 
 describe('kernel primitives', () => {
   it('carries structured AppError fields', () => {
@@ -106,7 +111,7 @@ describe('kernel primitives', () => {
     );
 
     const cache = {
-      get: async <T>(key: string) => store.get(key) as T | undefined,
+      get: async <T>(key: string) => getTestCacheEntry<T>(store, key),
       set: set as CacheGateway['set'],
       delete: async (key: string) => {
         store.delete(key);

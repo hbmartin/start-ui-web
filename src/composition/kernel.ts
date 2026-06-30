@@ -1,4 +1,4 @@
-import { Result } from '@bloodyowl/boxed';
+import { Option, Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
 import type { CacheGateway } from '@/modules/kernel/application/ports/cache-gateway';
@@ -33,15 +33,15 @@ const memoryCache = (clock: Clock): CacheGateway => {
   return {
     async get<T>(key: string) {
       const entry = entries.get(key);
-      if (!entry) return undefined;
+      if (!entry) return Option.None<T>();
       if (
         entry.expiresAt !== undefined &&
         entry.expiresAt <= clock.now().getTime()
       ) {
         entries.delete(key);
-        return undefined;
+        return Option.None<T>();
       }
-      return entry.value as T;
+      return Option.Some(entry.value as T);
     },
     async set<T>(key: string, value: T, options?: { ttlMs?: number }) {
       entries.set(key, {

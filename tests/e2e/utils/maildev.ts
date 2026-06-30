@@ -49,6 +49,13 @@ export type MaildevOtpPollEvent = {
   };
 };
 
+type MaildevOtpPollExtraDetails = Partial<
+  Omit<
+    MaildevOtpPollEvent['details'],
+    'afterGateEnabled' | 'afterMs' | 'attempt' | 'baseUrl' | 'elapsedMs'
+  >
+>;
+
 const extractOtp = (message: MaildevMessage): string | undefined => {
   for (const source of [message.subject, message.text, message.html]) {
     const match = source?.match(OTP_PATTERN);
@@ -160,6 +167,26 @@ export const readLatestOtp = async (
 
   let attempt = 0;
   let lastError: unknown;
+  const basePollDetails = (): MaildevOtpPollEvent['details'] => ({
+    attempt,
+    baseUrl: MAILDEV_BASE_URL,
+    elapsedMs: Date.now() - startedAt,
+    afterGateEnabled: hasAfterGate,
+    ...(hasAfterGate ? { afterMs } : {}),
+  });
+  const emitPoll = (
+    type: MaildevOtpPollEvent['type'],
+    details: MaildevOtpPollExtraDetails = {}
+  ) => {
+    options.onPoll?.({
+      type,
+      details: {
+        ...basePollDetails(),
+        ...details,
+      },
+    });
+  };
+
   do {
     attempt += 1;
     try {
@@ -169,17 +196,9 @@ export const readLatestOtp = async (
         email,
         hasAfterGate,
       });
-      options.onPoll?.({
-        type: 'maildev.poll.result',
-        details: {
-          ...summary,
-          attempt,
-          baseUrl: MAILDEV_BASE_URL,
-          elapsedMs: Date.now() - startedAt,
-          afterGateEnabled: hasAfterGate,
-          ...(hasAfterGate ? { afterMs } : {}),
-          status,
-        },
+      emitPoll('maildev.poll.result', {
+        ...summary,
+        status,
       });
 
       const otp = messages
@@ -194,56 +213,31 @@ export const readLatestOtp = async (
         .map(extractOtp)
         .find((value): value is string => Boolean(value));
       if (otp) {
-        options.onPoll?.({
-          type: 'maildev.otp.found',
-          details: {
-            ...summary,
-            attempt,
-            baseUrl: MAILDEV_BASE_URL,
-            elapsedMs: Date.now() - startedAt,
-            afterGateEnabled: hasAfterGate,
-            ...(hasAfterGate ? { afterMs } : {}),
-            status,
-          },
+        emitPoll('maildev.otp.found', {
+          ...summary,
+          status,
         });
         return otp;
       }
     } catch (error) {
       lastError = error;
-      options.onPoll?.({
-        type: 'maildev.poll.error',
-        details: {
-          attempt,
-          baseUrl: MAILDEV_BASE_URL,
-          elapsedMs: Date.now() - startedAt,
-          afterGateEnabled: hasAfterGate,
-          ...(hasAfterGate ? { afterMs } : {}),
-          error: error instanceof Error ? error.message : String(error),
-        },
+      emitPoll('maildev.poll.error', {
+        error: error instanceof Error ? error.message : String(error),
       });
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   } while (Date.now() < deadline);
 
-  options.onPoll?.({
-    type: 'maildev.poll.timeout',
-    details: {
-      attempt,
-      baseUrl: MAILDEV_BASE_URL,
-      elapsedMs: Date.now() - startedAt,
-      afterGateEnabled: hasAfterGate,
-      ...(hasAfterGate ? { afterMs } : {}),
-      ...(lastError
-        ? {
-            error:
-              lastError instanceof Error
-                ? lastError.message
-                : String(lastError),
-          }
-        : {}),
-    },
-  });
+  emitPoll(
+    'maildev.poll.timeout',
+    lastError
+      ? {
+          error:
+            lastError instanceof Error ? lastError.message : String(lastError),
+        }
+      : undefined
+  );
 
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for an OTP email to ${email}` +

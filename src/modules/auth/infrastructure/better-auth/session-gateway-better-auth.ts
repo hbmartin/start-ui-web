@@ -1,4 +1,4 @@
-import { Result } from '@bloodyowl/boxed';
+import { Option, Result } from '@bloodyowl/boxed';
 import { and, eq } from 'drizzle-orm';
 
 import type { Clock } from '@/modules/kernel/application/ports/clock';
@@ -95,7 +95,7 @@ export class SessionGatewayBetterAuth implements SessionGateway {
 
   private async resolveAppUser(
     providerUser: AuthenticatedUserSource
-  ): Promise<AuthenticatedUserSource | null> {
+  ): Promise<Option<AuthenticatedUserSource>> {
     const identity = await this.db.query.authIdentity.findFirst({
       where: and(
         eq(authIdentity.provider, 'better-auth'),
@@ -114,13 +114,13 @@ export class SessionGatewayBetterAuth implements SessionGateway {
         })
         .onConflictDoNothing();
     }
-    if (userId === providerUser.id) return providerUser;
+    if (userId === providerUser.id) return Option.Some(providerUser);
 
     const appUser = await this.db.query.user.findFirst({
       where: eq(userTable.id, userId),
     });
 
-    return appUser ?? null;
+    return Option.fromNullable(appUser);
   }
 
   async getSession(input: {
@@ -147,14 +147,16 @@ export class SessionGatewayBetterAuth implements SessionGateway {
           if (this.isPastAbsoluteMax(session.session.createdAt)) {
             return Result.Ok({ type: 'auth_session_missing' });
           }
-          const user = await this.resolveAppUser(session.user);
-          if (!user) return Result.Ok({ type: 'auth_session_missing' });
-          return Result.Ok({
-            type: 'auth_session_found',
-            session: {
-              user: toAuthenticatedUser(user),
-              session: toAuthenticatedSession(session.session, user.id),
-            },
+          return (await this.resolveAppUser(session.user)).match({
+            None: () => Result.Ok({ type: 'auth_session_missing' as const }),
+            Some: (user) =>
+              Result.Ok({
+                type: 'auth_session_found' as const,
+                session: {
+                  user: toAuthenticatedUser(user),
+                  session: toAuthenticatedSession(session.session, user.id),
+                },
+              }),
           });
         } catch (error) {
           return Result.Error(

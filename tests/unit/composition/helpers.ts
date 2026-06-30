@@ -1,4 +1,4 @@
-import { Result } from '@bloodyowl/boxed';
+import { Option, Result } from '@bloodyowl/boxed';
 
 import type { Kernel } from '@/composition/kernel';
 import { toGeneratedId } from '@/modules/kernel/domain/ids';
@@ -25,7 +25,9 @@ export function makeTestKernel(overrides: Partial<Kernel> = {}): Kernel {
     },
     cacheGateway: {
       async get<T>(key: string) {
-        return cache.get(key) as T | undefined;
+        return cache.has(key)
+          ? Option.Some(cache.get(key) as T)
+          : Option.None<T>();
       },
       async set<T>(key: string, value: T) {
         cache.set(key, value);

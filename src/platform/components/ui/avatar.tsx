@@ -4,6 +4,13 @@ import * as React from 'react';
 
 import { cn } from '@/platform/lib/tailwind/utils';
 
+const toInitials = (name: string | undefined) =>
+  name
+    ?.split(' ')
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join('');
+
 function Avatar({
   className,
   size = 'default',
@@ -88,11 +95,7 @@ function AvatarFallback(
         )}
         {...rest}
       >
-        {name
-          ?.split(' ')
-          .slice(0, 2)
-          .map((s) => s[0])
-          .join('')}
+        {toInitials(name)}
       </AvatarPrimitive.Fallback>
     );
   }
@@ -124,11 +127,7 @@ function AvatarFallback(
           ]}
         />
         <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-avatar-foreground uppercase mix-blend-overlay group-data-[size=sm]/avatar:text-2xs">
-          {name
-            ?.split(' ')
-            .slice(0, 2)
-            .map((s) => s[0])
-            .join('')}
+          {toInitials(name)}
         </span>
       </div>
     </AvatarPrimitive.Fallback>
