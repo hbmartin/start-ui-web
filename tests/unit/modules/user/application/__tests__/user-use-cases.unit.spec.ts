@@ -733,6 +733,109 @@ describe('user use cases', () => {
       });
     });
 
+    it('revokes the target sessions after a role change so the cached role is evicted', async () => {
+      const { useCases, auth, logger } = makeContext({
+        permissionChecker: makePermissionChecker(
+          userUpdatePermission,
+          userSetRolePermission
+        ),
+        repo: {
+          getUpdateSnapshot: vi.fn<UserRepository['getUpdateSnapshot']>(
+            async () =>
+              Result.Ok({
+                type: 'user_update_snapshot_found',
+                snapshot: { email: user.email, role: 'admin' },
+              })
+          ),
+        },
+      });
+
+      await expectOk(
+        useCases.update({
+          currentUserId: adminId,
+          id: userId,
+          user: { email: user.email, role: 'user' },
+        })
+      );
+
+      expect(auth.revokeUserSessions).toHaveBeenCalledWith(userId);
+      expect(logger.warn).toHaveBeenCalledWith({
+        event: 'security.session_revoked',
+        details: {
+          mode: 'all',
+          reason: 'role_changed',
+          revokedByUserId: adminId,
+          targetUserId: userId,
+        },
+      });
+    });
+
+    it('does not revoke sessions when the role is unchanged', async () => {
+      const { useCases, auth } = makeContext({
+        permissionChecker: makePermissionChecker(userUpdatePermission),
+        repo: {
+          getUpdateSnapshot: vi.fn<UserRepository['getUpdateSnapshot']>(
+            async () =>
+              Result.Ok({
+                type: 'user_update_snapshot_found',
+                snapshot: { email: user.email, role: 'user' },
+              })
+          ),
+        },
+      });
+
+      await expectOk(
+        useCases.update({
+          currentUserId: adminId,
+          id: userId,
+          user: { email: user.email, role: 'user' },
+        })
+      );
+
+      expect(auth.revokeUserSessions).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a post-role-change session-revoke failure as an app error', async () => {
+      const { useCases } = makeContext({
+        permissionChecker: makePermissionChecker(
+          userUpdatePermission,
+          userSetRolePermission
+        ),
+        repo: {
+          getUpdateSnapshot: vi.fn<UserRepository['getUpdateSnapshot']>(
+            async () =>
+              Result.Ok({
+                type: 'user_update_snapshot_found',
+                snapshot: { email: user.email, role: 'admin' },
+              })
+          ),
+        },
+        auth: {
+          revokeUserSessions: vi.fn<UserAuthGateway['revokeUserSessions']>(
+            async () =>
+              Result.Error(
+                new AppError({
+                  code: 'USER_SESSIONS_REVOKE_FAILED',
+                  category: 'system',
+                  status: 500,
+                  message: 'Failed to revoke user sessions',
+                })
+              )
+          ),
+        },
+      });
+
+      await expect(
+        expectFailure(
+          useCases.update({
+            currentUserId: adminId,
+            id: userId,
+            user: { email: user.email, role: 'user' },
+          })
+        )
+      ).resolves.toMatchObject({ code: 'USER_SESSIONS_REVOKE_FAILED' });
+    });
+
     it('normalizes a null display name to an empty string', async () => {
       const { useCases, repo } = makeContext({
         permissionChecker: makePermissionChecker(userUpdatePermission),

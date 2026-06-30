@@ -60,14 +60,14 @@ export async function updateUser(
       ? undefined
       : (input.user.role ?? undefined);
 
-  if (
-    canChangeRole({
-      currentUserId: input.currentUserId,
-      userId: input.id,
-      nextRole,
-      currentRole: current.role,
-    })
-  ) {
+  const roleChanged = canChangeRole({
+    currentUserId: input.currentUserId,
+    userId: input.id,
+    nextRole,
+    currentRole: current.role,
+  });
+
+  if (roleChanged) {
     const canSetRole = await deps.permissionChecker.hasPermission(
       input.currentUserId,
       { user: ['set-role'] }
@@ -98,5 +98,25 @@ export async function updateUser(
     ...update,
   });
   if (result.isError()) return Result.Error(result.getError());
+
+  // A privilege change must evict the target's existing sessions. The session
+  // store caches the user's role/ban snapshot at sign-in time, so without an
+  // explicit revoke a demoted (or banned) user keeps presenting their old role
+  // on every live session until it expires. Revoking forces re-authentication,
+  // which mints a fresh session carrying the new role. (CWE-613 / CWE-269.)
+  if (roleChanged) {
+    const revoked = await deps.userAuthGateway.revokeUserSessions(input.id);
+    if (revoked.isError()) return Result.Error(revoked.getError());
+    deps.logger.warn({
+      event: 'security.session_revoked',
+      details: {
+        mode: 'all',
+        reason: 'role_changed',
+        revokedByUserId: input.currentUserId,
+        targetUserId: input.id,
+      },
+    });
+  }
+
   return Result.Ok(result.get());
 }

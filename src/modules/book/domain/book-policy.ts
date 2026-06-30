@@ -16,6 +16,16 @@ export const bookCoverAcceptedFileTypes = [
 export const bookCoverMaxFileSizeBytes = 1024 * 1024 * 10;
 
 /**
+ * Maximum stored lengths for the free-text book fields. Shared by the
+ * presentation form schema and the server-side transport validator so the bound
+ * is enforced at both tiers (A04 "plausibility checks at each tier"), bounding
+ * unbounded-`text`-column growth. (CWE-1284 / CWE-770.)
+ */
+export const BOOK_TITLE_MAX_LENGTH = 200;
+export const BOOK_AUTHOR_MAX_LENGTH = 200;
+export const BOOK_PUBLISHER_MAX_LENGTH = 200;
+
+/**
  * Namespace prefix for the stable cover-upload rejection translation keys. The
  * transport builds its key table from this prefix and the presentation layer
  * detects a rejection key by it, so the literal lives in exactly one place.

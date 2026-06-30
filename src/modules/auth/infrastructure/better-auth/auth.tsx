@@ -13,6 +13,7 @@ import {
   toOtpCode,
 } from '@/modules/kernel/domain/ids';
 import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
+import { isProdRuntimeEnvironment } from '@/modules/kernel/infrastructure/config/env-schema';
 import {
   type Database,
   getDefaultDbClient,
@@ -72,7 +73,7 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       freshAge: authConfig.sessionFreshAgeInSeconds,
     },
     advanced: createAuthCookieSecurityOptions(envClient.VITE_BASE_URL, {
-      isProduction: import.meta.env.PROD,
+      isProduction: isProdRuntimeEnvironment(),
     }),
     account: {
       encryptOAuthTokens: true,
@@ -85,6 +86,11 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       additionalFields: {
         onboardedAt: {
           type: 'date',
+          // Server-managed workflow flag. `input: false` keeps it out of Better
+          // Auth's user-writable input, so a caller cannot self-set it via
+          // `POST /api/auth/update-user` to skip onboarding. The onboarding use
+          // case writes it directly through the repository. (CWE-915 / CWE-841.)
+          input: false,
         },
       },
     },
@@ -111,6 +117,11 @@ export function createAuth(input?: Database | CreateAuthOptions) {
       emailOTP({
         disableSignUp: !authSignupEnabled,
         expiresIn: AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES * 60,
+        // Encrypt the one-time code at rest (symmetric, keyed by AUTH_SECRET)
+        // instead of the Better Auth default of storing it in plaintext in the
+        // `verification` table. Defense-in-depth against DB read access.
+        // (CWE-256 / CWE-312.)
+        storeOTP: 'encrypted',
         allowedAttempts: authConfig.otpAllowedAttempts,
         rateLimit: {
           window: authConfig.otpSendWindowSeconds,

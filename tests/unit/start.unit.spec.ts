@@ -14,14 +14,15 @@ vi.mock('@sentry/tanstackstart-react', () => ({
 }));
 
 describe('TanStack Start instance', () => {
-  it('adds Sentry, telemetry, security headers, auth context, browser mutation guard, and server-function CSRF middleware', async () => {
+  it('adds Sentry, telemetry, security headers, auth context, browser mutation guard, server-function body limit, and server-function CSRF middleware', async () => {
     const { startInstance } = await import('@/start');
     const options = (startInstance as ExplicitAny).options;
     const telemetry = options.requestMiddleware[1] as ExplicitAny;
     const securityHeaders = options.requestMiddleware[2] as ExplicitAny;
     const authContext = options.requestMiddleware[3] as ExplicitAny;
     const browserMutationGuard = options.requestMiddleware[4] as ExplicitAny;
-    const csrf = options.requestMiddleware[5] as ExplicitAny;
+    const serverFnBodyLimit = options.requestMiddleware[5] as ExplicitAny;
+    const csrf = options.requestMiddleware[6] as ExplicitAny;
 
     expect(options.requestMiddleware[0]).toBe(sentryMiddleware.request);
     expect(options.functionMiddleware).toEqual([sentryMiddleware.function]);
@@ -29,6 +30,7 @@ describe('TanStack Start instance', () => {
     expect(securityHeaders.type).toBe('request');
     expect(authContext.type).toBe('request');
     expect(browserMutationGuard.type).toBe('request');
+    expect(serverFnBodyLimit.type).toBe('request');
     expect(csrf.type).toBe('csrf');
     expect(csrf.options.filter({ handlerType: 'serverFn' })).toBe(true);
     expect(csrf.options.filter({ handlerType: 'router' })).toBe(false);

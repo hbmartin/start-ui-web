@@ -5,13 +5,17 @@ import {
   type Router,
 } from '@better-upload/server';
 import { custom } from '@better-upload/server/clients';
+import { Result } from '@bloodyowl/boxed';
 import { mapValues } from 'remeda';
 
 import type {
+  ObjectDeleteOutcome,
   ObjectStoragePort,
   ObjectUploadRequestHandler,
   ObjectUploadRouteDefinition,
 } from '@/modules/kernel/application/ports/object-storage';
+import type { ApplicationResult } from '@/modules/kernel/application/result';
+import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { getStorageConfig } from '@/modules/kernel/infrastructure/config/storage';
 
 const createUploadClient = () => {
@@ -67,5 +71,45 @@ export class BetterUploadObjectStorage implements ObjectStoragePort {
       routes: mapValues(routes, toBetterUploadRoute),
     } satisfies Router;
     return (request) => handleRequest(request, router);
+  }
+
+  /**
+   * Delete an object via a SigV4-signed `DELETE` issued through the same
+   * configured S3 client used for presigning (`client.s3` is an aws4fetch
+   * `AwsClient`), so no extra SDK/dependency is needed. S3 returns 204 for a
+   * successful delete and 204/404 when the object is already gone — both are
+   * treated as success (idempotent).
+   */
+  async deleteObject(
+    objectKey: string
+  ): Promise<ApplicationResult<ObjectDeleteOutcome>> {
+    const config = getStorageConfig();
+    const client = createUploadClient();
+    const objectUrl = `${client.buildBucketUrl(config.bucketName)}/${objectKey}`;
+
+    try {
+      const response = await client.s3.fetch(objectUrl, { method: 'DELETE' });
+      if (response.ok || response.status === 404) {
+        return Result.Ok({ type: 'object_deleted' });
+      }
+      return Result.Error(
+        new AppError({
+          code: 'OBJECT_STORAGE_DELETE_FAILED',
+          category: 'system',
+          status: 502,
+          message: `Object storage delete failed with status ${response.status}`,
+        })
+      );
+    } catch (error) {
+      return Result.Error(
+        new AppError({
+          code: 'OBJECT_STORAGE_DELETE_FAILED',
+          category: 'system',
+          status: 502,
+          message: 'Object storage delete failed',
+          cause: error,
+        })
+      );
+    }
   }
 }

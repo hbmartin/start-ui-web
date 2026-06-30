@@ -2,6 +2,7 @@ import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AccountRepository } from '@/modules/account/application/ports/account-repository';
+import { ACCOUNT_NAME_MAX_LENGTH } from '@/modules/account/domain/account-policy';
 import { createAccountUseCases } from '@/modules/account/factory';
 import type { PermissionChecker } from '@/modules/kernel/application/ports/permission-checker';
 import { toUserId } from '@/modules/kernel/domain/ids';
@@ -118,6 +119,38 @@ describe('account use cases', () => {
     const updated = await useCases.updateInfo({
       currentUserId: scope('user-1').userId,
       name: '   ',
+    });
+
+    expect(getOk(submitted)).toEqual({ type: 'account_invalid' });
+    expect(getOk(updated)).toEqual({ type: 'account_invalid' });
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects over-length account names before repository writes', async () => {
+    const repositoryWithSpies: AccountRepository = {
+      submitOnboarding: async (id) =>
+        Result.Ok({ type: 'account_updated', account: { id } }),
+      updateInfo: async (id) =>
+        Result.Ok({ type: 'account_updated', account: { id } }),
+    };
+    const submitSpy = vi.spyOn(repositoryWithSpies, 'submitOnboarding');
+    const updateSpy = vi.spyOn(repositoryWithSpies, 'updateInfo');
+    const useCases = createAccountUseCases({
+      accountRepository: repositoryWithSpies,
+      clock,
+      logger,
+      permissionChecker: allowed,
+    });
+    const tooLong = 'a'.repeat(ACCOUNT_NAME_MAX_LENGTH + 1);
+
+    const submitted = await useCases.submitOnboarding({
+      currentUserId: scope('user-1').userId,
+      name: tooLong,
+    });
+    const updated = await useCases.updateInfo({
+      currentUserId: scope('user-1').userId,
+      name: tooLong,
     });
 
     expect(getOk(submitted)).toEqual({ type: 'account_invalid' });

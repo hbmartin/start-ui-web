@@ -1,3 +1,4 @@
+export type * from './application/ports/book-cover-storage';
 export type * from './application/ports/book-repository';
 export type { BookTransactionContext } from './application/use-cases/types';
 export type * from './domain/book';

@@ -35,6 +35,15 @@ export async function prepareBookCoverUpload(
     return Result.Ok({ type: 'book_cover_upload_invalid_file_type' });
   }
 
+  // Bind the issued key to this caller so only they can later attach it to a
+  // book; the binding is verified and consumed on write
+  // (`coverStorage.consumeUpload`). (CWE-472 / CWE-639.)
+  const remembered = await deps.coverStorage.rememberUpload(
+    objectKey,
+    input.currentUserId
+  );
+  if (remembered.isError()) return Result.Error(remembered.getError());
+
   deps.logger.info({
     event: 'book.cover_upload.prepare',
     details: {

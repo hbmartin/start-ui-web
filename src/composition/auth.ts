@@ -75,7 +75,7 @@ const secondaryStoreFactory = createCachedFactory<SecondaryStore, never>(
   buildSecondaryStore
 );
 
-const getSecondaryStore = () => secondaryStoreFactory.get();
+export const getSecondaryStore = () => secondaryStoreFactory.get();
 
 const assertBetterAuthProvider = () => {
   const { provider } = getAuthProviderConfig();

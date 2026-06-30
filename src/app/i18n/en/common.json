@@ -25,6 +25,7 @@
     "update": "Update"
   },
   "errors": {
-    "required": "Required"
+    "required": "Required",
+    "maxLength": "Too long"
   }
 }

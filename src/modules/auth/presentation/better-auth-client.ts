@@ -32,6 +32,8 @@ const betterAuthClient = createAuthClient({
       user: {
         onboardedAt: {
           type: 'date',
+          // Mirror the server: server-managed, not client-writable input.
+          input: false,
         },
       },
     }),

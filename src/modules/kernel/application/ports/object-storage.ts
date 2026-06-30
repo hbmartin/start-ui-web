@@ -11,6 +11,7 @@
 
 import type { Result } from '@bloodyowl/boxed';
 
+import type { ApplicationResult } from '../result';
 import type { UploadRejectedError } from '../../domain/errors/upload-rejected-error';
 
 export type ObjectUploadPrepared = {
@@ -38,6 +39,12 @@ export type ObjectUploadRequestHandler = (
   request: Request
 ) => Promise<Response>;
 
+/**
+ * Outcome of deleting a stored object. Deleting a key that does not exist is a
+ * success (idempotent) so callers can reclaim covers without racing.
+ */
+export type ObjectDeleteOutcome = { type: 'object_deleted' };
+
 export type ObjectStoragePort = {
   /**
    * Build an HTTP handler that serves presigned uploads for the given named
@@ -46,4 +53,12 @@ export type ObjectStoragePort = {
   createUploadRequestHandler: (
     routes: Record<string, ObjectUploadRouteDefinition>
   ) => ObjectUploadRequestHandler;
+  /**
+   * Delete a stored object by its server-generated key. Idempotent: a missing
+   * object resolves `object_deleted`. Genuine provider/transport failures are
+   * returned as `Result.Error(AppError)`.
+   */
+  deleteObject: (
+    objectKey: string
+  ) => Promise<ApplicationResult<ObjectDeleteOutcome>>;
 };

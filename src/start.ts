@@ -11,6 +11,7 @@ import {
 import { observeHttpRequest } from '@/composition/telemetry/request-observability';
 import type { AuthSession } from '@/modules/auth';
 import type { Logger } from '@/modules/kernel';
+import { isProdRuntimeEnvironment } from '@/modules/kernel/backend';
 import { envClient } from '@/platform/env/client';
 import {
   appendBrowserMutationVaryHeader,
@@ -19,6 +20,7 @@ import {
 } from '@/platform/http/browser-mutation-protection';
 import { replaceCspNoncePlaceholderInHtmlResponse } from '@/platform/http/csp-nonce';
 import { createCspNonce } from '@/platform/http/csp-nonce-server';
+import { exceedsDeclaredBodyLimit } from '@/platform/http/request-body-limit';
 import { applySecurityHeaders } from '@/platform/http/security-headers';
 import { createNoOpTelemetry } from '@/platform/telemetry';
 
@@ -81,7 +83,7 @@ const getSecurityHeaderOptions = (context?: unknown) => {
     allowPlaywrightScreenshotStyles: isTestRuntime,
     baseUrl: envClient.VITE_BASE_URL,
     cspNonce: getCspNonceFromContext(context),
-    isProduction: import.meta.env.PROD,
+    isProduction: isProdRuntimeEnvironment(),
     s3BucketPublicUrl: envClient.VITE_S3_BUCKET_PUBLIC_URL,
   };
 };
@@ -205,6 +207,20 @@ export const browserMutationGuardMiddleware = createMiddleware({
   return result;
 });
 
+// Coarse whole-body cap for server functions (the per-field `.max()` validators
+// are the primary bound). Rejects oversized payloads before the handler runs.
+export const serverFnBodyLimitMiddleware = createMiddleware({
+  type: 'request',
+}).server(({ context, request, handlerType, next }) => {
+  if (handlerType === 'serverFn' && exceedsDeclaredBodyLimit(request)) {
+    return applyAppSecurityHeaders(
+      new Response('Payload Too Large', { status: 413 }),
+      context
+    );
+  }
+  return next();
+});
+
 export const telemetryRequestMiddleware = createMiddleware({
   type: 'request',
 }).server(({ context, request, pathname, handlerType, next }) =>
@@ -232,6 +248,7 @@ export const startInstance = createStart(() => ({
     securityHeadersMiddleware,
     authRequestContextMiddleware,
     browserMutationGuardMiddleware,
+    serverFnBodyLimitMiddleware,
     csrfMiddleware,
   ],
   functionMiddleware: [sentryGlobalFunctionMiddleware],

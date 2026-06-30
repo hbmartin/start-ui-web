@@ -20,6 +20,11 @@ import type {
   BookUpdateOutcome,
 } from '../../application/use-cases/types';
 import type { Book, BookListPage } from '../../domain/book';
+import {
+  BOOK_AUTHOR_MAX_LENGTH,
+  BOOK_PUBLISHER_MAX_LENGTH,
+  BOOK_TITLE_MAX_LENGTH,
+} from '../../domain/book-policy';
 
 export const zGetAllInput = () =>
   z
@@ -40,10 +45,10 @@ const zBookCoverInput = () =>
 
 const zBookWriteInput = () =>
   z.object({
-    title: z.string().trim().min(1),
-    author: z.string().trim().min(1),
+    title: z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH),
+    author: z.string().trim().min(1).max(BOOK_AUTHOR_MAX_LENGTH),
     genreId: zGenreId(),
-    publisher: z.string().nullish(),
+    publisher: z.string().max(BOOK_PUBLISHER_MAX_LENGTH).nullish(),
     coverId: zBookCoverInput(),
   });
 
@@ -64,6 +69,13 @@ const bookDuplicateConfig = {
   },
 } as const;
 
+const bookCoverUnownedConfig = {
+  book_cover_unowned: {
+    code: 'BAD_REQUEST',
+    message: 'Cover upload is no longer valid; please re-upload the cover.',
+  },
+} as const;
+
 const bookListConfig = {
   book_forbidden: 'FORBIDDEN',
   book_listed: (outcome) => outcome.page,
@@ -79,6 +91,7 @@ const bookCreateConfig = {
   book_created: (outcome) => outcome.book,
   book_forbidden: 'FORBIDDEN',
   ...bookDuplicateConfig,
+  ...bookCoverUnownedConfig,
 } as const satisfies OutcomeHandlerConfig<BookCreateOutcome, Book>;
 
 const bookUpdateConfig = {
@@ -86,6 +99,7 @@ const bookUpdateConfig = {
   book_not_found: 'NOT_FOUND',
   book_updated: (outcome) => outcome.book,
   ...bookDuplicateConfig,
+  ...bookCoverUnownedConfig,
 } as const satisfies OutcomeHandlerConfig<BookUpdateOutcome, Book>;
 
 const bookDeleteConfig = {
