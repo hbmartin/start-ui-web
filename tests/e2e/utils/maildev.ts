@@ -26,6 +26,29 @@ type MaildevMessage = {
 
 const OTP_PATTERN = /\b(\d{6})\b/;
 
+export type MaildevOtpPollEvent = {
+  type:
+    | 'maildev.otp.found'
+    | 'maildev.poll.error'
+    | 'maildev.poll.result'
+    | 'maildev.poll.timeout';
+  details: {
+    attempt: number;
+    baseUrl: string;
+    elapsedMs: number;
+    afterGateEnabled: boolean;
+    afterMs?: number;
+    error?: string;
+    latestAddressedMessageAt?: string;
+    latestMessageAt?: string;
+    messagesAddressedToRecipient?: number;
+    messagesEligibleAfterGate?: number;
+    messagesWithOtp?: number;
+    status?: number;
+    totalMessages?: number;
+  };
+};
+
 const extractOtp = (message: MaildevMessage): string | undefined => {
   for (const source of [message.subject, message.text, message.html]) {
     const match = source?.match(OTP_PATTERN);
@@ -54,28 +77,112 @@ const messageTimestamp = (message: MaildevMessage) => {
   return Number.isNaN(timestamp) ? undefined : timestamp;
 };
 
-const fetchMessages = async (): Promise<MaildevMessage[]> => {
+const isoTimestamp = (timestamp: number | undefined) =>
+  timestamp === undefined ? undefined : new Date(timestamp).toISOString();
+
+const summarizeMessages = (
+  messages: MaildevMessage[],
+  input: { email: string; hasAfterGate: boolean; afterMs: number }
+) => {
+  let latestMessageAt: number | undefined;
+  let latestAddressedMessageAt: number | undefined;
+
+  const addressedMessages = messages.filter((message) => {
+    const timestamp = messageTimestamp(message);
+    if (
+      timestamp !== undefined &&
+      (latestMessageAt === undefined || timestamp > latestMessageAt)
+    ) {
+      latestMessageAt = timestamp;
+    }
+
+    const addressed = isAddressedTo(message, input.email);
+    if (
+      addressed &&
+      timestamp !== undefined &&
+      (latestAddressedMessageAt === undefined ||
+        timestamp > latestAddressedMessageAt)
+    ) {
+      latestAddressedMessageAt = timestamp;
+    }
+
+    return addressed;
+  });
+
+  const eligibleMessages = addressedMessages.filter((message) => {
+    const timestamp = messageTimestamp(message);
+    return (
+      !input.hasAfterGate ||
+      (timestamp !== undefined && timestamp >= input.afterMs)
+    );
+  });
+
+  return {
+    latestAddressedMessageAt: isoTimestamp(latestAddressedMessageAt),
+    latestMessageAt: isoTimestamp(latestMessageAt),
+    messagesAddressedToRecipient: addressedMessages.length,
+    messagesEligibleAfterGate: eligibleMessages.length,
+    messagesWithOtp: eligibleMessages.filter((message) => extractOtp(message))
+      .length,
+    totalMessages: messages.length,
+  };
+};
+
+const fetchMessages = async (): Promise<{
+  messages: MaildevMessage[];
+  status: number;
+}> => {
   const response = await fetch(`${MAILDEV_BASE_URL}/email`);
   if (!response.ok) {
     throw new Error(`Maildev request failed with status ${response.status}`);
   }
-  return (await response.json()) as MaildevMessage[];
+  return {
+    messages: (await response.json()) as MaildevMessage[],
+    status: response.status,
+  };
 };
 
 export const readLatestOtp = async (
   email: string,
-  options: { afterMs?: number; timeoutMs?: number; intervalMs?: number } = {}
+  options: {
+    afterMs?: number;
+    intervalMs?: number;
+    onPoll?: (event: MaildevOtpPollEvent) => void;
+    timeoutMs?: number;
+  } = {}
 ): Promise<string> => {
   const hasAfterGate = options.afterMs !== undefined;
   const afterMs = options.afterMs ?? 0;
   const timeoutMs = options.timeoutMs ?? 15_000;
   const intervalMs = options.intervalMs ?? 500;
   const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
 
+  let attempt = 0;
   let lastError: unknown;
   do {
+    attempt += 1;
     try {
-      const otp = (await fetchMessages())
+      const { messages, status } = await fetchMessages();
+      const summary = summarizeMessages(messages, {
+        afterMs,
+        email,
+        hasAfterGate,
+      });
+      options.onPoll?.({
+        type: 'maildev.poll.result',
+        details: {
+          ...summary,
+          attempt,
+          baseUrl: MAILDEV_BASE_URL,
+          elapsedMs: Date.now() - startedAt,
+          afterGateEnabled: hasAfterGate,
+          ...(hasAfterGate ? { afterMs } : {}),
+          status,
+        },
+      });
+
+      const otp = messages
         .filter((message) => {
           const timestamp = messageTimestamp(message);
           return (
@@ -86,13 +193,57 @@ export const readLatestOtp = async (
         .sort((a, b) => (messageTimestamp(b) ?? 0) - (messageTimestamp(a) ?? 0))
         .map(extractOtp)
         .find((value): value is string => Boolean(value));
-      if (otp) return otp;
+      if (otp) {
+        options.onPoll?.({
+          type: 'maildev.otp.found',
+          details: {
+            ...summary,
+            attempt,
+            baseUrl: MAILDEV_BASE_URL,
+            elapsedMs: Date.now() - startedAt,
+            afterGateEnabled: hasAfterGate,
+            ...(hasAfterGate ? { afterMs } : {}),
+            status,
+          },
+        });
+        return otp;
+      }
     } catch (error) {
       lastError = error;
+      options.onPoll?.({
+        type: 'maildev.poll.error',
+        details: {
+          attempt,
+          baseUrl: MAILDEV_BASE_URL,
+          elapsedMs: Date.now() - startedAt,
+          afterGateEnabled: hasAfterGate,
+          ...(hasAfterGate ? { afterMs } : {}),
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
     }
 
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   } while (Date.now() < deadline);
+
+  options.onPoll?.({
+    type: 'maildev.poll.timeout',
+    details: {
+      attempt,
+      baseUrl: MAILDEV_BASE_URL,
+      elapsedMs: Date.now() - startedAt,
+      afterGateEnabled: hasAfterGate,
+      ...(hasAfterGate ? { afterMs } : {}),
+      ...(lastError
+        ? {
+            error:
+              lastError instanceof Error
+                ? lastError.message
+                : String(lastError),
+          }
+        : {}),
+    },
+  });
 
   throw new Error(
     `Timed out after ${timeoutMs}ms waiting for an OTP email to ${email}` +

@@ -12,7 +12,6 @@ import type {
   ObjectUploadRequestHandler,
   ObjectUploadRouteDefinition,
 } from '@/modules/kernel/application/ports/object-storage';
-import { UploadRejectedError } from '@/modules/kernel/domain/errors/upload-rejected-error';
 import { getStorageConfig } from '@/modules/kernel/infrastructure/config/storage';
 
 const createUploadClient = () => {
@@ -32,24 +31,25 @@ const toBetterUploadRoute = (definition: ObjectUploadRouteDefinition) =>
     fileTypes: definition.fileTypes,
     maxFileSize: definition.maxFileSize,
     onBeforeUpload: async ({ req, file }) => {
-      try {
-        const prepared = await definition.prepare({
-          headers: req.headers,
-          fileType: file.type,
-        });
-        return {
-          objectInfo: {
-            key: prepared.objectKey,
-            cacheControl: prepared.cacheControl,
-          },
-        };
-      } catch (error) {
-        // Map the provider-neutral rejection to better-upload's mechanism.
-        if (error instanceof UploadRejectedError) {
-          throw new RejectUpload(error.messageKey);
-        }
-        throw error;
+      const prepared = await definition.prepare({
+        headers: req.headers,
+        fileType: file.type,
+      });
+      // Map the provider-neutral rejection to better-upload's mechanism. This
+      // adapter is the single seam that speaks the SDK's exception dialect;
+      // genuine system failures reject the promise above and propagate.
+      if (prepared.isError()) {
+        throw new RejectUpload(prepared.getError().messageKey);
       }
+      const objectInfo = prepared.get();
+      return {
+        objectInfo: {
+          key: objectInfo.objectKey,
+          ...(objectInfo.cacheControl
+            ? { cacheControl: objectInfo.cacheControl }
+            : {}),
+        },
+      };
     },
   });
 

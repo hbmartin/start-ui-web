@@ -6,6 +6,8 @@ import { connect, type Socket } from 'node:net';
 import { createInterface } from 'node:readline';
 import type { ReactElement } from 'react';
 
+import { sanitizeLogFields } from '@/platform/lib/redaction/sanitize-log-fields';
+
 import {
   EMAIL_PROVIDER_SMTP,
   type EmailGateway,
@@ -16,13 +18,16 @@ import {
 } from '@/modules/email';
 import {
   AppError,
+  type Logger,
   toEmailProviderMessageId,
   toEmailRecipientList,
   type TransactionRunner,
 } from '@/modules/kernel';
 import { getEmailConfig } from '@/modules/kernel/backend';
+import { envClient } from '@/platform/env/client';
 
 type EmailGatewaySmtpDeps = {
+  logger?: Pick<Logger, 'info'>;
   statusTransactionRunner: TransactionRunner<EmailTransactionContext>;
 };
 
@@ -42,6 +47,19 @@ type SmtpMessage = {
 };
 
 const smtpTimeoutMs = 15_000;
+const SMTP_DIAGNOSTIC_SENSITIVE_KEYS = new Set([
+  'bcc',
+  'cc',
+  'code',
+  'email',
+  'from',
+  'idempotencyKey',
+  'otp',
+  'recipient',
+  'recipients',
+  'replyTo',
+  'to',
+]);
 
 const recipientToStatusValue = (recipient: SendEmailParams['to']) =>
   toEmailRecipientList(
@@ -151,6 +169,57 @@ const smtpTimeoutError = () =>
     message: 'SMTP connection timed out',
   });
 
+// Distinct from smtpProtocolError so the send loop can tell "the stream ended
+// out from under us" (a symptom) apart from a genuine protocol failure like a
+// 535/550 (the real cause). Only the former should defer to a captured socket
+// error (timeout / reset); the latter must win.
+const smtpConnectionClosedError = (command: string) =>
+  new AppError({
+    code: 'EMAIL_SMTP_CONNECTION_CLOSED',
+    category: 'system',
+    status: 502,
+    message: 'SMTP connection closed while waiting',
+    details: { command },
+  });
+
+const shouldLogE2eSmtpDiagnostics = () => envClient.VITE_ENV_NAME === 'tests';
+
+const logE2eSmtpDiagnostic = (
+  logger: Pick<Logger, 'info'> | undefined,
+  event: string,
+  details?: Record<string, unknown>
+) => {
+  if (!logger) return;
+  if (!shouldLogE2eSmtpDiagnostics()) return;
+
+  logger.info({
+    event,
+    direction: 'internal',
+    ...(details
+      ? {
+          details: sanitizeLogFields(details, {
+            sensitiveKeys: SMTP_DIAGNOSTIC_SENSITIVE_KEYS,
+          }),
+        }
+      : {}),
+  });
+};
+
+const smtpErrorDiagnostics = (error: unknown) => {
+  if (error instanceof AppError) {
+    return {
+      category: error.category,
+      code: error.code,
+      message: error.message,
+      status: error.status,
+    };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : String(error),
+  };
+};
+
 const parseSmtpServer = (server: string): SmtpServerConfig => {
   const url = new URL(server);
   if (url.protocol !== 'smtp:') {
@@ -244,9 +313,7 @@ const readSmtpResponse = async (
   while (true) {
     const result = await lines.next();
     if (result.done) {
-      throw smtpProtocolError('SMTP connection closed while waiting', {
-        command,
-      });
+      throw smtpConnectionClosedError(command);
     }
 
     responseLines.push(result.value);
@@ -327,7 +394,18 @@ const sendSmtpMessage = async (
     writeSmtpLine(socket, 'QUIT');
     await expectSmtpResponse(lines, 'QUIT', [221]);
   } catch (error) {
-    throw socketError ?? error;
+    // A premature close surfaces only as EMAIL_SMTP_CONNECTION_CLOSED; in that
+    // case prefer the underlying socket cause (timeout / reset), which explains
+    // *why*. A genuine protocol error (e.g. 535/550) is the real cause and must
+    // win over any trailing socket reset, so it is thrown as-is.
+    if (
+      socketError &&
+      error instanceof AppError &&
+      error.code === 'EMAIL_SMTP_CONNECTION_CLOSED'
+    ) {
+      throw socketError;
+    }
+    throw error;
   } finally {
     lineReader.close();
     socket.end();
@@ -335,9 +413,11 @@ const sendSmtpMessage = async (
 };
 
 export class EmailGatewaySmtp implements EmailGateway {
+  private readonly logger?: Pick<Logger, 'info'>;
   private readonly statusTransactionRunner: TransactionRunner<EmailTransactionContext>;
 
   constructor(deps: EmailGatewaySmtpDeps) {
+    this.logger = deps.logger;
     this.statusTransactionRunner = deps.statusTransactionRunner;
   }
 
@@ -369,11 +449,25 @@ export class EmailGatewaySmtp implements EmailGateway {
     input: SendEmailParams
   ): ReturnType<EmailGateway['sendEmail']> {
     if (!input.idempotencyKey.trim()) {
+      logE2eSmtpDiagnostic(
+        this.logger,
+        'email.smtp.send.invalid_idempotency_key',
+        {
+          provider: EMAIL_PROVIDER_SMTP,
+        }
+      );
       return Result.Error(idempotencyKeyError());
     }
 
     const emailConfig = getEmailConfig();
     if (emailConfig.deliveryDisabled) {
+      logE2eSmtpDiagnostic(
+        this.logger,
+        'email.smtp.send.skipped_delivery_disabled',
+        {
+          provider: EMAIL_PROVIDER_SMTP,
+        }
+      );
       return Result.Ok({
         type: 'email_send_skipped',
         provider: EMAIL_PROVIDER_SMTP,
@@ -381,10 +475,19 @@ export class EmailGatewaySmtp implements EmailGateway {
     }
     const emailServer = emailConfig.server;
     if (!emailServer) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.missing_server', {
+        provider: EMAIL_PROVIDER_SMTP,
+      });
       return Result.Error(missingEmailServerError());
     }
 
     const recipient = recipientToStatusValue(input.to);
+    logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.record_attempt.start', {
+      metadata: input.metadata,
+      provider: EMAIL_PROVIDER_SMTP,
+      recipientCount: splitRecipients(input.to).length,
+      subjectLength: input.subject.length,
+    });
     const attemptResult = await this.recordSendAttempt({
       provider: EMAIL_PROVIDER_SMTP,
       recipient,
@@ -392,10 +495,25 @@ export class EmailGatewaySmtp implements EmailGateway {
       idempotencyKey: input.idempotencyKey,
       metadata: input.metadata,
     });
-    if (attemptResult.isError()) return Result.Error(attemptResult.getError());
+    if (attemptResult.isError()) {
+      logE2eSmtpDiagnostic(
+        this.logger,
+        'email.smtp.send.record_attempt.error',
+        {
+          ...smtpErrorDiagnostics(attemptResult.getError()),
+          provider: EMAIL_PROVIDER_SMTP,
+        }
+      );
+      return Result.Error(attemptResult.getError());
+    }
 
     const attempt = attemptResult.get().record;
     if (attempt.externalId) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.idempotent_replay', {
+        externalId: attempt.externalId,
+        provider: EMAIL_PROVIDER_SMTP,
+        status: attempt.status,
+      });
       return Result.Ok({
         type: 'email_send_recorded',
         provider: EMAIL_PROVIDER_SMTP,
@@ -418,11 +536,28 @@ export class EmailGatewaySmtp implements EmailGateway {
         },
       });
       if (failedAttemptResult.isError()) {
+        logE2eSmtpDiagnostic(
+          this.logger,
+          'email.smtp.send.record_failed_attempt.error',
+          {
+            ...smtpErrorDiagnostics(failedAttemptResult.getError()),
+            provider: EMAIL_PROVIDER_SMTP,
+          }
+        );
         return Result.Error(failedAttemptResult.getError());
       }
 
       const failedAttempt = failedAttemptResult.get().record;
       if (failedAttempt.externalId) {
+        logE2eSmtpDiagnostic(
+          this.logger,
+          'email.smtp.send.record_failed_attempt.replayed',
+          {
+            externalId: failedAttempt.externalId,
+            provider: EMAIL_PROVIDER_SMTP,
+            status: failedAttempt.status,
+          }
+        );
         return Result.Ok({
           type: 'email_send_recorded',
           provider: EMAIL_PROVIDER_SMTP,
@@ -454,6 +589,10 @@ export class EmailGatewaySmtp implements EmailGateway {
       render(input.template as ReactElement)
     );
     if (htmlResult.isError()) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.render_html.error', {
+        ...smtpErrorDiagnostics(htmlResult.getError()),
+        provider: EMAIL_PROVIDER_SMTP,
+      });
       return renderFailed(htmlResult.getError());
     }
 
@@ -463,6 +602,10 @@ export class EmailGatewaySmtp implements EmailGateway {
       })
     );
     if (textResult.isError()) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.render_text.error', {
+        ...smtpErrorDiagnostics(textResult.getError()),
+        provider: EMAIL_PROVIDER_SMTP,
+      });
       return renderFailed(textResult.getError());
     }
 
@@ -470,9 +613,22 @@ export class EmailGatewaySmtp implements EmailGateway {
     const text = textResult.get();
     const externalId = smtpExternalId(input.idempotencyKey);
     const serverResult = await Result.fromPromise(
-      Promise.resolve().then(() =>
-        sendSmtpMessage(
-          parseSmtpServer(emailServer),
+      Promise.resolve().then(() => {
+        const smtpServer = parseSmtpServer(emailServer);
+        logE2eSmtpDiagnostic(
+          this.logger,
+          'email.smtp.send.smtp_delivery.start',
+          {
+            externalId,
+            provider: EMAIL_PROVIDER_SMTP,
+            recipientCount: splitRecipients(input.to).length,
+            serverHost: smtpServer.host,
+            serverPort: smtpServer.port,
+          }
+        );
+
+        return sendSmtpMessage(
+          smtpServer,
           buildSmtpMessage({
             from: emailConfig.from,
             to: splitRecipients(input.to),
@@ -485,10 +641,15 @@ export class EmailGatewaySmtp implements EmailGateway {
             messageId: `${externalId}@start-ui.local`,
             headers: input.headers,
           })
-        )
-      )
+        );
+      })
     );
     if (serverResult.isError()) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.smtp_delivery.error', {
+        ...smtpErrorDiagnostics(serverResult.getError()),
+        externalId,
+        provider: EMAIL_PROVIDER_SMTP,
+      });
       const failedAttempt = await recordFailedAttempt(
         providerErrorMetadata(serverResult.getError())
       );
@@ -505,9 +666,24 @@ export class EmailGatewaySmtp implements EmailGateway {
       );
     }
 
+    logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.smtp_delivery.ok', {
+      externalId,
+      provider: EMAIL_PROVIDER_SMTP,
+    });
     const upsertResult = await this.upsertStatusByExternalId(input, externalId);
-    if (upsertResult.isError()) return Result.Error(upsertResult.getError());
+    if (upsertResult.isError()) {
+      logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.status_upsert.error', {
+        ...smtpErrorDiagnostics(upsertResult.getError()),
+        externalId,
+        provider: EMAIL_PROVIDER_SMTP,
+      });
+      return Result.Error(upsertResult.getError());
+    }
 
+    logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.status_upsert.ok', {
+      externalId,
+      provider: EMAIL_PROVIDER_SMTP,
+    });
     return Result.Ok({
       type: 'email_send_recorded',
       provider: EMAIL_PROVIDER_SMTP,

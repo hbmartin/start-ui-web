@@ -16,6 +16,13 @@ export const bookCoverAcceptedFileTypes = [
 export const bookCoverMaxFileSizeBytes = 1024 * 1024 * 10;
 
 /**
+ * Namespace prefix for the stable cover-upload rejection translation keys. The
+ * transport builds its key table from this prefix and the presentation layer
+ * detects a rejection key by it, so the literal lives in exactly one place.
+ */
+export const bookCoverUploadErrorKeyPrefix = 'book:manager.uploadErrors.';
+
+/**
  * Cache-Control pinned onto the presigned cover upload. Cover object keys are
  * unique per upload (`books/<generatedId>.<ext>`) and never overwritten in
  * place, so an immutable long-lived cache is safe. Pinning this server-side

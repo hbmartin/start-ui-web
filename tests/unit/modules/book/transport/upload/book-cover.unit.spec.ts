@@ -21,6 +21,18 @@ const telemetryMock = {
   startSpan: startSpanMock,
 } as unknown as Pick<TelemetryAdapter, 'startSpan'>;
 
+// Narrow a boxed Result via its `this`-typed accessors outside the test body so
+// the assertions stay conditional-free.
+const expectOk = <A, E>(result: Result<A, E>): A => {
+  if (result.isError()) throw result.getError();
+  return result.get();
+};
+
+const expectErr = <A, E>(result: Result<A, E>): E => {
+  if (result.isOk()) throw new Error('expected an upload rejection');
+  return result.getError();
+};
+
 describe('book cover upload transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -46,19 +58,19 @@ describe('book cover upload transport', () => {
       })
     );
 
-    await expect(
-      handleBookCoverBeforeUpload(
-        {
-          getCurrentSession: async () => ({
-            user: mockUser,
-            session: mockSession,
-          }),
-          getUseCases: () => ({ prepareCoverUpload }),
-          telemetry: telemetryMock,
-        },
-        { headers, fileType: 'image/webp' }
-      )
-    ).resolves.toEqual({
+    const result = await handleBookCoverBeforeUpload(
+      {
+        getCurrentSession: async () => ({
+          user: mockUser,
+          session: mockSession,
+        }),
+        getUseCases: () => ({ prepareCoverUpload }),
+        telemetry: telemetryMock,
+      },
+      { headers, fileType: 'image/webp' }
+    );
+
+    expect(expectOk(result)).toEqual({
       objectKey: 'books/generated.webp',
       cacheControl: 'public, max-age=31536000, immutable',
     });
@@ -82,59 +94,59 @@ describe('book cover upload transport', () => {
   });
 
   it('maps unauthenticated users to a rejected upload (stable key)', async () => {
-    await expect(
-      handleBookCoverBeforeUpload(
-        {
-          getCurrentSession: async () => null,
-          getUseCases: () => ({ prepareCoverUpload: vi.fn() }),
-          telemetry: telemetryMock,
-        },
-        { headers, fileType: 'image/png' }
-      )
-    ).rejects.toMatchObject({
+    const result = await handleBookCoverBeforeUpload(
+      {
+        getCurrentSession: async () => null,
+        getUseCases: () => ({ prepareCoverUpload: vi.fn() }),
+        telemetry: telemetryMock,
+      },
+      { headers, fileType: 'image/png' }
+    );
+
+    expect(expectErr(result)).toMatchObject({
       name: 'UploadRejectedError',
       messageKey: 'book:manager.uploadErrors.NOT_AUTHENTICATED',
     });
   });
 
   it('maps expected use-case failures to rejected uploads (stable keys)', async () => {
-    await expect(
-      handleBookCoverBeforeUpload(
-        {
-          getCurrentSession: async () => ({
-            user: mockUser,
-            session: mockSession,
-          }),
-          getUseCases: () => ({
-            prepareCoverUpload: async () =>
-              Result.Ok({ type: 'book_cover_upload_forbidden' as const }),
-          }),
-          telemetry: telemetryMock,
-        },
-        { headers, fileType: 'image/png' }
-      )
-    ).rejects.toMatchObject({
+    const forbiddenResult = await handleBookCoverBeforeUpload(
+      {
+        getCurrentSession: async () => ({
+          user: mockUser,
+          session: mockSession,
+        }),
+        getUseCases: () => ({
+          prepareCoverUpload: async () =>
+            Result.Ok({ type: 'book_cover_upload_forbidden' as const }),
+        }),
+        telemetry: telemetryMock,
+      },
+      { headers, fileType: 'image/png' }
+    );
+
+    expect(expectErr(forbiddenResult)).toMatchObject({
       name: 'UploadRejectedError',
       messageKey: 'book:manager.uploadErrors.UNAUTHORIZED',
     });
 
-    await expect(
-      handleBookCoverBeforeUpload(
-        {
-          getCurrentSession: async () => ({
-            user: mockUser,
-            session: mockSession,
-          }),
-          getUseCases: () => ({
-            prepareCoverUpload: async () =>
-              Result.Ok({
-                type: 'book_cover_upload_invalid_file_type' as const,
-              }),
-          }),
-          telemetry: telemetryMock,
-        },
-        { headers, fileType: 'text/plain' }
-      )
-    ).rejects.toBeInstanceOf(UploadRejectedError);
+    const invalidTypeResult = await handleBookCoverBeforeUpload(
+      {
+        getCurrentSession: async () => ({
+          user: mockUser,
+          session: mockSession,
+        }),
+        getUseCases: () => ({
+          prepareCoverUpload: async () =>
+            Result.Ok({
+              type: 'book_cover_upload_invalid_file_type' as const,
+            }),
+        }),
+        telemetry: telemetryMock,
+      },
+      { headers, fileType: 'text/plain' }
+    );
+
+    expect(expectErr(invalidTypeResult)).toBeInstanceOf(UploadRejectedError);
   });
 });

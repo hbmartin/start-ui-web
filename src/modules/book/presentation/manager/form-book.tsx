@@ -11,7 +11,10 @@ import {
 } from '@/platform/components/form';
 
 import { useCurrentScopeKey } from '@/modules/auth/client';
-import { bookCoverAcceptedFileTypes } from '@/modules/book';
+import {
+  bookCoverAcceptedFileTypes,
+  bookCoverUploadErrorKeyPrefix,
+} from '@/modules/book';
 import { genreQueries } from '@/modules/genre/client';
 
 import { type FormFieldsBook, zFormFieldsBook } from '../schema';
@@ -88,9 +91,9 @@ export const FormBook = withForm({
                   // (see book-cover transport); translate it here at render
                   // time, falling back to a generic message for any other error.
                   const message = error instanceof Error ? error.message : '';
-                  const fallback = t('book:manager.uploadErrors.failed');
+                  const fallback = t(`${bookCoverUploadErrorKeyPrefix}failed`);
                   toast.error(
-                    message.startsWith('book:manager.uploadErrors.')
+                    message.startsWith(bookCoverUploadErrorKeyPrefix)
                       ? t(message, { defaultValue: fallback })
                       : fallback
                   );
