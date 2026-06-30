@@ -4,9 +4,14 @@
  * Abstracts the presigned-upload mechanism so transport and composition do not
  * depend on a specific upload SDK. The current adapter is better-upload + S3
  * (`infrastructure/storage`), but any provider can implement this port. A route
- * `prepare` hook rejects an upload by raising `UploadRejectedError`
- * (`domain/errors/upload-rejected-error`).
+ * `prepare` hook rejects an upload by returning `Result.Error(UploadRejectedError)`
+ * (`domain/errors/upload-rejected-error`); the adapter maps that to its
+ * provider's rejection mechanism. Only genuine system failures throw.
  */
+
+import type { Result } from '@bloodyowl/boxed';
+
+import type { UploadRejectedError } from '../../domain/errors/upload-rejected-error';
 
 export type ObjectUploadPrepared = {
   /** Server-generated storage object key. The client never controls this. */
@@ -20,12 +25,13 @@ export type ObjectUploadRouteDefinition = {
   maxFileSize: number;
   /**
    * Resolve the server-decided object key (+ optional cache-control) for an
-   * incoming upload, or reject it by raising `UploadRejectedError`.
+   * incoming upload, or reject it with `Result.Error(UploadRejectedError)`.
+   * Genuine system failures reject the promise and propagate.
    */
   prepare: (ctx: {
     headers: Headers;
     fileType: string;
-  }) => Promise<ObjectUploadPrepared>;
+  }) => Promise<Result<ObjectUploadPrepared, UploadRejectedError>>;
 };
 
 export type ObjectUploadRequestHandler = (

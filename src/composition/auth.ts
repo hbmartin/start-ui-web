@@ -19,6 +19,7 @@ import { InMemorySecondaryStore } from '@/modules/auth/infrastructure/secondary-
 import { UpstashSecondaryStore } from '@/modules/auth/infrastructure/secondary-store/upstash-secondary-store';
 import { ConfigurationError } from '@/modules/kernel';
 import {
+  createTelemetryLogger,
   getAuthProviderConfig,
   getBetterAuthConfig,
   getRedisConfig,
@@ -49,7 +50,11 @@ type AuthHttpOverrides = AuthInstanceOverrides & {
 };
 
 const buildAuthEmailPort = (overrides?: AuthInstanceOverrides) =>
-  overrides?.authEmailPort ?? new AuthEmailPortEmailGateway(getEmailGateway());
+  overrides?.authEmailPort ??
+  new AuthEmailPortEmailGateway(
+    getEmailGateway(),
+    createTelemetryLogger({ telemetry: telemetryProxy })
+  );
 
 /**
  * Durable when Upstash Redis is configured, otherwise a per-process map. The

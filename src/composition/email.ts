@@ -7,22 +7,30 @@ import {
 } from '@/modules/email';
 import {
   createEmailStatusRepository,
+  createEmailStatusTransactionRunner,
   EmailGatewayResend,
   EmailGatewaySmtp,
   ResendWebhookVerifier,
 } from '@/modules/email/backend';
-import type { TransactionRunner } from '@/modules/kernel';
-import { getEmailConfig } from '@/modules/kernel/backend';
+import type { Logger, TransactionRunner } from '@/modules/kernel';
+import {
+  createTelemetryLogger,
+  getEmailConfig,
+} from '@/modules/kernel/backend';
 import {
   createTransactionRunner,
   type Database,
+  type DbTransaction,
   getDefaultDbClient,
 } from '@/modules/kernel/infrastructure/db/client';
 
-import type { Kernel } from './kernel';
 import { createCachedFactory } from './shared/singleton';
+import { telemetryProxy } from './telemetry';
 
-type EmailKernel = Pick<Kernel, 'db' | 'transactionRunner'>;
+type EmailKernel = {
+  db: Database;
+  transactionRunner: TransactionRunner<DbTransaction>;
+};
 
 export type EmailOverrides = {
   kernel?: EmailKernel;
@@ -38,29 +46,6 @@ type EmailServices = {
   resendWebhookVerifier: ResendWebhookVerifier;
 };
 
-const createEmailStatusTransactionRunner = (
-  kernel: EmailKernel,
-  emailStatusRepositoryOverride?: EmailStatusRepository
-): TransactionRunner<EmailTransactionContext> => {
-  if (emailStatusRepositoryOverride) {
-    return {
-      run: (work) =>
-        work({ emailStatusRepository: emailStatusRepositoryOverride }),
-    };
-  }
-
-  return {
-    run: (work, options) =>
-      kernel.transactionRunner.run(
-        (db) =>
-          work({
-            emailStatusRepository: createEmailStatusRepository({ db }),
-          }),
-        options
-      ),
-  };
-};
-
 const createEmailKernel = (db: Database): EmailKernel => ({
   db,
   transactionRunner: createTransactionRunner(db),
@@ -70,13 +55,18 @@ const getDefaultEmailKernel = (): EmailKernel =>
   createEmailKernel(getDefaultDbClient());
 
 const createConfiguredEmailGateway = (
-  statusTransactionRunner: TransactionRunner<EmailTransactionContext>
+  statusTransactionRunner: TransactionRunner<EmailTransactionContext>,
+  logger?: Pick<Logger, 'info'>
 ): EmailGateway => ({
   sendEmail(input) {
-    const Gateway = getEmailConfig().server
-      ? EmailGatewaySmtp
-      : EmailGatewayResend;
-    return new Gateway({ statusTransactionRunner }).sendEmail(input);
+    if (getEmailConfig().server) {
+      return new EmailGatewaySmtp({
+        logger,
+        statusTransactionRunner,
+      }).sendEmail(input);
+    }
+
+    return new EmailGatewayResend({ statusTransactionRunner }).sendEmail(input);
   },
 });
 
@@ -84,17 +74,24 @@ const buildEmailServices = (overrides?: EmailOverrides): EmailServices => {
   const kernel =
     overrides?.kernel ??
     (overrides?.db ? createEmailKernel(overrides.db) : getDefaultEmailKernel());
+  const emailStatusRepositoryOverride = overrides?.emailStatusRepository;
   const emailStatusRepository =
-    overrides?.emailStatusRepository ??
+    emailStatusRepositoryOverride ??
     createEmailStatusRepository({ db: kernel.db });
-  const statusTransactionRunner = createEmailStatusTransactionRunner(
-    kernel,
-    overrides?.emailStatusRepository
-  );
+  const statusTransactionRunner: TransactionRunner<EmailTransactionContext> =
+    emailStatusRepositoryOverride
+      ? {
+          run: (work) =>
+            work({ emailStatusRepository: emailStatusRepositoryOverride }),
+        }
+      : createEmailStatusTransactionRunner(kernel.transactionRunner);
 
   const gateway =
     overrides?.emailGateway ??
-    createConfiguredEmailGateway(statusTransactionRunner);
+    createConfiguredEmailGateway(
+      statusTransactionRunner,
+      createTelemetryLogger({ telemetry: telemetryProxy })
+    );
 
   return {
     gateway,

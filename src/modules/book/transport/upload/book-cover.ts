@@ -15,6 +15,7 @@ import {
   bookCoverAcceptedFileTypes,
   bookCoverCacheControl,
   bookCoverMaxFileSizeBytes,
+  bookCoverUploadErrorKeyPrefix,
 } from '../../domain/book-policy';
 
 export type BookCoverUploadDeps = {
@@ -30,9 +31,9 @@ type BookCoverUploadErrorKey =
   | 'invalid_file_type';
 
 const uploadErrorTranslationKeys = {
-  NOT_AUTHENTICATED: 'book:manager.uploadErrors.NOT_AUTHENTICATED',
-  UNAUTHORIZED: 'book:manager.uploadErrors.UNAUTHORIZED',
-  invalid_file_type: 'book:manager.uploadErrors.invalid_file_type',
+  NOT_AUTHENTICATED: `${bookCoverUploadErrorKeyPrefix}NOT_AUTHENTICATED`,
+  UNAUTHORIZED: `${bookCoverUploadErrorKeyPrefix}UNAUTHORIZED`,
+  invalid_file_type: `${bookCoverUploadErrorKeyPrefix}invalid_file_type`,
 } as const satisfies Record<BookCoverUploadErrorKey, string>;
 
 export const bookCoverUploadConstraints = {
@@ -41,16 +42,16 @@ export const bookCoverUploadConstraints = {
 } as const;
 
 /**
- * Rejects the upload by throwing a provider-neutral {@link UploadRejectedError}
- * carrying a stable translation KEY (never a translated string). The storage
- * adapter maps it to its provider's rejection mechanism, and the client
- * translates the key at render time.
+ * Rejects the upload with a provider-neutral {@link UploadRejectedError} carrying
+ * a stable translation KEY (never a translated string), returned as a
+ * `Result.Error`. The storage adapter maps it to its provider's rejection
+ * mechanism, and the client translates the key at render time.
  */
 const rejectUpload = (
   deps: Pick<BookCoverUploadDeps, 'logger'>,
   key: BookCoverUploadErrorKey,
   fileType: string
-): never => {
+): Result<never, UploadRejectedError> => {
   deps.logger?.warn({
     details: {
       fileType,
@@ -58,13 +59,13 @@ const rejectUpload = (
     },
     event: 'security.upload_rejected',
   });
-  throw new UploadRejectedError(uploadErrorTranslationKeys[key]);
+  return Result.Error(new UploadRejectedError(uploadErrorTranslationKeys[key]));
 };
 
 export const handleBookCoverBeforeUpload = async (
   deps: BookCoverUploadDeps,
   input: { headers: Headers; fileType: string }
-): Promise<ObjectUploadPrepared> =>
+): Promise<Result<ObjectUploadPrepared, UploadRejectedError>> =>
   deps.telemetry.startSpan(
     {
       attributes: {
@@ -78,9 +79,10 @@ export const handleBookCoverBeforeUpload = async (
     },
     async () => {
       const session = await deps.getCurrentSession(input.headers);
-      const user =
-        session?.user ??
-        rejectUpload(deps, 'NOT_AUTHENTICATED', input.fileType);
+      const user = session?.user;
+      if (!user) {
+        return rejectUpload(deps, 'NOT_AUTHENTICATED', input.fileType);
+      }
 
       const prepared = await deps.getUseCases().prepareCoverUpload({
         currentUserId: user.id,
@@ -89,6 +91,7 @@ export const handleBookCoverBeforeUpload = async (
 
       return match(prepared)
         .with(Result.P.Error(P.select()), (error) => {
+          // A genuine system failure, not an upload rejection: propagate.
           throw error;
         })
         .with(
@@ -101,10 +104,11 @@ export const handleBookCoverBeforeUpload = async (
           // cannot choose its own value. Content-Disposition and
           // `X-Content-Type-Options: nosniff` must be enforced by the public
           // bucket policy. See `docs/security-upload.md`.
-          (upload): ObjectUploadPrepared => ({
-            objectKey: upload.objectKey,
-            cacheControl: bookCoverCacheControl,
-          })
+          (upload): Result<ObjectUploadPrepared, UploadRejectedError> =>
+            Result.Ok({
+              objectKey: upload.objectKey,
+              cacheControl: bookCoverCacheControl,
+            })
         )
         .with(Result.P.Ok({ type: 'book_cover_upload_forbidden' }), () =>
           rejectUpload(deps, 'UNAUTHORIZED', input.fileType)

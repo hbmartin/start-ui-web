@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@playwright/test';
+import type { Page, Request, Response, TestInfo } from '@playwright/test';
 import { expect } from '@playwright/test';
 import type { CustomFixture } from '@tests/e2e/utils/types';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -12,7 +12,7 @@ import { AUTH_SIGNUP_ENABLED } from '@/modules/auth/client';
 import { FileRouteTypes } from '@/routeTree.gen';
 
 import { installConsoleErrorGuard } from './console-error-guard';
-import { readLatestOtp } from './maildev';
+import { type MaildevOtpPollEvent, readLatestOtp } from './maildev';
 
 type PostAuthRoute = '/app' | '/manager';
 
@@ -64,11 +64,24 @@ export type ExtendedPage = { page: ExtendedPageInstance };
 
 const DEBUG_PATHS = ['/api/auth', '/login', '/manager', '/app'] as const;
 const AUTH_WAIT_TIMEOUT_MS = 25_000;
+const AUTH_API_RESPONSE_BODY_PREVIEW_LENGTH = 2_000;
+const DIAGNOSTIC_RESPONSE_HEADERS = [
+  'content-type',
+  'location',
+  'retry-after',
+  'x-ratelimit-limit',
+  'x-ratelimit-remaining',
+  'x-ratelimit-reset',
+  'x-request-id',
+  'x-retry-after',
+] as const;
 const SENSITIVE_DETAIL_KEYS = new Set([
+  'code',
   'email',
   'id',
   'identifier',
   'name',
+  'otp',
   'phone',
   'user',
 ]);
@@ -79,6 +92,51 @@ const redactDiagnosticDetails = (
   details
     ? sanitizeLogFields(details, { sensitiveKeys: SENSITIVE_DETAIL_KEYS })
     : details;
+
+const selectedResponseHeaders = (response: Response) => {
+  const headers = response.headers();
+  const selected: Record<string, string> = {};
+
+  for (const header of DIAGNOSTIC_RESPONSE_HEADERS) {
+    const value = headers[header];
+    if (value) selected[header] = value;
+  }
+
+  return selected;
+};
+
+const readRequestPostData = (request: Request) => {
+  const postData = request.postData();
+  if (!postData) return undefined;
+
+  try {
+    return {
+      postDataJson: request.postDataJSON() as unknown,
+      postDataLength: postData.length,
+    };
+  } catch (error) {
+    return {
+      postDataLength: postData.length,
+      postDataParseError:
+        error instanceof Error ? error.message : String(error),
+    };
+  }
+};
+
+const responseBodyPreview = async (response: Response) => {
+  try {
+    const body = await response.text();
+    return {
+      bodyLength: body.length,
+      bodyPreview: body.slice(0, AUTH_API_RESPONSE_BODY_PREVIEW_LENGTH),
+      bodyTruncated: body.length > AUTH_API_RESPONSE_BODY_PREVIEW_LENGTH,
+    };
+  } catch (error) {
+    return {
+      bodyReadError: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
 
 const shouldRecordUrl = (rawUrl: string) => {
   try {
@@ -242,6 +300,20 @@ const createAuthDiagnostics = (page: Page, testInfo: TestInfo) => {
     });
   });
 
+  page.on('request', (request) => {
+    const requestUrl = request.url();
+    if (!requestUrl.includes('/api/auth')) {
+      return;
+    }
+
+    log('request', {
+      method: request.method(),
+      requestUrl,
+      resourceType: request.resourceType(),
+      ...readRequestPostData(request),
+    });
+  });
+
   page.on('response', (response) => {
     const responseUrl = response.url();
     if (!shouldRecordUrl(responseUrl)) {
@@ -254,10 +326,23 @@ const createAuthDiagnostics = (page: Page, testInfo: TestInfo) => {
     }
 
     log('response', {
+      headers: selectedResponseHeaders(response),
       method: response.request().method(),
       responseUrl,
       status,
     });
+
+    if (status >= 400 && responseUrl.includes('/api/auth')) {
+      void (async () => {
+        const body = await responseBodyPreview(response);
+        log('response.body', {
+          method: response.request().method(),
+          responseUrl,
+          status,
+          ...body,
+        });
+      })();
+    }
   });
 
   return { attach, log, waitForUrl };
@@ -310,14 +395,18 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
       emailInputMatches: (await emailInput.inputValue()) === input.email,
     });
 
+    const submitButton = page.getByRole('button', {
+      name: locales[DEFAULT_LANGUAGE_KEY].auth[
+        AUTH_SIGNUP_ENABLED ? 'pageLoginWithSignUp' : 'pageLogin'
+      ].loginWithEmail,
+    });
     const otpRequestedAfterMs = Date.now();
-    await page
-      .getByRole('button', {
-        name: locales[DEFAULT_LANGUAGE_KEY].auth[
-          AUTH_SIGNUP_ENABLED ? 'pageLoginWithSignUp' : 'pageLogin'
-        ].loginWithEmail,
-      })
-      .click();
+
+    diagnostics.log('login.email.submit.ready', {
+      buttonEnabled: await submitButton.isEnabled(),
+      otpRequestedAfterMs,
+    });
+    await submitButton.click();
     diagnostics.log('login.email.submitted');
 
     await diagnostics.waitForUrl(
@@ -332,9 +421,24 @@ export const pageWithUtils: CustomFixture<Page & PageUtils> = async (
       'true'
     );
     diagnostics.log('login.verify.form.hydrated');
+    const logMaildevPoll = ({ details, type }: MaildevOtpPollEvent) => {
+      diagnostics.log(`login.${type}`, details);
+    };
     const code =
       input.code ??
-      (await readLatestOtp(input.email, { afterMs: otpRequestedAfterMs }));
+      (await readLatestOtp(input.email, {
+        afterMs: otpRequestedAfterMs,
+        onPoll: logMaildevPoll,
+      }).catch(async (error) => {
+        diagnostics.log('login.maildev.otp.failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+        await diagnostics.attach('login-maildev-otp-failed');
+        throw error;
+      }));
+    diagnostics.log('login.maildev.otp.received', {
+      codeLength: code.length,
+    });
     await page
       .getByText(locales[DEFAULT_LANGUAGE_KEY].auth.common.otp.label)
       .fill(code);

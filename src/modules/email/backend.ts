@@ -38,22 +38,26 @@ type EmailServerRuntimeDeps = {
   handlers: ResendWebhookHandlers;
 };
 
-const createEmailStatusTransactionRunner =
-  (): TransactionRunner<EmailTransactionContext> => {
-    const db = getDefaultDbClient();
-    const transactionRunner = createTransactionRunner(db);
-
-    return {
-      run: (work, options) =>
-        transactionRunner.run(
-          (tx) =>
-            work({
-              emailStatusRepository: createEmailStatusRepository({ db: tx }),
-            }),
-          options
-        ),
-    };
-  };
+/**
+ * Wraps a base transaction runner so each transaction exposes an
+ * `emailStatusRepository` bound to that transaction. Shared with
+ * `composition/email.ts` (consumed through this public gate) so the wiring lives
+ * in one place; the default base targets the default DB client.
+ */
+export const createEmailStatusTransactionRunner = (
+  base: ReturnType<typeof createTransactionRunner> = createTransactionRunner(
+    getDefaultDbClient()
+  )
+): TransactionRunner<EmailTransactionContext> => ({
+  run: (work, options) =>
+    base.run(
+      (tx) =>
+        work({
+          emailStatusRepository: createEmailStatusRepository({ db: tx }),
+        }),
+      options
+    ),
+});
 
 const createDefaultEmailUseCases = () => {
   const db = getDefaultDbClient();

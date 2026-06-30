@@ -23,6 +23,12 @@ const testState = vi.hoisted(() => {
 });
 
 vi.mock('@/modules/kernel/backend', () => ({
+  createTelemetryLogger: () => ({
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  }),
   getEmailConfig: () => testState.emailConfig,
 }));
 
