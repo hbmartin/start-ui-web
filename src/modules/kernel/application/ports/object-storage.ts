@@ -6,7 +6,7 @@
  * (`infrastructure/storage`), but any provider can implement this port. A route
  * `prepare` hook rejects an upload by returning `Result.Error(UploadRejectedError)`
  * (`domain/errors/upload-rejected-error`); the adapter maps that to its
- * provider's rejection mechanism. Only genuine system failures throw.
+ * provider's rejection mechanism. Genuine system failures reject the promise.
  */
 
 import type { Result } from '@bloodyowl/boxed';

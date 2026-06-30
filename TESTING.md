@@ -15,6 +15,7 @@ This project uses a layered test system. The default rule is to verify behavior 
 | Visual regression | `tests/e2e/visual/*.visual.spec.ts` | `pnpm test:e2e:visual` | Stable critical screens with local Playwright snapshots. Baseline updates use `pnpm test:e2e:visual:update` and require review. |
 | Coverage | All Vitest projects | `pnpm test:coverage` | Floor metric for touched code and trend signal in CI. Do not treat line coverage as proof of assertion quality. |
 | Mutation testing | Stryker scoped configs | `pnpm test:mutation:critical` or scoped scripts | Test sensitivity for critical domain/application logic. Run periodically and for risky auth, authorization, and data-loss changes. |
+| Fitness functions | `scripts/fitness/**`, `test-results/fitness/**` | `pnpm fitness:quick`, `pnpm fitness:collect`, `pnpm fitness:ratchet --base <sha>` | Composite architecture, evolvability, test-strength, and operations scoring. Ratchet comparisons block policy and material evolvability regressions. |
 
 `pnpm test` still runs all Vitest projects. Use the layer commands when you need a faster or more diagnostic signal.
 
@@ -59,6 +60,8 @@ pnpm check
 pnpm test:affected:list # Show affected Vitest tests for changed files
 pnpm test:affected      # Run affected Vitest tests for changed files
 ```
+
+`pnpm check` includes `pnpm fitness:quick`. Use `pnpm fitness:collect` when you need JSON, Markdown, and SARIF reports under `test-results/fitness/`. Use `pnpm fitness:ratchet --base <sha>` for current-vs-base comparisons; CI uploads those reports as artifacts rather than committing metric baselines. `pnpm fitness:agent` emits `{"decision":"block"|"approve","reason":...,"reportPath":...}` for blocking local and agent hooks.
 
 CodeQL is intentionally opt-in locally because the CLI is not a Node dependency. Use `pnpm codeql:test`, `pnpm codeql:db`, and `pnpm codeql:analyze` when changing `.github/codeql/**` or when investigating semantic security/data-flow behavior. These commands call the CodeQL CLI directly, install the local query pack dependencies first, and write outputs under `test-results/codeql/`.
 

@@ -342,6 +342,15 @@ describe('strict modular monolith layout', () => {
     ).toEqual([]);
   });
 
+  it('keeps fitness scripts out of app and module internals', () => {
+    expect(
+      findImportViolations(
+        listSourceFiles(path.join(root, 'scripts', 'fitness')),
+        /from\s+['"]@\/(?:app|composition|modules\/[^/]+\/(?:domain|application|infrastructure|transport|presentation))(?:\/[^'"]*)?['"]/g
+      )
+    ).toEqual([]);
+  });
+
   it('keeps testing gates out of production source imports', () => {
     const productionFiles = listSourceFiles(path.join(root, 'src')).filter(
       (file) =>

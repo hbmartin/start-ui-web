@@ -7,3 +7,17 @@ pre-commit:
     lint:
       glob: '*.{js,ts,cjs,mjs,jsx,tsx}'
       run: pnpm oxlint {staged_files}
+    fitness-agent:
+      glob: '*.{js,ts,cjs,mjs,jsx,tsx,json,md,css,yml,yaml}'
+      run: pnpm fitness:agent
+
+pre-push:
+  commands:
+    fitness-ratchet:
+      run: |
+        base="$(git merge-base HEAD origin/main 2>/dev/null || true)"
+        if [ -z "$base" ]; then
+          echo "Skipping fitness ratchet: origin/main is unavailable."
+          exit 0
+        fi
+        pnpm fitness:ratchet --base "$base"
