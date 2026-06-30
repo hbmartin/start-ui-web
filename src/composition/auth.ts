@@ -27,6 +27,10 @@ import {
 import { AuthEmailPortEmailGateway } from './auth-email-port';
 import { getEmailGateway } from './email';
 import { createCachedFactory } from './shared/singleton';
+// Same instance the kernel exposes as `kernel.telemetry`. Sourced from the
+// telemetry barrel rather than `getKernel()` to avoid an auth <-> kernel
+// composition cycle (kernel dynamically imports this module for permissions).
+import { telemetryProxy } from './telemetry';
 
 export type AuthOverrides = {
   sessionGateway?: SessionGateway;
@@ -55,7 +59,10 @@ const buildAuthEmailPort = (overrides?: AuthInstanceOverrides) =>
 const buildSecondaryStore = (): SecondaryStore => {
   const redisConfig = getRedisConfig();
   return redisConfig
-    ? new UpstashSecondaryStore({ config: redisConfig })
+    ? new UpstashSecondaryStore({
+        config: redisConfig,
+        telemetry: telemetryProxy,
+      })
     : new InMemorySecondaryStore();
 };
 
@@ -128,17 +135,24 @@ export const getAuthHttpGateway = (overrides?: AuthHttpOverrides) =>
 const buildAuthUseCases = (overrides?: AuthOverrides) => {
   const authEmailPort = buildAuthEmailPort(overrides);
   const authInstance = getAuth({ authEmailPort });
+  const telemetry = telemetryProxy;
 
   return createAuthUseCases({
     sessionGateway:
-      overrides?.sessionGateway ?? new SessionGatewayBetterAuth(authInstance),
+      overrides?.sessionGateway ??
+      new SessionGatewayBetterAuth(
+        authInstance,
+        undefined,
+        undefined,
+        telemetry
+      ),
     authorizationGateway:
       overrides?.authorizationGateway ??
-      new AuthorizationGatewayBetterAuth(authInstance),
+      new AuthorizationGatewayBetterAuth(authInstance, telemetry),
     authEmailPort,
     userAdminGateway:
       overrides?.userAdminGateway ??
-      new UserAdminGatewayBetterAuth(authInstance),
+      new UserAdminGatewayBetterAuth(authInstance, undefined, telemetry),
   });
 };
 

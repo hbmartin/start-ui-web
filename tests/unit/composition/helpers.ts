@@ -2,6 +2,7 @@ import { Result } from '@bloodyowl/boxed';
 
 import type { Kernel } from '@/composition/kernel';
 import { toGeneratedId } from '@/modules/kernel/domain/ids';
+import { createNoOpTelemetry } from '@/platform/telemetry';
 
 export const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -15,6 +16,7 @@ export function makeTestKernel(overrides: Partial<Kernel> = {}): Kernel {
       warn: () => {},
       error: () => {},
     },
+    telemetry: createNoOpTelemetry(),
     clock: {
       now: () => now,
     },

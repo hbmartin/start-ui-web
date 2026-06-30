@@ -59,10 +59,11 @@ export class InMemorySecondaryStore implements SecondaryStore {
   }
 
   private sweep(currentTime: number): void {
-    const sweepWindow = [...this.entries.entries()].slice(
-      0,
-      this.sweepMaxEntries
-    );
+    const sweepWindow: Array<[string, Entry]> = [];
+    for (const item of this.entries.entries()) {
+      sweepWindow.push(item);
+      if (sweepWindow.length >= this.sweepMaxEntries) break;
+    }
     for (const [key, entry] of sweepWindow) {
       this.entries.delete(key);
       if (!this.isExpired(entry, currentTime)) this.entries.set(key, entry);

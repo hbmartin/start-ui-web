@@ -559,6 +559,31 @@ describe('server config accessors', () => {
     expect(getEmailConfig().server).toBe('smtp://127.0.0.1:1025');
   });
 
+  it('does not require Resend credentials for SMTP email delivery', async () => {
+    vi.stubEnv('RESEND_API_KEY', undefined);
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    vi.stubEnv('EMAIL_SERVER', 'smtp://127.0.0.1:1025');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+
+    expect(getEmailConfig()).toMatchObject({
+      resendApiKey: undefined,
+      server: 'smtp://127.0.0.1:1025',
+    });
+  });
+
+  it('requires Resend credentials when SMTP email delivery is not configured', async () => {
+    vi.stubEnv('RESEND_API_KEY', undefined);
+    vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');
+    const { getEmailConfig } =
+      await import('@/modules/kernel/infrastructure/config/email');
+    const { ConfigurationError } =
+      await import('@/modules/kernel/domain/errors/configuration-error');
+
+    expect(() => getEmailConfig()).toThrow(ConfigurationError);
+    expect(() => getEmailConfig()).toThrow('RESEND_API_KEY');
+  });
+
   it('rejects unsupported email server protocols', async () => {
     vi.stubEnv('RESEND_API_KEY', makeTestSecret('resend-api-key'));
     vi.stubEnv('EMAIL_FROM', 'Start UI <noreply@example.com>');

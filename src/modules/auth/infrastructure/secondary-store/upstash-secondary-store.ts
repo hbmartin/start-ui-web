@@ -6,7 +6,7 @@ import {
   getRedisConfig,
   type RedisConfig,
 } from '@/modules/kernel/infrastructure/config/redis';
-import { getTelemetry } from '@/platform/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import type { SecondaryStore } from '../../application/ports/secondary-store';
 
@@ -37,6 +37,8 @@ type CommandOutcome = BoxedResult<unknown, AppError>;
 const DEFAULT_TIMEOUT_MS = 2_000;
 
 export type UpstashSecondaryStoreOptions = {
+  /** Injected telemetry sink used to report best-effort transport failures. */
+  telemetry: Pick<TelemetryAdapter, 'captureException'>;
   config?: RedisConfig;
   fetchFn?: typeof fetch;
   timeoutMs?: number;
@@ -47,8 +49,9 @@ export class UpstashSecondaryStore implements SecondaryStore {
   private readonly restToken: string;
   private readonly fetchFn: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly telemetry: Pick<TelemetryAdapter, 'captureException'>;
 
-  constructor(options: UpstashSecondaryStoreOptions = {}) {
+  constructor(options: UpstashSecondaryStoreOptions) {
     const config = options.config ?? getRedisConfig();
     if (!config) {
       throw new ConfigurationError(
@@ -59,10 +62,11 @@ export class UpstashSecondaryStore implements SecondaryStore {
     this.restToken = config.restToken;
     this.fetchFn = options.fetchFn ?? fetch;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.telemetry = options.telemetry;
   }
 
   private reportFailure(operation: string, error: unknown): void {
-    getTelemetry().captureException(error, {
+    this.telemetry.captureException(error, {
       level: 'warning',
       tags: { 'auth.secondary_store': 'upstash', 'auth.operation': operation },
     });

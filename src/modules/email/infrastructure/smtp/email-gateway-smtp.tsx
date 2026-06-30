@@ -14,13 +14,13 @@ import {
   type RecordEmailSendAttemptInput,
   type SendEmailParams,
 } from '@/modules/email';
-import type { TransactionRunner } from '@/modules/kernel';
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
+  AppError,
   toEmailProviderMessageId,
   toEmailRecipientList,
-} from '@/modules/kernel/domain/ids';
-import { getEmailConfig } from '@/modules/kernel/infrastructure/config/email';
+  type TransactionRunner,
+} from '@/modules/kernel';
+import { getEmailConfig } from '@/modules/kernel/backend';
 
 type EmailGatewaySmtpDeps = {
   statusTransactionRunner: TransactionRunner<EmailTransactionContext>;
@@ -284,6 +284,10 @@ const sendSmtpMessage = async (
   message: SmtpMessage
 ) => {
   const socket = connect({ host: config.host, port: config.port });
+  let socketError: Error | undefined;
+  socket.on('error', (error) => {
+    socketError = error;
+  });
   socket.setTimeout(smtpTimeoutMs);
   socket.on('timeout', () => {
     socket.destroy(smtpTimeoutError());
@@ -322,6 +326,8 @@ const sendSmtpMessage = async (
 
     writeSmtpLine(socket, 'QUIT');
     await expectSmtpResponse(lines, 'QUIT', [221]);
+  } catch (error) {
+    throw socketError ?? error;
   } finally {
     lineReader.close();
     socket.end();

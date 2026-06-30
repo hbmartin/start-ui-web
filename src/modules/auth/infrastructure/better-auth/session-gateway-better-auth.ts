@@ -14,7 +14,7 @@ import {
   type Database,
   getDefaultDbClient,
 } from '@/modules/kernel/infrastructure/db/client';
-import { getTelemetry } from '@/platform/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import type { Auth } from './auth';
 import { getDefaultAuth } from './auth';
@@ -75,7 +75,8 @@ export class SessionGatewayBetterAuth implements SessionGateway {
   constructor(
     private readonly auth: Auth = getDefaultAuth(),
     private readonly db: Database = getDefaultDbClient(),
-    private readonly clock: Clock = systemClock
+    private readonly clock: Clock = systemClock,
+    private readonly telemetry: Pick<TelemetryAdapter, 'startSpan'>
   ) {}
 
   /**
@@ -125,7 +126,7 @@ export class SessionGatewayBetterAuth implements SessionGateway {
   async getSession(input: {
     headers: Headers;
   }): ReturnType<SessionGateway['getSession']> {
-    return getTelemetry().startSpan(
+    return this.telemetry.startSpan(
       {
         attributes: {
           'auth.provider': 'better-auth',

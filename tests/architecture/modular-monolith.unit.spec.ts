@@ -558,13 +558,22 @@ describe('strict modular monolith layout', () => {
       .flatMap((file) => {
         const source = fs.readFileSync(file, 'utf8');
         const relative = path.relative(root, file);
+        const allowedServerFnSupportReexport =
+          relative === path.join('src', 'modules', 'kernel', 'server.ts')
+            ? /^export\s+\{[\s\S]*?\}\s+from\s+['"]\.\/transport\/tanstack\/server-fn-error['"];?\n?/m
+            : undefined;
+        const sourceWithoutAllowedSupport = allowedServerFnSupportReexport
+          ? source.replace(allowedServerFnSupportReexport, '')
+          : source;
         const reexportsServerFunctions =
           /^export\s+\*\s+from\s+['"]\.\/transport\/server-functions\/server-functions['"];?$/.test(
-            source.trim()
+            sourceWithoutAllowedSupport.trim()
           );
         const definesServerFunction =
-          source.includes('createServerFn') &&
-          !/export\s+\{[\s\S]*?\}\s+from\s+['"][^'"]+['"];/.test(source);
+          sourceWithoutAllowedSupport.includes('createServerFn') &&
+          !/export\s+\{[\s\S]*?\}\s+from\s+['"][^'"]+['"];/.test(
+            sourceWithoutAllowedSupport
+          );
 
         return reexportsServerFunctions || definesServerFunction
           ? []

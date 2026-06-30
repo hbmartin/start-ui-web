@@ -7,22 +7,18 @@ const bookUploadMocks = vi.hoisted(() => {
     info: vi.fn(),
     warn: vi.fn(),
   };
+  const uploadHandler = vi.fn();
 
   return {
-    createBookCoverUploadRoute: vi.fn(() => 'book-cover-route'),
-    getDefaultUploadClient: vi.fn(() => 'upload-client'),
-    getStorageConfig: vi.fn(() => ({ bucketName: 'book-covers' })),
-    handleRequest: vi.fn(),
     logger,
+    uploadHandler,
+    bookCoverUploadRouteDefinition: vi.fn(() => 'book-cover-route-def'),
+    createUploadRequestHandler: vi.fn(() => uploadHandler),
     telemetry: {
       startSpan: vi.fn((_options: unknown, fn: () => unknown) => fn()),
     },
   };
 });
-
-vi.mock('@better-upload/server', () => ({
-  handleRequest: bookUploadMocks.handleRequest,
-}));
 
 vi.mock('@/composition/auth', () => ({
   getAuthUseCases: vi.fn(() => ({
@@ -37,19 +33,19 @@ vi.mock('@/composition/book', () => ({
 vi.mock('@/composition/kernel', () => ({
   getKernel: vi.fn(() => ({
     logger: bookUploadMocks.logger,
+    telemetry: bookUploadMocks.telemetry,
   })),
 }));
 
 vi.mock('@/modules/book/transport/upload/book-cover', () => ({
-  createBookCoverUploadRoute: bookUploadMocks.createBookCoverUploadRoute,
-}));
-
-vi.mock('@/modules/kernel/infrastructure/config/storage', () => ({
-  getStorageConfig: bookUploadMocks.getStorageConfig,
+  bookCoverUploadRouteDefinition:
+    bookUploadMocks.bookCoverUploadRouteDefinition,
 }));
 
 vi.mock('@/modules/kernel/infrastructure/storage/better-upload', () => ({
-  getDefaultUploadClient: bookUploadMocks.getDefaultUploadClient,
+  BetterUploadObjectStorage: class {
+    createUploadRequestHandler = bookUploadMocks.createUploadRequestHandler;
+  },
 }));
 
 vi.mock('@/platform/telemetry', () => ({
@@ -63,11 +59,14 @@ describe('book upload composition', () => {
     bookUploadMocks.telemetry.startSpan.mockImplementation(
       (_options: unknown, fn: () => unknown) => fn()
     );
+    bookUploadMocks.createUploadRequestHandler.mockReturnValue(
+      bookUploadMocks.uploadHandler
+    );
   });
 
-  it('wraps upload requests in a telemetry span', async () => {
+  it('wraps upload requests in a telemetry span and delegates to the storage handler', async () => {
     const response = new Response('uploaded', { status: 201 });
-    bookUploadMocks.handleRequest.mockResolvedValueOnce(response);
+    bookUploadMocks.uploadHandler.mockResolvedValueOnce(response);
     const { handleBookUploadRequest } =
       await import('@/composition/book-upload');
     const request = new Request('https://app.example/api/upload', {
@@ -89,15 +88,9 @@ describe('book upload composition', () => {
       }),
       expect.any(Function)
     );
-    expect(bookUploadMocks.handleRequest).toHaveBeenCalledWith(
-      request,
-      expect.objectContaining({
-        bucketName: 'book-covers',
-        client: 'upload-client',
-        routes: {
-          bookCover: 'book-cover-route',
-        },
-      })
-    );
+    expect(bookUploadMocks.createUploadRequestHandler).toHaveBeenCalledWith({
+      bookCover: 'book-cover-route-def',
+    });
+    expect(bookUploadMocks.uploadHandler).toHaveBeenCalledWith(request);
   });
 });

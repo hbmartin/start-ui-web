@@ -26,6 +26,8 @@ import {
   createRequestLogger,
   type Logger,
   type LogLevel,
+  toRequestId,
+  type UserId,
 } from '@/modules/kernel';
 import { getBetterAuthConfig } from '@/modules/kernel/backend';
 import {
@@ -34,9 +36,7 @@ import {
   ServerFnError,
   type ServerFnErrorCode,
   type ServerFnErrorData,
-} from '@/modules/kernel/backend';
-import type { UserId } from '@/modules/kernel/domain/ids';
-import { toRequestId } from '@/modules/kernel/domain/ids';
+} from '@/modules/kernel/server';
 import { timingStore } from '@/modules/kernel/transport/tanstack/timing-store';
 import { cachePrivateNoStore } from '@/platform/http/cache-control';
 import type { TelemetryAdapter } from '@/platform/telemetry';

@@ -40,7 +40,7 @@ const testState = vi.hoisted(() => {
   };
 });
 
-vi.mock('@/modules/kernel/infrastructure/config/email', () => ({
+vi.mock('@/modules/kernel/backend', () => ({
   getEmailConfig: () => testState.emailConfig,
 }));
 
@@ -107,6 +107,15 @@ function getOk<TOutcome extends { type: string }>(
 ) {
   if (result.isError()) throw result.getError();
   return result.get();
+}
+
+function getError<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isOk()) {
+    throw new Error(`Expected Result.Error, got ${result.get().type}`);
+  }
+  return result.getError();
 }
 
 const handleSmtpLine = (
@@ -191,6 +200,43 @@ const startSmtpServer = async (): Promise<{
         });
       }),
     sessions,
+    url: `smtp://${tcpAddress.address}:${tcpAddress.port}`,
+  };
+};
+
+const startFailingSmtpServer = async (): Promise<{
+  close: () => Promise<void>;
+  sessions: SmtpSession[];
+  url: string;
+}> => {
+  const server: Server = createServer((socket) => {
+    socket.on('error', () => {});
+    socket.destroy(new Error('socket reset by test SMTP server'));
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected TCP SMTP server address');
+  }
+  const tcpAddress: AddressInfo = address;
+
+  return {
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      }),
+    sessions: [],
     url: `smtp://${tcpAddress.address}:${tcpAddress.port}`,
   };
 };
@@ -292,5 +338,35 @@ describe('EmailGatewaySmtp', () => {
     });
     expect(statusRepository.recordSendAttempt).not.toHaveBeenCalled();
     expect(statusRepository.upsertStatusByExternalId).not.toHaveBeenCalled();
+  });
+
+  it('records a failed send when the SMTP socket fails after connect', async () => {
+    smtpServer = await startFailingSmtpServer();
+    testState.emailConfig.server = smtpServer.url;
+    const statusRepository = makeStatusRepository();
+    const { EmailGatewaySmtp } = await loadGateway();
+
+    const result = await new EmailGatewaySmtp({
+      statusTransactionRunner: makeStatusTransactionRunner(statusRepository),
+    }).sendEmail({
+      to: recipient,
+      subject: 'Login code',
+      template: createElement('div', null, '123456'),
+      idempotencyKey,
+    });
+
+    expect(getError(result)).toMatchObject({ code: 'EMAIL_SEND_FAILED' });
+    expect(statusRepository.recordSendAttempt).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        provider: 'smtp',
+        status: 'send_failed',
+        metadata: {
+          providerError: expect.objectContaining({
+            provider: 'smtp',
+            message: expect.any(String),
+          }),
+        },
+      })
+    );
   });
 });

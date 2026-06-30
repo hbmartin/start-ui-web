@@ -254,6 +254,25 @@ rules:
         - package.json
         - pnpm-lock.yaml
 
+  - id: node-net-socket-requires-error-listener
+    message: node:net sockets must register an error listener so late network failures cannot crash the process.
+    severity: ERROR
+    languages:
+      - typescript
+    patterns:
+      - pattern: |
+          const $SOCKET = connect(...);
+          ...
+      - pattern-not-inside: |
+          const $SOCKET = connect(...);
+          ...
+          $SOCKET.on('error', ...);
+          ...
+    paths:
+      include:
+        - src/**/*.ts
+        - src/**/*.tsx
+
   - id: no-hardcoded-git-binary-path
     message: Use git from PATH in scripts instead of hard-coded platform-specific Git binary paths.
     severity: ERROR
@@ -756,6 +775,17 @@ rules:
         - '**/*.unit.spec.ts'
         - '**/*.test.ts'
 
+  - id: no-better-auth-secondary-storage-error-swallowing
+    message: Better Auth secondary storage must propagate SecondaryStore Result.Error values instead of converting them to cache misses or successful writes.
+    languages: [typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern-regex: 'if\s*\([^)]*\.isError\(\)\)\s*return\s+(?:null|undefined)\b'
+      - pattern-regex: '^\s*await\s+store\.(?:set|delete)\('
+    paths:
+      include:
+        - src/modules/auth/infrastructure/better-auth/secondary-storage-adapter.ts
+
   - id: no-composition-spread-overrides
     message: Composition factories must merge override keys explicitly with ??; spreading overrides can let explicit undefined erase required dependencies.
     languages: [typescript]
@@ -903,14 +933,14 @@ rules:
         - src/composition/telemetry/sentry-adapter.ts
 
   - id: auth-server-functions-require-telemetry
-    message: Auth server functions must pass telemetryProxy into createServerContextTools.
+    message: Auth server functions must pass injected telemetry into createServerContextTools (sourced from getKernel().telemetry in composition, not the telemetry service-locator).
     languages: [typescript]
     severity: ERROR
     patterns:
       - pattern: |
           createServerContextTools({ getAuthUseCases, ... })
       - pattern-not: |
-          createServerContextTools({ ..., telemetry: telemetryProxy, ... })
+          createServerContextTools({ ..., telemetry: $TELEMETRY, ... })
     paths:
       include:
         - src/modules/auth/transport/server-functions/server-functions.ts
@@ -1299,5 +1329,57 @@ rules:
         - src/**
       exclude:
         - src/platform/http/get-client-ip.ts
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'
+
+  - id: no-telemetry-locator-in-feature-modules
+    message: Feature modules must receive telemetry via injected dependency (getKernel().telemetry, wired in composition), not the telemetry service-locator. Import only the TelemetryAdapter type. The kernel/platform/composition substrate is exempt.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '\bgetTelemetry\s*\(|\bsetTelemetry\s*\(|\btelemetryProxy\b'
+    paths:
+      include:
+        - src/modules/**
+      exclude:
+        - src/modules/kernel/**
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'
+
+  - id: transport-no-i18n-translation
+    message: Transport must not translate at runtime. Throw stable error KEYS (e.g. UploadRejectedError) and translate at render time; import only language constants from @/platform/lib/i18n/constants.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '\bi18n\.t\s*\(|from\s+[''"](?:i18next|react-i18next)[''"]'
+    paths:
+      include:
+        - src/modules/*/transport/**
+      exclude:
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'
+
+  - id: better-upload-server-confined
+    message: '@better-upload/server stays in the kernel object-storage adapter (src/modules/kernel/infrastructure/storage). Transport and composition depend on ObjectStoragePort, not the SDK.'
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '[''"]@better-upload/server'
+    paths:
+      include:
+        - src/**
+      exclude:
+        - src/modules/kernel/infrastructure/storage/**
+        - '**/*.unit.spec.ts'
+        - '**/*.test.ts'
+
+  - id: better-upload-client-confined
+    message: '@better-upload/client stays in the shared platform upload UI components (src/platform/components/upload, form/field-upload-input). Modules depend on those components, not the SDK.'
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '[''"]@better-upload/client'
+    paths:
+      include:
+        - src/**
+      exclude:
+        - src/platform/components/upload/**
+        - src/platform/components/form/field-upload-input/**
         - '**/*.unit.spec.ts'
         - '**/*.test.ts'

@@ -17,6 +17,7 @@ import {
 } from '@/modules/kernel/infrastructure/db/client';
 import { cuidIdGenerator } from '@/modules/kernel/infrastructure/id/nanoid';
 import { createTelemetryLogger } from '@/modules/kernel/infrastructure/logger/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import { createCachedFactory } from './shared/singleton';
 import type { Overrides } from './shared/types';
@@ -86,6 +87,7 @@ const createProductionPermissionChecker = (): PermissionChecker => ({
 export type Kernel = {
   db: Database;
   logger: Logger;
+  telemetry: TelemetryAdapter;
   clock: Clock;
   idGenerator: IdGenerator;
   cacheGateway: CacheGateway;
@@ -101,6 +103,7 @@ const buildDefaultKernel = (): Kernel => {
   return {
     db,
     logger: createProductionLogger(),
+    telemetry: telemetryProxy,
     clock,
     idGenerator: cuidIdGenerator,
     cacheGateway: memoryCache(clock),
@@ -122,6 +125,7 @@ export const getKernel = (overrides?: KernelOverrides): Kernel => {
   return {
     db,
     logger: overrides.logger ?? base.logger,
+    telemetry: overrides.telemetry ?? base.telemetry,
     clock,
     idGenerator: overrides.idGenerator ?? base.idGenerator,
     cacheGateway:

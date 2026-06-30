@@ -6,7 +6,7 @@ import {
   type Database,
   getDefaultDbClient,
 } from '@/modules/kernel/infrastructure/db/client';
-import { getTelemetry } from '@/platform/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import type { Auth } from './auth';
 import { getDefaultAuth } from './auth';
@@ -16,13 +16,14 @@ import type { UserAdminGateway } from '../../application/ports/user-admin-gatewa
 export class UserAdminGatewayBetterAuth implements UserAdminGateway {
   constructor(
     private readonly auth: Auth = getDefaultAuth(),
-    private readonly db: Database = getDefaultDbClient()
+    private readonly db: Database = getDefaultDbClient(),
+    private readonly telemetry: Pick<TelemetryAdapter, 'startSpan'>
   ) {}
 
   async removeUser(
     input: Parameters<UserAdminGateway['removeUser']>[0]
   ): ReturnType<UserAdminGateway['removeUser']> {
-    return getTelemetry().startSpan(
+    return this.telemetry.startSpan(
       {
         attributes: {
           'auth.provider': 'better-auth',
@@ -67,7 +68,7 @@ export class UserAdminGatewayBetterAuth implements UserAdminGateway {
   async revokeUserSessions(
     input: Parameters<UserAdminGateway['revokeUserSessions']>[0]
   ): ReturnType<UserAdminGateway['revokeUserSessions']> {
-    return getTelemetry().startSpan(
+    return this.telemetry.startSpan(
       {
         attributes: {
           'auth.provider': 'better-auth',
@@ -112,7 +113,7 @@ export class UserAdminGatewayBetterAuth implements UserAdminGateway {
   async revokeUserSession(
     input: Parameters<UserAdminGateway['revokeUserSession']>[0]
   ): ReturnType<UserAdminGateway['revokeUserSession']> {
-    return getTelemetry().startSpan(
+    return this.telemetry.startSpan(
       {
         attributes: {
           'auth.provider': 'better-auth',

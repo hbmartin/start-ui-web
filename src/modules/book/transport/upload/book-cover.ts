@@ -1,13 +1,15 @@
-import { RejectUpload, route } from '@better-upload/server';
 import { Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
-import i18n from '@/platform/lib/i18n';
-
 import type { AuthSession } from '@/modules/auth';
 import type { BookUseCases } from '@/modules/book';
-import type { Logger } from '@/modules/kernel';
-import { getTelemetry } from '@/platform/telemetry';
+import {
+  type Logger,
+  type ObjectUploadPrepared,
+  type ObjectUploadRouteDefinition,
+  UploadRejectedError,
+} from '@/modules/kernel';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import {
   bookCoverAcceptedFileTypes,
@@ -15,9 +17,10 @@ import {
   bookCoverMaxFileSizeBytes,
 } from '../../domain/book-policy';
 
-type BookCoverUploadDeps = {
+export type BookCoverUploadDeps = {
   getCurrentSession: (headers: Headers) => Promise<AuthSession | null>;
   getUseCases: () => Pick<BookUseCases, 'prepareCoverUpload'>;
+  telemetry: Pick<TelemetryAdapter, 'startSpan'>;
   logger?: Pick<Logger, 'warn'>;
 };
 
@@ -25,13 +28,6 @@ type BookCoverUploadErrorKey =
   | 'NOT_AUTHENTICATED'
   | 'UNAUTHORIZED'
   | 'invalid_file_type';
-
-type BookCoverBeforeUploadResult = {
-  objectInfo: {
-    key: string;
-    cacheControl: string;
-  };
-};
 
 const uploadErrorTranslationKeys = {
   NOT_AUTHENTICATED: 'book:manager.uploadErrors.NOT_AUTHENTICATED',
@@ -44,6 +40,12 @@ export const bookCoverUploadConstraints = {
   maxFileSize: bookCoverMaxFileSizeBytes,
 } as const;
 
+/**
+ * Rejects the upload by throwing a provider-neutral {@link UploadRejectedError}
+ * carrying a stable translation KEY (never a translated string). The storage
+ * adapter maps it to its provider's rejection mechanism, and the client
+ * translates the key at render time.
+ */
 const rejectUpload = (
   deps: Pick<BookCoverUploadDeps, 'logger'>,
   key: BookCoverUploadErrorKey,
@@ -56,14 +58,14 @@ const rejectUpload = (
     },
     event: 'security.upload_rejected',
   });
-  throw new RejectUpload(i18n.t(uploadErrorTranslationKeys[key]));
+  throw new UploadRejectedError(uploadErrorTranslationKeys[key]);
 };
 
 export const handleBookCoverBeforeUpload = async (
   deps: BookCoverUploadDeps,
   input: { headers: Headers; fileType: string }
-): Promise<BookCoverBeforeUploadResult> =>
-  getTelemetry().startSpan(
+): Promise<ObjectUploadPrepared> =>
+  deps.telemetry.startSpan(
     {
       attributes: {
         'file.mime_type': input.fileType,
@@ -94,19 +96,14 @@ export const handleBookCoverBeforeUpload = async (
             type: 'book_cover_upload_prepared',
             upload: P.select(),
           }),
-          // better-upload pins the presigned PUT Content-Type to `file.type`,
-          // which it rejects unless it is in `fileTypes`
-          // (`bookCoverAcceptedFileTypes`), so the served Content-Type is
-          // always a server-validated image MIME. We additionally pin
-          // Cache-Control here so the client cannot choose its own value.
-          // Content-Disposition and `X-Content-Type-Options: nosniff` are not
-          // settable through better-upload's presign API and must be enforced
-          // by the public bucket policy. See `docs/security-upload.md`.
-          (upload) => ({
-            objectInfo: {
-              key: upload.objectKey,
-              cacheControl: bookCoverCacheControl,
-            },
+          // The adapter pins the presigned PUT Content-Type to the validated
+          // image MIME; we additionally pin Cache-Control here so the client
+          // cannot choose its own value. Content-Disposition and
+          // `X-Content-Type-Options: nosniff` must be enforced by the public
+          // bucket policy. See `docs/security-upload.md`.
+          (upload): ObjectUploadPrepared => ({
+            objectKey: upload.objectKey,
+            cacheControl: bookCoverCacheControl,
           })
         )
         .with(Result.P.Ok({ type: 'book_cover_upload_forbidden' }), () =>
@@ -120,17 +117,13 @@ export const handleBookCoverBeforeUpload = async (
     }
   );
 
-export const createBookCoverUploadRoute = (deps: BookCoverUploadDeps) =>
-  route({
-    ...bookCoverUploadConstraints,
-    onBeforeUpload: async ({ req, file }) => {
-      return handleBookCoverBeforeUpload(deps, {
-        headers: req.headers,
-        fileType: file.type,
-      });
-    },
-  });
-
-export type BookCoverUploadRoute = ReturnType<
-  typeof createBookCoverUploadRoute
->;
+/**
+ * Provider-neutral upload route definition consumed by `ObjectStoragePort`.
+ * No upload-SDK types cross this boundary.
+ */
+export const bookCoverUploadRouteDefinition = (
+  deps: BookCoverUploadDeps
+): ObjectUploadRouteDefinition => ({
+  ...bookCoverUploadConstraints,
+  prepare: (ctx) => handleBookCoverBeforeUpload(deps, ctx),
+});

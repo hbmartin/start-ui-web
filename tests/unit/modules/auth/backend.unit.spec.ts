@@ -35,11 +35,8 @@ vi.mock('@/composition/auth', () => ({
 vi.mock('@/composition/kernel', () => ({
   getKernel: vi.fn(() => ({
     logger: authBackendMocks.logger,
+    telemetry: authBackendMocks.telemetry,
   })),
-}));
-
-vi.mock('@/composition/telemetry', () => ({
-  telemetryProxy: authBackendMocks.telemetry,
 }));
 
 vi.mock('@/modules/auth/transport/tanstack/server-context', () => ({

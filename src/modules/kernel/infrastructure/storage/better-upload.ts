@@ -1,33 +1,71 @@
+import {
+  handleRequest,
+  RejectUpload,
+  route,
+  type Router,
+} from '@better-upload/server';
 import { custom } from '@better-upload/server/clients';
+import { mapValues } from 'remeda';
 
+import type {
+  ObjectStoragePort,
+  ObjectUploadRequestHandler,
+  ObjectUploadRouteDefinition,
+} from '@/modules/kernel/application/ports/object-storage';
+import { UploadRejectedError } from '@/modules/kernel/domain/errors/upload-rejected-error';
 import { getStorageConfig } from '@/modules/kernel/infrastructure/config/storage';
 
-export function createUploadClient() {
-  const storageConfig = getStorageConfig();
-
+const createUploadClient = () => {
+  const config = getStorageConfig();
   return custom({
-    host: storageConfig.host,
-    accessKeyId: storageConfig.accessKeyId,
-    secretAccessKey: storageConfig.secretAccessKey,
-    region: storageConfig.region,
-    forcePathStyle: storageConfig.forcePathStyle,
-    secure: storageConfig.secure,
+    host: config.host,
+    accessKeyId: config.accessKeyId,
+    secretAccessKey: config.secretAccessKey,
+    region: config.region,
+    forcePathStyle: config.forcePathStyle,
+    secure: config.secure,
   });
+};
+
+const toBetterUploadRoute = (definition: ObjectUploadRouteDefinition) =>
+  route({
+    fileTypes: definition.fileTypes,
+    maxFileSize: definition.maxFileSize,
+    onBeforeUpload: async ({ req, file }) => {
+      try {
+        const prepared = await definition.prepare({
+          headers: req.headers,
+          fileType: file.type,
+        });
+        return {
+          objectInfo: {
+            key: prepared.objectKey,
+            cacheControl: prepared.cacheControl,
+          },
+        };
+      } catch (error) {
+        // Map the provider-neutral rejection to better-upload's mechanism.
+        if (error instanceof UploadRejectedError) {
+          throw new RejectUpload(error.messageKey);
+        }
+        throw error;
+      }
+    },
+  });
+
+/**
+ * better-upload (+ S3-compatible) implementation of {@link ObjectStoragePort}.
+ * This adapter is the ONLY place allowed to import `@better-upload/server`.
+ */
+export class BetterUploadObjectStorage implements ObjectStoragePort {
+  createUploadRequestHandler(
+    routes: Record<string, ObjectUploadRouteDefinition>
+  ): ObjectUploadRequestHandler {
+    const router = {
+      client: createUploadClient(),
+      bucketName: getStorageConfig().bucketName,
+      routes: mapValues(routes, toBetterUploadRoute),
+    } satisfies Router;
+    return (request) => handleRequest(request, router);
+  }
 }
-
-export type UploadClient = ReturnType<typeof createUploadClient>;
-
-let defaultUploadClient: UploadClient | undefined;
-
-export function getDefaultUploadClient() {
-  defaultUploadClient ??= createUploadClient();
-  return defaultUploadClient;
-}
-
-export const uploadClient = new Proxy({} as UploadClient, {
-  get(_target, prop) {
-    const client = getDefaultUploadClient();
-    const value = Reflect.get(client, prop, client);
-    return typeof value === 'function' ? value.bind(client) : value;
-  },
-});

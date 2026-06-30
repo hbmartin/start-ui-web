@@ -246,7 +246,7 @@ module.exports = {
         'Routes, transport, and other features must not import infrastructure adapters directly. Go through composition.',
       from: {
         pathNot:
-          '^src/(composition|modules/[^/]+/infrastructure|modules/[^/]+/server\\.ts$|modules/[^/]+/testing\\.ts$|modules/kernel)',
+          '^src/(composition|modules/[^/]+/infrastructure|modules/[^/]+/server\\.ts$|modules/[^/]+/backend\\.ts$|modules/[^/]+/testing\\.ts$|modules/kernel)',
       },
       to: {
         path: '^src/modules/(?!kernel/)[^/]+/infrastructure',
@@ -294,6 +294,24 @@ module.exports = {
       to: {
         path: '^src/modules/kernel/infrastructure/config/env-schema\\.ts$',
       },
+    },
+    {
+      name: 'composition-email-uses-email-public-gate',
+      severity: 'error',
+      comment:
+        'Email composition must select adapters through the email public backend gate, not direct infrastructure imports.',
+      from: { path: '^src/composition/email\\.ts$' },
+      to: { path: '^src/modules/email/infrastructure' },
+    },
+    {
+      name: 'smtp-gateway-uses-kernel-public-gates',
+      severity: 'error',
+      comment:
+        'The SMTP adapter must use kernel public gates for errors, IDs, ports, and config.',
+      from: {
+        path: '^src/modules/email/infrastructure/smtp/email-gateway-smtp\\.tsx$',
+      },
+      to: { path: '^src/modules/kernel/(domain|infrastructure|transport)' },
     },
     {
       name: 'routes-use-module-public-api',
@@ -346,10 +364,9 @@ module.exports = {
       name: 'better-upload-server-confined',
       severity: 'error',
       comment:
-        'Better Upload server SDK imports stay in upload infrastructure, upload transport, or composition.',
+        'Better Upload server SDK imports stay in the kernel object-storage adapter (ObjectStoragePort). Transport/composition depend on the port, not the SDK.',
       from: {
-        pathNot:
-          '^src/(modules/kernel/infrastructure/storage/|modules/book/transport/upload/|composition/book-upload\\.ts$)',
+        pathNot: '^src/modules/kernel/infrastructure/storage/',
       },
       to: { path: 'node_modules/@better-upload/server/' },
     },
@@ -362,6 +379,24 @@ module.exports = {
         pathNot: '^src/platform/components/(form/field-upload-input|upload)/',
       },
       to: { path: 'node_modules/@better-upload/client/' },
+    },
+    {
+      name: 'business-domain-app-no-telemetry',
+      severity: 'error',
+      comment:
+        'Domain and application code must use the injected Logger port, never the platform telemetry facade/service-locator. Module infra/transport receive telemetry via getKernel().telemetry (enforced at usage level by Semgrep no-telemetry-locator-in-feature-modules).',
+      from: { path: '^src/modules/[^/]+/(domain|application)' },
+      to: { path: '^src/platform/telemetry' },
+    },
+    {
+      name: 'transport-no-i18n-translation',
+      severity: 'error',
+      comment:
+        'Transport must emit stable error keys, not translate at runtime. Import only language constants from platform/lib/i18n/constants, never the i18n instance or i18next/react-i18next.',
+      from: { path: '^src/modules/[^/]+/transport' },
+      to: {
+        path: 'node_modules/(?:i18next|react-i18next)/|^src/platform/lib/i18n/index\\.',
+      },
     },
     {
       name: 'sentry-sdk-confined',

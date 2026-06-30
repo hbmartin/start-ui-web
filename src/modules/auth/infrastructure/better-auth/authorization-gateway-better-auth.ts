@@ -1,19 +1,22 @@
 import { Result } from '@bloodyowl/boxed';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import { getTelemetry } from '@/platform/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import type { Auth } from './auth';
 import { getDefaultAuth } from './auth';
 import type { AuthorizationGateway } from '../../application/ports/authorization-gateway';
 
 export class AuthorizationGatewayBetterAuth implements AuthorizationGateway {
-  constructor(private readonly auth: Auth = getDefaultAuth()) {}
+  constructor(
+    private readonly auth: Auth = getDefaultAuth(),
+    private readonly telemetry: Pick<TelemetryAdapter, 'startSpan'>
+  ) {}
 
   async userHasPermission(
     input: Parameters<AuthorizationGateway['userHasPermission']>[0]
   ): ReturnType<AuthorizationGateway['userHasPermission']> {
-    return getTelemetry().startSpan(
+    return this.telemetry.startSpan(
       {
         attributes: {
           'auth.provider': 'better-auth',
