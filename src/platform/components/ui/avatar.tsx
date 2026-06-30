@@ -6,7 +6,8 @@ import { cn } from '@/platform/lib/tailwind/utils';
 
 const toInitials = (name: string | undefined) =>
   name
-    ?.split(' ')
+    ?.trim()
+    .split(/\s+/)
     .slice(0, 2)
     .map((s) => s[0])
     .join('');

@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { match, P } from 'ts-pattern';
 
 import type { SessionId, UserId } from '@/modules/kernel/domain/ids';
 
@@ -23,21 +24,41 @@ export async function revokeUserSession(
     input.currentUserId,
     { session: ['revoke'] }
   );
-  if (allowed.isError()) return Result.Error(allowed.getError());
-  if (allowed.get().type === 'permission_denied') {
-    return Result.Ok({ type: 'user_forbidden' });
-  }
+  const permissionResult = match(allowed)
+    .with(Result.P.Error(P.select()), (error) => Result.Error(error))
+    .with(Result.P.Ok({ type: 'permission_denied' }), () =>
+      Result.Ok({ type: 'user_forbidden' as const })
+    )
+    .with(Result.P.Ok({ type: 'permission_granted' }), () => undefined)
+    .exhaustive();
+  if (permissionResult !== undefined) return permissionResult;
 
   const targetResult = await deps.userRepository.findSessionForRevocation({
     userId: input.id,
     sessionId: input.sessionId,
   });
-  if (targetResult.isError()) return Result.Error(targetResult.getError());
-  const targetOutcome = targetResult.get();
-  if (targetOutcome.type === 'user_session_not_found') {
-    return Result.Ok({ type: 'user_session_not_found' });
-  }
-  const targetSession = targetOutcome.target;
+  const targetResultBranch = match(targetResult)
+    .with(Result.P.Error(P.select()), (error) => ({
+      result: Result.Error(error),
+      type: 'return' as const,
+    }))
+    .with(Result.P.Ok({ type: 'user_session_not_found' }), () => ({
+      result: Result.Ok({ type: 'user_session_not_found' as const }),
+      type: 'return' as const,
+    }))
+    .with(
+      Result.P.Ok({
+        target: P.select(),
+        type: 'user_session_revocation_target_found',
+      }),
+      (target) => ({
+        target,
+        type: 'continue' as const,
+      })
+    )
+    .exhaustive();
+  if (targetResultBranch.type === 'return') return targetResultBranch.result;
+  const targetSession = targetResultBranch.target;
   if (input.currentSessionId === targetSession.id) {
     return Result.Ok({ type: 'user_self' });
   }
