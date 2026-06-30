@@ -1,8 +1,8 @@
 import type { WebhookEventPayload } from 'resend';
 import type { Resend } from 'resend';
 
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import { getEmailConfig } from '@/modules/kernel/infrastructure/config/email';
+import { AppError } from '@/modules/kernel';
+import { getEmailConfig } from '@/modules/kernel/backend';
 
 import { getDefaultResendClient } from './resend-client';
 

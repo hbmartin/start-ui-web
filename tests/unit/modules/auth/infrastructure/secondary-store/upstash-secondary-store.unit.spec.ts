@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const telemetryMock = vi.hoisted(() => ({
-  captureException: vi.fn(),
-}));
-
-vi.mock('@/platform/telemetry', () => ({
-  getTelemetry: () => telemetryMock,
-}));
-
 import { UpstashSecondaryStore } from '@/modules/auth/infrastructure/secondary-store/upstash-secondary-store';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import type { TelemetryAdapter } from '@/platform/telemetry';
+
+const captureException = vi.fn();
+const telemetry = { captureException } as unknown as Pick<
+  TelemetryAdapter,
+  'captureException'
+>;
 
 const config = {
   restUrl: 'https://redis.example.com',
@@ -49,7 +48,7 @@ describe('UpstashSecondaryStore', () => {
 
   it('issues a GET command and returns the stored value', async () => {
     const fetchFn = vi.fn(async () => jsonResponse({ result: 'value-1' }));
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectOk(store.get('key-1'), {
       type: 'secondary_store_hit',
@@ -71,14 +70,14 @@ describe('UpstashSecondaryStore', () => {
     expect.hasAssertions();
 
     const fetchFn = vi.fn(async () => jsonResponse({ result: null }));
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectOk(store.get('absent'), { type: 'secondary_store_miss' });
   });
 
   it('sends SET with an EX ttl and DEL commands', async () => {
     const fetchFn = vi.fn(async () => jsonResponse({ result: 'OK' }));
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectOk(store.set('key-1', 'value-1', 60), {
       type: 'secondary_store_set',
@@ -115,18 +114,18 @@ describe('UpstashSecondaryStore', () => {
     const fetchFn = vi.fn(async () => {
       throw new Error('network down');
     });
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectErrorCode(
       store.get('key-1'),
       'AUTH_SECONDARY_STORE_UPSTASH_ERROR'
     );
-    expect(telemetryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 
   it('returns and reports write failures', async () => {
     const fetchFn = vi.fn(async () => new Response('boom', { status: 500 }));
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectErrorCode(
       store.set('key-1', 'value-1'),
@@ -136,7 +135,7 @@ describe('UpstashSecondaryStore', () => {
       store.delete('key-1'),
       'AUTH_SECONDARY_STORE_UPSTASH_ERROR'
     );
-    expect(telemetryMock.captureException).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledTimes(2);
   });
 
   it('aborts slow Upstash requests', async () => {
@@ -152,18 +151,19 @@ describe('UpstashSecondaryStore', () => {
       config,
       fetchFn,
       timeoutMs: 1,
+      telemetry,
     });
 
     await expectErrorCode(
       store.get('key-1'),
       'AUTH_SECONDARY_STORE_UPSTASH_ERROR'
     );
-    expect(telemetryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
   });
 
   it('rejects invalid ttl values before issuing a request', async () => {
     const fetchFn = vi.fn(async () => jsonResponse({ result: 'OK' }));
-    const store = new UpstashSecondaryStore({ config, fetchFn });
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
 
     await expectErrorCode(
       store.set('key-1', 'value-1', Number.NaN),

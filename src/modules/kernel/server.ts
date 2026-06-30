@@ -2,6 +2,14 @@ import { createServerFn } from '@tanstack/react-start';
 
 import { getTelemetry } from '@/platform/telemetry';
 
+export {
+  isServerFnError,
+  SERVER_FN_ERROR_CODES,
+  ServerFnError,
+  type ServerFnErrorCode,
+  type ServerFnErrorData,
+} from './transport/tanstack/server-fn-error';
+
 export const initSsrApp = createServerFn({ method: 'GET' }).handler(
   async () => {
     const { createSsrAppHandlers } =

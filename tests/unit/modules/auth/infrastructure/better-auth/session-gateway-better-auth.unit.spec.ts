@@ -2,18 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Auth } from '@/modules/auth/infrastructure/better-auth/auth';
 import type { Database } from '@/modules/kernel/infrastructure/db/client';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 vi.mock('@/modules/auth/infrastructure/better-auth/auth', () => ({
   getDefaultAuth: vi.fn(),
 }));
 
-const telemetryMock = vi.hoisted(() => ({
-  startSpan: vi.fn((_options: unknown, fn: () => unknown) => fn()),
-}));
-
-vi.mock('@/platform/telemetry', () => ({
-  getTelemetry: () => telemetryMock,
-}));
+const startSpan = vi.fn((_options: unknown, fn: () => unknown) => fn());
+const telemetry = { startSpan } as unknown as Pick<
+  TelemetryAdapter,
+  'startSpan'
+>;
 
 const SESSION_ABSOLUTE_MAX_IN_SECONDS = 2_592_000;
 
@@ -103,7 +102,12 @@ describe('SessionGatewayBetterAuth', () => {
   it('keeps valid provider roles', async () => {
     const { SessionGatewayBetterAuth } = await loadGateway();
     const db = makeDb();
-    const gateway = new SessionGatewayBetterAuth(makeAuth('admin'), db);
+    const gateway = new SessionGatewayBetterAuth(
+      makeAuth('admin'),
+      db,
+      undefined,
+      telemetry
+    );
 
     const session = await gateway.getSession({ headers: new Headers() });
 
@@ -120,7 +124,7 @@ describe('SessionGatewayBetterAuth', () => {
       providerUserId: 'user-1',
       userId: 'user-1',
     });
-    expect(telemetryMock.startSpan).toHaveBeenCalledWith(
+    expect(startSpan).toHaveBeenCalledWith(
       expect.objectContaining({
         attributes: expect.objectContaining({
           'auth.provider': 'better-auth',
@@ -135,7 +139,12 @@ describe('SessionGatewayBetterAuth', () => {
 
   it('falls back to the least-privileged role for unknown provider roles', async () => {
     const { SessionGatewayBetterAuth } = await loadGateway();
-    const gateway = new SessionGatewayBetterAuth(makeAuth('owner'), makeDb());
+    const gateway = new SessionGatewayBetterAuth(
+      makeAuth('owner'),
+      makeDb(),
+      undefined,
+      telemetry
+    );
 
     const session = await gateway.getSession({ headers: new Headers() });
 
@@ -167,7 +176,9 @@ describe('SessionGatewayBetterAuth', () => {
           role: 'admin',
           onboardedAt: new Date('2026-01-01T00:00:00.000Z'),
         },
-      })
+      }),
+      undefined,
+      telemetry
     );
 
     const session = await gateway.getSession({ headers: new Headers() });
@@ -202,7 +213,9 @@ describe('SessionGatewayBetterAuth', () => {
       makeDb({
         identityUserId: 'deleted-app-user',
         appUser: null,
-      })
+      }),
+      undefined,
+      telemetry
     );
 
     const session = await gateway.getSession({ headers: new Headers() });
@@ -221,7 +234,8 @@ describe('SessionGatewayBetterAuth', () => {
     const gateway = new SessionGatewayBetterAuth(
       makeAuth('admin', { createdAt }),
       makeDb(),
-      clock
+      clock,
+      telemetry
     );
 
     const session = await gateway.getSession({ headers: new Headers() });
@@ -242,7 +256,8 @@ describe('SessionGatewayBetterAuth', () => {
     const gateway = new SessionGatewayBetterAuth(
       makeAuth('admin', { createdAt }),
       makeDb(),
-      clock
+      clock,
+      telemetry
     );
 
     const session = await gateway.getSession({ headers: new Headers() });
@@ -261,7 +276,8 @@ describe('SessionGatewayBetterAuth', () => {
     const gateway = new SessionGatewayBetterAuth(
       makeAuth('admin', { createdAt }),
       makeDb(),
-      clock
+      clock,
+      telemetry
     );
 
     const session = await gateway.getSession({ headers: new Headers() });
@@ -280,7 +296,8 @@ describe('SessionGatewayBetterAuth', () => {
       const gateway = new SessionGatewayBetterAuth(
         makeAuth('admin', { createdAt }),
         makeDb(),
-        clock
+        clock,
+        telemetry
       );
 
       const session = await gateway.getSession({ headers: new Headers() });

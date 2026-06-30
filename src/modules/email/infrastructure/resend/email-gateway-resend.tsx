@@ -12,13 +12,13 @@ import {
   type SendEmailParams,
   type UpsertEmailStatusInput,
 } from '@/modules/email';
-import type { TransactionRunner } from '@/modules/kernel';
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
+  AppError,
   toEmailProviderMessageId,
   toEmailRecipientList,
-} from '@/modules/kernel/domain/ids';
-import { getEmailConfig } from '@/modules/kernel/infrastructure/config/email';
+  type TransactionRunner,
+} from '@/modules/kernel';
+import { getEmailConfig } from '@/modules/kernel/backend';
 
 import { getDefaultResendClient } from './resend-client';
 

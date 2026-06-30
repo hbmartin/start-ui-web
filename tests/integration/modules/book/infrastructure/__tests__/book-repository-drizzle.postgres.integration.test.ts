@@ -5,7 +5,6 @@ import { POSTGRES_TESTCONTAINER_IMAGE } from '@tests/server/docker-images';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createBookRepository } from '@/modules/book/infrastructure/drizzle/book-repository-drizzle';
-import type { AppError } from '@/modules/kernel';
 import { toBookId, toGenreId } from '@/modules/kernel/domain/ids';
 import {
   createDbClient,
@@ -20,14 +19,19 @@ import {
   genre as genreTable,
 } from '@/modules/kernel/infrastructure/db/schema';
 import type { DbLike } from '@/modules/kernel/infrastructure/db/types';
+import type { ApplicationResult } from '@/modules/kernel/testing';
+
+function getOk<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isError()) throw result.getError();
+  return result.get();
+}
 
 type TableRow = {
   schemaname: string;
   tablename: string;
 };
-
-const getResultError = (result: unknown) =>
-  (result as { getError: () => AppError }).getError();
 
 const quoteIdentifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
@@ -124,7 +128,7 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
     });
   });
 
-  it('maps normalized duplicate insert conflicts to a book duplicate error', async () => {
+  it('maps normalized duplicate insert conflicts to a duplicate outcome', async () => {
     const initializedDb = getInitializedDb(db);
     const repository = createBookRepository({ db: initializedDb });
 
@@ -148,10 +152,7 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
       coverId: null,
     });
 
-    expect(result.isError()).toBe(true);
-    expect(getResultError(result)).toMatchObject({
-      code: 'BOOK_DUPLICATE',
-      status: 409,
-    });
+    expect(getOk(result)).toEqual({ type: 'book_duplicate' });
+    await expect(initializedDb.query.book.findMany()).resolves.toHaveLength(1);
   });
 });

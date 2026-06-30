@@ -1,6 +1,6 @@
 import { createServerFn, createServerOnlyFn } from '@tanstack/react-start';
 
-import { getTelemetry } from '@/platform/telemetry';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 import {
   type AuthHandlers,
@@ -11,36 +11,38 @@ import type { ServerContextTools } from '../tanstack/server-context';
 type CurrentSessionDeps = {
   handlers: AuthHandlers;
   serverContextTools: ServerContextTools;
+  telemetry: Pick<TelemetryAdapter, 'startSpan'>;
 };
 
 const getCurrentSessionDeps = createServerOnlyFn(
   async (): Promise<CurrentSessionDeps> => {
-    const [
-      { getAuthUseCases },
-      { createServerContextTools },
-      { telemetryProxy },
-    ] = await Promise.all([
-      import('@/composition/auth'),
-      import('../tanstack/server-context'),
-      import('@/composition/telemetry'),
-    ]);
+    const [{ getAuthUseCases }, { getKernel }, { createServerContextTools }] =
+      await Promise.all([
+        import('@/composition/auth'),
+        import('@/composition/kernel'),
+        import('../tanstack/server-context'),
+      ]);
+
+    const telemetry = getKernel().telemetry;
 
     return {
       handlers: createAuthHandlers(),
       serverContextTools: createServerContextTools({
         getAuthUseCases,
-        telemetry: telemetryProxy,
+        telemetry,
       }),
+      telemetry,
     };
   }
 );
 
 export const currentSession = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { handlers, serverContextTools } = await getCurrentSessionDeps();
+    const { handlers, serverContextTools, telemetry } =
+      await getCurrentSessionDeps();
 
     return serverContextTools.withPublicContext(async (ctx) =>
-      getTelemetry().startSpan(
+      telemetry.startSpan(
         {
           attributes: {
             'operation.name': 'auth.currentSession',

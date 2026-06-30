@@ -83,8 +83,17 @@ export const FormBook = withForm({
                 inputProps={{
                   accept: join(bookCoverAcceptedFileTypes, ','),
                 }}
-                onError={() => {
-                  toast.error(t('book:manager.uploadErrors.failed'));
+                onError={(error) => {
+                  // The server rejects uploads with a stable translation KEY
+                  // (see book-cover transport); translate it here at render
+                  // time, falling back to a generic message for any other error.
+                  const message = error instanceof Error ? error.message : '';
+                  const fallback = t('book:manager.uploadErrors.failed');
+                  toast.error(
+                    message.startsWith('book:manager.uploadErrors.')
+                      ? t(message, { defaultValue: fallback })
+                      : fallback
+                  );
                 }}
               />
             )}

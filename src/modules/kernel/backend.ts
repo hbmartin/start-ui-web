@@ -11,12 +11,10 @@ export {
 export { getHttpConfig } from './infrastructure/config/http';
 export { getRedisConfig } from './infrastructure/config/redis';
 export { validateServerConfig } from './infrastructure/config/server';
-export { getDefaultDbClient } from './infrastructure/db/client';
-export { book, genre, user } from './infrastructure/db/schema';
 export {
-  isServerFnError,
-  SERVER_FN_ERROR_CODES,
-  ServerFnError,
-  type ServerFnErrorCode,
-  type ServerFnErrorData,
-} from './transport/tanstack/server-fn-error';
+  createTransactionRunner,
+  getDefaultDbClient,
+} from './infrastructure/db/client';
+export { book, genre, user } from './infrastructure/db/schema';
+export { createTelemetryLogger } from './infrastructure/logger/telemetry';
+export { appErrorToResponse } from './transport/http/error-mapper';

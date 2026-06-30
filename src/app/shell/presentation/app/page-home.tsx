@@ -11,9 +11,7 @@ export const PageHome = () => {
       <PageLayoutTopBar className="md:hidden">
         <Logo className="mx-auto w-24" />
       </PageLayoutTopBar>
-      <PageLayoutContent>
-        <div className="flex flex-1 flex-col gap-4" />
-      </PageLayoutContent>
+      <PageLayoutContent />
     </PageLayout>
   );
 };

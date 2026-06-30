@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { InMemorySecondaryStore } from '@/modules/auth/infrastructure/secondary-store/in-memory-secondary-store';
 
@@ -112,6 +112,43 @@ describe('InMemorySecondaryStore', () => {
     await expectMiss(store.get('a'));
     await expectMiss(store.get('b'));
     await expectHit(store.get('c'), '3');
+  });
+
+  it('does not iterate beyond the bounded sweep window', async () => {
+    const store = new InMemorySecondaryStore({
+      sweepThreshold: 100,
+      sweepIntervalMs: 0,
+      sweepMaxEntries: 2,
+    });
+
+    await store.set('a', '1');
+    await store.set('b', '2');
+    await store.set('c', '3');
+    await store.set('d', '4');
+
+    const internals = store as unknown as {
+      entries: Map<string, unknown>;
+      sweepThreshold: number;
+    };
+    internals.sweepThreshold = 1;
+    const originalEntries = internals.entries.entries.bind(internals.entries);
+    let nextCalls = 0;
+    vi.spyOn(internals.entries, 'entries').mockImplementation(() => {
+      const iterator = originalEntries();
+      return {
+        [Symbol.iterator]() {
+          return this;
+        },
+        next() {
+          nextCalls += 1;
+          return iterator.next();
+        },
+      } as MapIterator<[string, unknown]>;
+    });
+
+    await store.set('trigger', '5');
+
+    expect(nextCalls).toBe(2);
   });
 
   it('does not revisit live entries while sweeping', async () => {

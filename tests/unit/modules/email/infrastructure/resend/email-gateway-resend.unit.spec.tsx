@@ -34,7 +34,7 @@ const testState = vi.hoisted(() => {
   };
 });
 
-vi.mock('@/modules/kernel/infrastructure/config/email', () => ({
+vi.mock('@/modules/kernel/backend', () => ({
   getEmailConfig: () => testState.emailConfig,
 }));
 

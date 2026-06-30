@@ -1,4 +1,3 @@
-import { RejectUpload } from '@better-upload/server';
 import { Result } from '@bloodyowl/boxed';
 import { mockSession, mockUser } from '@tests/server/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,21 +10,23 @@ import {
   bookCoverUploadConstraints,
   handleBookCoverBeforeUpload,
 } from '@/modules/book/transport/upload/book-cover';
+import { UploadRejectedError } from '@/modules/kernel';
 import { toBookCoverObjectKey } from '@/modules/kernel/testing';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
 const headers = new Headers();
 
-const telemetryMock = vi.hoisted(() => ({
-  startSpan: vi.fn((_options: unknown, fn: () => unknown) => fn()),
-}));
-
-vi.mock('@/platform/telemetry', () => ({
-  getTelemetry: () => telemetryMock,
-}));
+const startSpanMock = vi.fn((_options: unknown, fn: () => unknown) => fn());
+const telemetryMock = {
+  startSpan: startSpanMock,
+} as unknown as Pick<TelemetryAdapter, 'startSpan'>;
 
 describe('book cover upload transport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    startSpanMock.mockImplementation((_options: unknown, fn: () => unknown) =>
+      fn()
+    );
   });
 
   it('keeps upload route limits server-side', () => {
@@ -53,21 +54,20 @@ describe('book cover upload transport', () => {
             session: mockSession,
           }),
           getUseCases: () => ({ prepareCoverUpload }),
+          telemetry: telemetryMock,
         },
         { headers, fileType: 'image/webp' }
       )
     ).resolves.toEqual({
-      objectInfo: {
-        key: 'books/generated.webp',
-        cacheControl: 'public, max-age=31536000, immutable',
-      },
+      objectKey: 'books/generated.webp',
+      cacheControl: 'public, max-age=31536000, immutable',
     });
 
     expect(prepareCoverUpload).toHaveBeenCalledWith({
       currentUserId: mockUser.id,
       fileType: 'image/webp',
     });
-    expect(telemetryMock.startSpan).toHaveBeenCalledWith(
+    expect(startSpanMock).toHaveBeenCalledWith(
       expect.objectContaining({
         attributes: expect.objectContaining({
           'file.mime_type': 'image/webp',
@@ -81,19 +81,23 @@ describe('book cover upload transport', () => {
     );
   });
 
-  it('maps unauthenticated users to a rejected upload', async () => {
+  it('maps unauthenticated users to a rejected upload (stable key)', async () => {
     await expect(
       handleBookCoverBeforeUpload(
         {
           getCurrentSession: async () => null,
           getUseCases: () => ({ prepareCoverUpload: vi.fn() }),
+          telemetry: telemetryMock,
         },
         { headers, fileType: 'image/png' }
       )
-    ).rejects.toBeInstanceOf(RejectUpload);
+    ).rejects.toMatchObject({
+      name: 'UploadRejectedError',
+      messageKey: 'book:manager.uploadErrors.NOT_AUTHENTICATED',
+    });
   });
 
-  it('maps expected use-case failures to rejected uploads', async () => {
+  it('maps expected use-case failures to rejected uploads (stable keys)', async () => {
     await expect(
       handleBookCoverBeforeUpload(
         {
@@ -105,10 +109,14 @@ describe('book cover upload transport', () => {
             prepareCoverUpload: async () =>
               Result.Ok({ type: 'book_cover_upload_forbidden' as const }),
           }),
+          telemetry: telemetryMock,
         },
         { headers, fileType: 'image/png' }
       )
-    ).rejects.toBeInstanceOf(RejectUpload);
+    ).rejects.toMatchObject({
+      name: 'UploadRejectedError',
+      messageKey: 'book:manager.uploadErrors.UNAUTHORIZED',
+    });
 
     await expect(
       handleBookCoverBeforeUpload(
@@ -123,9 +131,10 @@ describe('book cover upload transport', () => {
                 type: 'book_cover_upload_invalid_file_type' as const,
               }),
           }),
+          telemetry: telemetryMock,
         },
         { headers, fileType: 'text/plain' }
       )
-    ).rejects.toBeInstanceOf(RejectUpload);
+    ).rejects.toBeInstanceOf(UploadRejectedError);
   });
 });

@@ -29,7 +29,7 @@ const isSupportedEmailServer = (value: string) => {
 
 const emailEnvSchema = baseEnvSchema
   .extend({
-    RESEND_API_KEY: zNonEmptyEnvString(),
+    RESEND_API_KEY: z.string().trim().min(1).optional(),
     RESEND_WEBHOOK_SECRET: z.string().trim().optional(),
     RESEND_WEBHOOK_MAX_BYTES: z.coerce.number().int().positive().optional(),
     EMAIL_SERVER: z
@@ -44,6 +44,16 @@ const emailEnvSchema = baseEnvSchema
     EMAIL_DELIVERY_DISABLED: z.stringbool().default(false),
   })
   .superRefine((env, ctx) => {
+    const usesResendDelivery = !env.EMAIL_SERVER;
+
+    if (usesResendDelivery && !env.RESEND_API_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RESEND_API_KEY'],
+        message: 'RESEND_API_KEY is required when EMAIL_SERVER is not set',
+      });
+    }
+
     if (!isProdRuntimeEnvironment(env)) return;
 
     if (env.EMAIL_SERVER) {
@@ -54,7 +64,11 @@ const emailEnvSchema = baseEnvSchema
       });
     }
 
-    if (isPlaceholderEmailSecret(env.RESEND_API_KEY)) {
+    if (
+      usesResendDelivery &&
+      env.RESEND_API_KEY &&
+      isPlaceholderEmailSecret(env.RESEND_API_KEY)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['RESEND_API_KEY'],
@@ -76,7 +90,7 @@ const emailEnvSchema = baseEnvSchema
   });
 
 export type EmailConfig = {
-  resendApiKey: string;
+  resendApiKey?: string;
   resendWebhookSecret?: string;
   resendWebhookMaxBytes: number;
   server?: string;

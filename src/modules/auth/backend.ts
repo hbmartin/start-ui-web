@@ -4,7 +4,6 @@ import {
   getAuthUseCases,
 } from '@/composition/auth';
 import { getKernel } from '@/composition/kernel';
-import { telemetryProxy } from '@/composition/telemetry';
 import type { Logger } from '@/modules/kernel';
 
 import { createServerContextTools } from './transport/tanstack/server-context';
@@ -27,12 +26,12 @@ const kernelLogger: Logger = {
 const serverContextTools = createServerContextTools({
   getAuthUseCases,
   logger: kernelLogger,
-  telemetry: telemetryProxy,
+  telemetry: getKernel().telemetry,
 });
 
 export { getAuthUseCases };
 export const handleAuthRequest = (request: Request) =>
-  telemetryProxy.startSpan(
+  getKernel().telemetry.startSpan(
     {
       attributes: {
         'auth.provider': 'better-auth',
@@ -46,7 +45,7 @@ export const handleAuthRequest = (request: Request) =>
     () => getAuthHttpGateway().handle(request)
   );
 export const handleLogoutRequest = (request: Request) =>
-  telemetryProxy.startSpan(
+  getKernel().telemetry.startSpan(
     {
       attributes: {
         'auth.provider': 'better-auth',

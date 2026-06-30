@@ -4,14 +4,13 @@ import type { Auth } from '@/modules/auth/infrastructure/better-auth/auth';
 import { UserAdminGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/user-admin-gateway-better-auth';
 import { toSessionId, toUserId } from '@/modules/kernel/domain/ids';
 import type { Database } from '@/modules/kernel/infrastructure/db/client';
+import type { TelemetryAdapter } from '@/platform/telemetry';
 
-const telemetryMock = vi.hoisted(() => ({
-  startSpan: vi.fn((_options: unknown, fn: () => unknown) => fn()),
-}));
-
-vi.mock('@/platform/telemetry', () => ({
-  getTelemetry: () => telemetryMock,
-}));
+const startSpan = vi.fn((_options: unknown, fn: () => unknown) => fn());
+const telemetry = { startSpan } as unknown as Pick<
+  TelemetryAdapter,
+  'startSpan'
+>;
 
 const makeAuth = () => ({
   api: {
@@ -45,7 +44,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     const auth = makeAuth();
     const gateway = new UserAdminGatewayBetterAuth(
       auth as unknown as Auth,
-      makeDb({ session: { token: 'session-token', userId: 'user-1' } })
+      makeDb({ session: { token: 'session-token', userId: 'user-1' } }),
+      telemetry
     );
     const headers = new Headers();
 
@@ -65,7 +65,7 @@ describe('UserAdminGatewayBetterAuth', () => {
       body: { sessionToken: 'session-token' },
       headers,
     });
-    expect(telemetryMock.startSpan).toHaveBeenCalledWith(
+    expect(startSpan).toHaveBeenCalledWith(
       expect.objectContaining({
         attributes: expect.objectContaining({
           'auth.provider': 'better-auth',
@@ -85,7 +85,8 @@ describe('UserAdminGatewayBetterAuth', () => {
       makeDb({
         session: { token: 'session-token', userId: 'provider-user-1' },
         identityUserId: 'app-user-1',
-      })
+      }),
+      telemetry
     );
 
     const result = await gateway.revokeUserSession({
@@ -114,7 +115,8 @@ describe('UserAdminGatewayBetterAuth', () => {
       makeDb({
         session: { token: 'session-token', userId: 'provider-user-1' },
         identityUserId: 'other-app-user',
-      })
+      }),
+      telemetry
     );
 
     const result = await gateway.revokeUserSession({
@@ -140,7 +142,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     const auth = makeAuth();
     const gateway = new UserAdminGatewayBetterAuth(
       auth as unknown as Auth,
-      makeDb({ session: null })
+      makeDb({ session: null }),
+      telemetry
     );
 
     const result = await gateway.revokeUserSession({

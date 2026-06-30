@@ -5,10 +5,12 @@ import {
   type EmailTransactionContext,
   type EmailUseCases,
 } from '@/modules/email';
-import { createEmailStatusRepository } from '@/modules/email/infrastructure/drizzle/email-status-repository-drizzle';
-import { EmailGatewayResend } from '@/modules/email/infrastructure/resend/email-gateway-resend';
-import { ResendWebhookVerifier } from '@/modules/email/infrastructure/resend/resend-webhook-verifier';
-import { EmailGatewaySmtp } from '@/modules/email/infrastructure/smtp/email-gateway-smtp';
+import {
+  createEmailStatusRepository,
+  EmailGatewayResend,
+  EmailGatewaySmtp,
+  ResendWebhookVerifier,
+} from '@/modules/email/backend';
 import type { TransactionRunner } from '@/modules/kernel';
 import { getEmailConfig } from '@/modules/kernel/backend';
 import {
