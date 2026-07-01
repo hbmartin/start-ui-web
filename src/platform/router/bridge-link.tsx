@@ -1,9 +1,12 @@
-import { Link, type LinkProps } from '@tanstack/react-router';
+import { useForesight } from '@foresightjs/react';
+import { Link, type LinkProps, useRouter } from '@tanstack/react-router';
 import * as React from 'react';
 
 import { isProtectedNavigationPath } from './navigation-safety';
 
 export type BridgeLinkProps = LinkProps;
+
+const PREDICTED_PRELOAD_REACTIVATE_AFTER_MS = 60_000;
 
 const protectedNavigationErrorMessage = (target: string) =>
   `BridgeLink cannot navigate declaratively to protected side-effect route "${target}". Use an explicit command flow such as ConfirmSignOut instead.`;
@@ -14,14 +17,100 @@ const isProductionBuild = () =>
 const protectedNavigationTarget = (to: unknown) =>
   typeof to === 'string' && isProtectedNavigationPath(to) ? to : undefined;
 
+const shouldUsePredictedPreload = (
+  props: BridgeLinkProps,
+  protectedTarget: string | undefined
+) =>
+  protectedTarget === undefined &&
+  props.preload === undefined &&
+  props.disabled !== true &&
+  props.reloadDocument !== true &&
+  (props.target === undefined || props.target === '_self') &&
+  typeof props.to === 'string' &&
+  props.to.length > 0;
+
+const toRouterPreloadOptions = ({
+  _fromLocation,
+  from,
+  hash,
+  hashScrollIntoView,
+  ignoreBlocker,
+  mask,
+  params,
+  reloadDocument,
+  replace,
+  resetScroll,
+  search,
+  state,
+  to,
+  viewTransition,
+}: BridgeLinkProps) => ({
+  _fromLocation,
+  from,
+  hash,
+  hashScrollIntoView,
+  ignoreBlocker,
+  mask,
+  params,
+  reloadDocument,
+  replace,
+  resetScroll,
+  search,
+  state,
+  to,
+  viewTransition,
+});
+
+const assignForwardedRef = (
+  forwardedRef: React.ForwardedRef<HTMLAnchorElement>,
+  node: HTMLAnchorElement | null
+) => {
+  if (typeof forwardedRef === 'function') {
+    forwardedRef(node);
+    return;
+  }
+
+  if (forwardedRef) {
+    forwardedRef.current = node;
+  }
+};
+
 const BridgeLinkComponent = React.forwardRef<
   HTMLAnchorElement,
   BridgeLinkProps
->((props, ref) => {
+>((props, forwardedRef) => {
+  const router = useRouter();
   const protectedTarget = protectedNavigationTarget(props.to);
+  const usePredictedPreload = shouldUsePredictedPreload(props, protectedTarget);
+  const routePreloadOptions = toRouterPreloadOptions(props);
+  const { elementRef } = useForesight<HTMLAnchorElement>({
+    callback: () => {
+      void router
+        .preloadRoute(
+          routePreloadOptions as Parameters<typeof router.preloadRoute>[0]
+        )
+        .catch(() => undefined);
+    },
+    enabled: usePredictedPreload,
+    meta: { to: props.to },
+    name:
+      typeof props.to === 'string' ? `BridgeLink ${props.to}` : 'BridgeLink',
+    reactivateAfter: PREDICTED_PRELOAD_REACTIVATE_AFTER_MS,
+  });
+  const linkRef = React.useCallback(
+    (node: HTMLAnchorElement | null) => {
+      elementRef(node);
+      assignForwardedRef(forwardedRef, node);
+    },
+    [elementRef, forwardedRef]
+  );
 
   if (!protectedTarget) {
-    return <Link {...props} ref={ref} />;
+    const linkProps = usePredictedPreload
+      ? { ...props, preload: false as const }
+      : props;
+
+    return <Link {...linkProps} ref={linkRef} />;
   }
 
   const guardedProps = {
@@ -34,7 +123,7 @@ const BridgeLinkComponent = React.forwardRef<
     throw new Error(protectedNavigationErrorMessage(protectedTarget));
   }
 
-  return <Link {...guardedProps} ref={ref} />;
+  return <Link {...guardedProps} ref={linkRef} />;
 });
 
 BridgeLinkComponent.displayName = 'BridgeLink';

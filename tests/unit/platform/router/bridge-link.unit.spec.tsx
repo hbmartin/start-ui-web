@@ -7,9 +7,30 @@ type LinkMockProps = Record<string, unknown> & {
     | ReactNode
     | ((state: { isActive: boolean; isTransitioning: boolean }) => ReactNode);
 };
+type ForesightMockOptions = {
+  callback: () => Promise<void> | void;
+  enabled?: boolean;
+  meta?: Record<string, unknown>;
+  name?: string;
+  reactivateAfter?: number;
+};
 
 const linkMocks = vi.hoisted(() => ({
   props: [] as LinkMockProps[],
+}));
+const foresightMocks = vi.hoisted(() => ({
+  elementRef: vi.fn(),
+  options: [] as ForesightMockOptions[],
+}));
+const routerMocks = vi.hoisted(() => ({
+  preloadRoute: vi.fn(async () => []),
+}));
+
+vi.mock('@foresightjs/react', () => ({
+  useForesight: (options: ForesightMockOptions) => {
+    foresightMocks.options.push(options);
+    return { elementRef: foresightMocks.elementRef };
+  },
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -19,16 +40,47 @@ vi.mock('@tanstack/react-router', () => ({
       ? props.children({ isActive: true, isTransitioning: false })
       : (props.children ?? null);
   },
+  useRouter: () => routerMocks,
 }));
 
 import { BridgeLink } from '@/platform/router';
 
 describe('BridgeLink', () => {
   beforeEach(() => {
+    foresightMocks.elementRef.mockClear();
+    foresightMocks.options = [];
     linkMocks.props = [];
+    routerMocks.preloadRoute.mockClear();
   });
 
-  it('passes ordinary routes through to TanStack Link', () => {
+  it('uses Foresight to preload ordinary routes by default', async () => {
+    const markup = renderToStaticMarkup(
+      <BridgeLink to="/manager">Manager</BridgeLink>
+    );
+
+    expect(markup).toBe('Manager');
+    expect(linkMocks.props).toHaveLength(1);
+    expect(linkMocks.props[0]).toMatchObject({
+      preload: false,
+      to: '/manager',
+    });
+    expect(foresightMocks.options).toHaveLength(1);
+    const foresightOptions = foresightMocks.options[0] as ForesightMockOptions;
+    expect(foresightOptions).toMatchObject({
+      enabled: true,
+      meta: { to: '/manager' },
+      name: 'BridgeLink /manager',
+      reactivateAfter: 60_000,
+    });
+
+    await foresightOptions.callback();
+
+    expect(routerMocks.preloadRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ to: '/manager' })
+    );
+  });
+
+  it('respects explicit TanStack preload props', () => {
     const markup = renderToStaticMarkup(
       <BridgeLink to="/login" preload="intent" data-testid="login-link">
         Login
@@ -42,6 +94,8 @@ describe('BridgeLink', () => {
       preload: 'intent',
       to: '/login',
     });
+    expect(foresightMocks.options).toHaveLength(1);
+    expect(foresightMocks.options[0]).toMatchObject({ enabled: false });
   });
 
   it('supports TanStack Link render-prop children', () => {
@@ -60,6 +114,8 @@ describe('BridgeLink', () => {
     ).toThrow(
       'BridgeLink cannot navigate declaratively to protected side-effect route "/logout". Use an explicit command flow such as ConfirmSignOut instead.'
     );
+    expect(foresightMocks.options).toHaveLength(1);
+    expect(foresightMocks.options[0]).toMatchObject({ enabled: false });
     expect(linkMocks.props).toEqual([]);
   });
 
