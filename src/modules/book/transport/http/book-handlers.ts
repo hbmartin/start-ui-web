@@ -49,6 +49,12 @@ const normalizePublisherName = (
   publisher: '' | PublisherName | null | undefined
 ): PublisherName | null => publisher || null;
 
+const zOptionalPublisherName = () =>
+  z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim() : value),
+    z.union([z.literal(''), zPublisherName()]).nullish()
+  );
+
 const normalizeBookWriteInputPayload = <
   TInput extends { publisher?: '' | PublisherName | null },
 >(
@@ -63,7 +69,7 @@ const zBookWriteInputBase = () =>
     title: zBookTitle(),
     author: zBookAuthor(),
     genreId: zGenreId(),
-    publisher: z.union([z.literal(''), zPublisherName()]).nullish(),
+    publisher: zOptionalPublisherName(),
     coverId: zBookCoverInput(),
   });
 

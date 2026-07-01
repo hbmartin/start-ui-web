@@ -395,6 +395,43 @@ describe('EmailGatewayResend', () => {
     });
   });
 
+  it('records send_failed status when Resend returns an invalid external ID', async () => {
+    const statusRepository = makeStatusRepository();
+    const resend = {
+      emails: {
+        send: vi.fn(async () => ({
+          data: { id: '   ' },
+          error: null,
+          headers: null,
+        })),
+      },
+    } as unknown as Resend;
+    const { EmailGatewayResend } = await loadGateway();
+
+    const result = await new EmailGatewayResend({
+      statusTransactionRunner: makeStatusTransactionRunner(statusRepository),
+      resend,
+    }).sendEmail({
+      to: recipient,
+      subject: 'Login code',
+      template: createElement('div', null, '123456'),
+      idempotencyKey,
+    });
+
+    expect(getError(result)).toMatchObject({
+      code: 'EMAIL_PROVIDER_RESPONSE_INVALID',
+      status: 500,
+    });
+    expect(statusRepository.recordSendAttempt).toHaveBeenLastCalledWith({
+      provider: 'resend',
+      recipient: 'user@example.com',
+      subject: 'Login code',
+      idempotencyKey: 'key-1',
+      status: 'send_failed',
+      metadata: {},
+    });
+  });
+
   it('returns an existing external ID if a failed send races with a completed attempt', async () => {
     const statusRepository = makeStatusRepository();
     vi.mocked(statusRepository.recordSendAttempt)

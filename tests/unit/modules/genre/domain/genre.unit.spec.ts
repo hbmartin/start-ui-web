@@ -36,6 +36,12 @@ describe('genre domain', () => {
     expect(normalizeGenreSearchTerm(' fiction ')).toBe('fiction');
     expect(normalizeGenreSearchTerm(undefined)).toBe('');
     expect(toGenreColor('#aabbcc').isOk()).toBe(true);
+    expect(
+      toGenreColor(' #AABBCC ').match({
+        Ok: (value) => value,
+        Error: () => null,
+      })
+    ).toBe('#aabbcc');
     expect(toGenreColor('aabbcc').isError()).toBe(true);
   });
 

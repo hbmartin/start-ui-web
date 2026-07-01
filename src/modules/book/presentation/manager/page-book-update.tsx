@@ -21,8 +21,8 @@ import { useIsUploadingFiles } from '@/platform/components/upload/utils';
 
 import { useCurrentScopeKey } from '@/modules/auth/client';
 import { bookQueries } from '@/modules/book/client';
+import type { BookId } from '@/modules/kernel';
 import { isServerFnError } from '@/modules/kernel/client';
-import type { BookId } from '@/modules/kernel/domain/ids';
 
 import {
   FormBook,

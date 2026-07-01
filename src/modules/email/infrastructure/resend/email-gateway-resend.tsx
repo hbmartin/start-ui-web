@@ -275,6 +275,9 @@ export class EmailGatewayResend implements EmailGateway {
 
     const externalId = toEmailProviderMessageId(data.id);
     if (externalId.isError()) {
+      const failedAttempt = await recordFailedAttempt();
+      if (failedAttempt) return failedAttempt;
+
       return Result.Error(invalidProviderResponseError(externalId.getError()));
     }
 

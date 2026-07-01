@@ -1,11 +1,12 @@
 import { Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
 
-import type { UserId } from '@/modules/kernel/domain/ids';
+import type { UserId } from '@/modules/kernel';
 
 import type { UserResult, UserUpdateOutcome, UserUseCaseDeps } from './types';
 import type { UserUpdateInput } from '../../domain/user';
 import { emptyUserDisplayName, shouldUnverifyEmail } from '../../domain/user';
+import { canChangeRole } from '../../domain/user-policy';
 
 export type UpdateUserInput = {
   currentUserId: UserId;
@@ -54,14 +55,15 @@ export async function updateUser(
   if (currentResultBranch.type === 'return') return currentResultBranch.result;
   const current = currentResultBranch.snapshot;
 
-  const submittedRole =
-    input.currentUserId === input.id
-      ? undefined
-      : (input.user.role ?? undefined);
-  const nextRole =
-    submittedRole !== undefined && submittedRole !== current.role
-      ? submittedRole
-      : undefined;
+  const submittedRole = input.user.role ?? undefined;
+  const nextRole = canChangeRole({
+    currentUserId: input.currentUserId,
+    userId: input.id,
+    nextRole: submittedRole,
+    currentRole: current.role,
+  })
+    ? submittedRole
+    : undefined;
 
   const roleWriteRequested = nextRole !== undefined;
 

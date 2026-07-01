@@ -3,16 +3,10 @@ import { zodValidator } from '@tanstack/zod-adapter';
 import { z } from 'zod';
 
 import { isForbiddenRouteContext } from '@/modules/auth/presentation';
-import { toScopeKey } from '@/modules/kernel';
 import { userQueries } from '@/modules/user/client';
 import { PageUsers } from '@/modules/user/presentation';
 import { observedLoader } from '@/platform/router/route-observability';
-
-const parseRouteScopeKey = (value: string) => {
-  const parsed = toScopeKey(value);
-  if (parsed.isError()) throw parsed.getError();
-  return parsed.get();
-};
+import { parseRouteScopeKey } from '@/routes/-route-params';
 
 export const Route = createFileRoute('/manager/users/')({
   validateSearch: zodValidator(

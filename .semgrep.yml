@@ -1443,7 +1443,7 @@ rules:
     message: Branch on parser Result values before unwrapping; do not call toX(...).get() directly in production code.
     severity: ERROR
     languages: [generic]
-    pattern-regex: '\bto(?:AccountName|UserDisplayName|BookTitle|BookAuthor|PublisherName|GenreName|GenreColor|UserId|BookId|GenreId|SessionId|ScopeKey|AuthorId|PublisherId|BookCoverObjectKey|EmailStatusId|EmailProviderMessageId|EmailIdempotencyKey|EmailWebhookEventId|EmailRecipientList|OtpCode|LanguageCode|EmailAddress|GeneratedId|RequestId|CorrelationId|CacheKey)\s*\([^;\n]*\)\s*\.get\s*\('
+    pattern-regex: '\bto(?:AccountName|UserDisplayName|BookTitle|BookAuthor|PublisherName|GenreName|GenreColor|UserId|BookId|GenreId|SessionId|ScopeKey|AuthorId|PublisherId|BookCoverObjectKey|EmailStatusId|EmailProviderMessageId|EmailIdempotencyKey|EmailWebhookEventId|EmailRecipientList|OtpCode|LanguageCode|EmailAddress|GeneratedId|RequestId|CorrelationId|CacheKey)\s*\([^;]*?\)\s*\.get\s*\('
     paths:
       include:
         - src/**/*.ts

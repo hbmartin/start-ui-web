@@ -104,6 +104,17 @@ describe('book HTTP transport handlers', () => {
     ).toBe(publisher);
   });
 
+  it('normalizes whitespace-only optional publisher input to null', () => {
+    expect(
+      zCreateInput().parse({
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
+        genreId: 'genre-1',
+        publisher: '   ',
+      }).publisher
+    ).toBeNull();
+  });
+
   test.prop([validPaginationLimit, fc.boolean()], PROPERTY_DEFAULTS)(
     'parses generated valid list pagination limits',
     (limit, asString) => {

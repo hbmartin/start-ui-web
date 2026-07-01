@@ -19,4 +19,19 @@ describe('account domain', () => {
       toAccountName('a'.repeat(ACCOUNT_NAME_MAX_LENGTH + 1)).isError()
     ).toBe(true);
   });
+
+  it('redacts invalid account name values from error details', () => {
+    const result = toAccountName('Sensitive Account Name'.repeat(20));
+    const error = result.match({
+      Ok: () => {
+        throw new Error('Expected parser to fail.');
+      },
+      Error: (value) => value,
+    });
+
+    expect(error.details).toMatchObject({
+      typeName: 'AccountName',
+      value: '<redacted>',
+    });
+  });
 });

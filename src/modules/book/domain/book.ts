@@ -2,13 +2,13 @@ import { Result } from '@bloodyowl/boxed';
 import { z } from 'zod';
 
 import type { GenreColor, GenreName } from '@/modules/genre';
-import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-error';
-import type {
-  BookCoverObjectKey,
-  BookId,
-  GenreId,
-  ParseResult,
-} from '@/modules/kernel/domain/ids';
+import {
+  type BookCoverObjectKey,
+  type BookId,
+  type GenreId,
+  IdValidationError,
+  type ParseResult,
+} from '@/modules/kernel';
 
 import {
   BOOK_AUTHOR_MAX_LENGTH,

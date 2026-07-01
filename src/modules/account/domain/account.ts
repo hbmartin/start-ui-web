@@ -1,8 +1,11 @@
 import { Result } from '@bloodyowl/boxed';
 import { z } from 'zod';
 
-import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-error';
-import type { ParseResult, UserId } from '@/modules/kernel/domain/ids';
+import {
+  IdValidationError,
+  type ParseResult,
+  type UserId,
+} from '@/modules/kernel';
 
 import { ACCOUNT_NAME_MAX_LENGTH } from './account-policy';
 
@@ -21,7 +24,11 @@ export const toAccountName = (name: string): ParseResult<AccountName> => {
   const result = zAccountNameSchema.safeParse(name);
   if (!result.success) {
     return Result.Error(
-      new IdValidationError('AccountName', name, 'AccountName is invalid')
+      new IdValidationError(
+        'AccountName',
+        '<redacted>',
+        'AccountName is invalid'
+      )
     );
   }
   return Result.Ok(result.data);
