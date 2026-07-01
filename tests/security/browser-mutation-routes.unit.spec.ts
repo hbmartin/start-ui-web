@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { shouldProtectBrowserMutation } from '@/platform/http/browser-mutation-protection';
+import { SIDE_EFFECT_ROUTE_PATHNAMES } from '@/platform/router';
 
 const root = process.cwd();
 
@@ -68,7 +69,7 @@ describe('browser mutation route coverage', () => {
       '/api/telemetry/otel/v1/traces',
       '/api/telemetry/sentry-tunnel',
       '/api/upload',
-      '/logout',
+      ...SIDE_EFFECT_ROUTE_PATHNAMES,
     ]);
     expect(externallyProtectedRoutes).toEqual([
       '/api/auth/$',

@@ -5,6 +5,8 @@ import path from 'node:path';
 import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { isProtectedNavigationPath } from '@/platform/router';
+
 const root = process.cwd();
 const sourceFileExtensions = new Set(['.ts', '.tsx']);
 const transactionApplicationErrorBoundaryFiles = new Set([
@@ -44,6 +46,17 @@ const protectedRouteGuardSpecs = [
   },
 ];
 const portOutcomeOffenderOrder = ['nullable', 'optional', 'boolean'] as const;
+const declarativeLinkComponentNames = new Set([
+  'BridgeLink',
+  'ButtonLink',
+  'Link',
+  'ResponsiveIconButtonLink',
+]);
+const directProtectedNavigationAllowlist = new Set([
+  path.join(root, 'src', 'platform', 'router', 'navigation-safety.ts'),
+  path.join(root, 'src', 'routes', 'logout.tsx'),
+  path.join(root, 'src', 'routeTree.gen.ts'),
+]);
 
 type PortOutcomeOffender = (typeof portOutcomeOffenderOrder)[number];
 
@@ -93,6 +106,99 @@ function readSource(file: string) {
 
 function relativePath(file: string) {
   return path.relative(root, file);
+}
+
+function getPropertyNameText(name: ts.PropertyName) {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  return undefined;
+}
+
+function getStaticStringExpression(expression: ts.Expression | undefined) {
+  if (!expression) return undefined;
+  if (
+    ts.isStringLiteral(expression) ||
+    ts.isNoSubstitutionTemplateLiteral(expression)
+  ) {
+    return expression.text;
+  }
+  return undefined;
+}
+
+function getJsxTagNameText(tagName: ts.JsxTagNameExpression) {
+  if (ts.isIdentifier(tagName)) return tagName.text;
+  if (ts.isPropertyAccessExpression(tagName)) return tagName.name.text;
+  return undefined;
+}
+
+function getJsxAttributeStringValue(attribute: ts.JsxAttribute) {
+  const initializer = attribute.initializer;
+  if (!initializer) return undefined;
+  if (ts.isStringLiteral(initializer)) return initializer.text;
+  if (ts.isJsxExpression(initializer)) {
+    return getStaticStringExpression(initializer.expression);
+  }
+  return undefined;
+}
+
+function formatNodeLocation(sourceFile: ts.SourceFile, node: ts.Node) {
+  const location = sourceFile.getLineAndCharacterOfPosition(
+    node.getStart(sourceFile)
+  );
+  return `${relativePath(sourceFile.fileName)}:${location.line + 1}`;
+}
+
+function findDirectProtectedNavigationViolations() {
+  return listSourceFiles(path.join(root, 'src'))
+    .filter((file) => !directProtectedNavigationAllowlist.has(file))
+    .flatMap((file) => {
+      const sourceFile = ts.createSourceFile(
+        file,
+        readSource(file),
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+      );
+      const violations: string[] = [];
+
+      const inspectNode = (node: ts.Node): void => {
+        if (
+          (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+          declarativeLinkComponentNames.has(
+            getJsxTagNameText(node.tagName) ?? ''
+          )
+        ) {
+          for (const property of node.attributes.properties) {
+            if (
+              !ts.isJsxAttribute(property) ||
+              !ts.isIdentifier(property.name) ||
+              property.name.text !== 'to'
+            ) {
+              continue;
+            }
+
+            const target = getJsxAttributeStringValue(property);
+            if (target && isProtectedNavigationPath(target)) {
+              violations.push(formatNodeLocation(sourceFile, property));
+            }
+          }
+        }
+
+        if (
+          ts.isPropertyAssignment(node) &&
+          getPropertyNameText(node.name) === 'to'
+        ) {
+          const target = getStaticStringExpression(node.initializer);
+          if (target && isProtectedNavigationPath(target)) {
+            violations.push(formatNodeLocation(sourceFile, node));
+          }
+        }
+
+        ts.forEachChild(node, inspectNode);
+      };
+
+      inspectNode(sourceFile);
+      return violations;
+    });
 }
 
 function findPortPromiseOutcomeOffenders(source: string, fileName = 'port.ts') {
@@ -542,6 +648,20 @@ describe('strict modular monolith layout', () => {
     expect(confirmSignOut).not.toContain("to: '/logout'");
     expect(confirmSignOut).toContain('signOut()');
     expect(confirmSignOut).toContain('clearAllQueryStateForAuthBoundary');
+  });
+
+  it('blocks direct declarative navigation to protected side-effect routes', () => {
+    expect(findDirectProtectedNavigationViolations()).toEqual([]);
+  });
+
+  it('routes platform button links through BridgeLink', () => {
+    const buttonLink = readSource(
+      path.join(root, 'src', 'platform', 'components', 'ui', 'button-link.tsx')
+    );
+
+    expect(buttonLink).toContain('@/platform/router');
+    expect(buttonLink).toContain('BridgeLink');
+    expect(buttonLink).not.toContain('@tanstack/react-router');
   });
 
   it('keeps presentation schemas free of i18n imports', () => {
