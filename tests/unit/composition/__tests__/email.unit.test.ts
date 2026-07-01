@@ -8,8 +8,8 @@ import { toEmailIdempotencyKey, toEmailRecipientList } from '@/modules/kernel';
 
 const testState = vi.hoisted(() => {
   const makeEmailConfig = () => ({
-    resendApiKey: 'resend-api-key',
-    resendWebhookSecret: 'resend-webhook-secret',
+    resendApiKey: 'resend-api-key', // pragma: allowlist secret
+    resendWebhookSecret: 'resend-webhook-secret', // pragma: allowlist secret
     resendWebhookMaxBytes: 1_000_000,
     server: undefined as string | undefined,
     from: 'Start UI <noreply@example.com>',

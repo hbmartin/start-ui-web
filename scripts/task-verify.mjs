@@ -7,6 +7,9 @@ const args = new Set(process.argv.slice(2));
 const runVisual = args.has('--visual');
 const runChromiumE2e = args.has('--e2e-chromium');
 const runBuild = args.has('--build');
+const checkStep = process.env.CI
+  ? { id: 'check-ci', command: 'pnpm', args: ['check:ci'] }
+  : { id: 'check', command: 'pnpm', args: ['check'] };
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 const reportDir = path.resolve('test-results', 'task-verification', timestamp);
@@ -17,11 +20,7 @@ const steps = [
     command: 'pnpm',
     args: ['format:changed'],
   },
-  {
-    id: 'check',
-    command: 'pnpm',
-    args: ['check'],
-  },
+  checkStep,
   {
     id: 'test-affected',
     command: 'pnpm',
