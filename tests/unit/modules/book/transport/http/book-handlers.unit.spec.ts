@@ -1,5 +1,6 @@
 import { Result } from '@bloodyowl/boxed';
 import { createAuthenticatedContext } from '@tests/server/test-utils';
+import { testBookAuthor, testBookTitle } from '@tests/support/branded-values';
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,7 @@ import {
   zGetAllInput,
 } from '@/modules/book/transport/http/book-handlers';
 import { toBookId, toGenreId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const validPaginationLimit = fc.integer({ max: 100, min: 1 });
 const invalidPaginationLimit = fc.oneof(
@@ -46,7 +48,7 @@ describe('book HTTP transport handlers', () => {
 
     expect(list).toHaveBeenCalledWith({
       currentUserId: ctx.scope.userId,
-      cursor: toBookId('book-1'),
+      cursor: unwrapParseResult(toBookId('book-1')),
       limit: 7,
       searchTerm: 'dune',
     });
@@ -57,7 +59,7 @@ describe('book HTTP transport handlers', () => {
     const create = vi.fn(async () =>
       Result.Ok({
         type: 'book_created' as const,
-        book: { id: toBookId('book-1') },
+        book: { id: unwrapParseResult(toBookId('book-1')) },
       })
     );
     const handlers = createBookHandlers({
@@ -68,21 +70,21 @@ describe('book HTTP transport handlers', () => {
       handlers.create(
         ctx,
         zCreateInput().parse({
-          title: 'Dune',
-          author: 'Frank Herbert',
+          title: testBookTitle('Dune'),
+          author: testBookAuthor('Frank Herbert'),
           genreId: 'genre-1',
           publisher: null,
           coverId: 'cover-1',
         })
       )
-    ).resolves.toEqual({ id: toBookId('book-1') });
+    ).resolves.toEqual({ id: unwrapParseResult(toBookId('book-1')) });
 
     expect(create).toHaveBeenCalledWith({
       currentUserId: ctx.scope.userId,
       book: {
-        title: 'Dune',
-        author: 'Frank Herbert',
-        genreId: toGenreId('genre-1'),
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
+        genreId: unwrapParseResult(toGenreId('genre-1')),
         publisher: null,
         coverId: 'cover-1',
       },
@@ -94,8 +96,8 @@ describe('book HTTP transport handlers', () => {
 
     expect(
       zCreateInput().parse({
-        title: 'Dune',
-        author: 'Frank Herbert',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
         genreId: 'genre-1',
         publisher: ` ${publisher} `,
       }).publisher

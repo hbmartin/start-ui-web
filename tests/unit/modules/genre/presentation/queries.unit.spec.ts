@@ -3,11 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { genreQueries } from '@/modules/genre/client';
 import { createGenreQueries } from '@/modules/genre/presentation/queries';
 import { toScopeKey } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 describe('genre query keys', () => {
   it('partitions protected read keys by scope', () => {
-    const scopeA = toScopeKey('scope-a');
-    const scopeB = toScopeKey('scope-b');
+    const scopeA = unwrapParseResult(toScopeKey('scope-a'));
+    const scopeB = unwrapParseResult(toScopeKey('scope-b'));
 
     expect(genreQueries.all()).toEqual(['genre', 'v1']);
     expect(genreQueries.getAll(scopeA)).toEqual([
@@ -29,7 +30,7 @@ describe('genre query keys', () => {
 
     await (
       queries.getAllList({
-        scopeKey: toScopeKey('scope-a'),
+        scopeKey: unwrapParseResult(toScopeKey('scope-a')),
         searchTerm: 'fantasy',
       }).queryFn as () => Promise<unknown>
     )();

@@ -11,6 +11,7 @@ import {
   toEmailRecipientList,
   toLanguageCode,
   toOtpCode,
+  unwrapParseResult,
 } from '@/modules/kernel/testing';
 
 vi.mock('@/platform/lib/i18n', () => ({
@@ -25,7 +26,7 @@ describe('AuthEmailPortEmailGateway', () => {
       Result.Ok({
         type: 'email_send_recorded' as const,
         provider: 'resend' as const,
-        externalId: toEmailProviderMessageId('email_123'),
+        externalId: unwrapParseResult(toEmailProviderMessageId('email_123')),
       })
     );
     const gateway = { sendEmail } satisfies EmailGateway;
@@ -33,20 +34,20 @@ describe('AuthEmailPortEmailGateway', () => {
       await import('@/composition/auth-email-port');
 
     const result = await new AuthEmailPortEmailGateway(gateway).sendSignInOtp({
-      email: toEmailAddress(' User@Example.com '),
-      otp: toOtpCode('123456'),
-      language: toLanguageCode('en'),
+      email: unwrapParseResult(toEmailAddress(' User@Example.com ')),
+      otp: unwrapParseResult(toOtpCode('123456')),
+      language: unwrapParseResult(toLanguageCode('en')),
     });
 
     const expectedDigest = createHash('sha256')
       .update('user@example.com|123456|en')
       .digest('hex');
-    const idempotencyKey = toEmailIdempotencyKey(
-      `auth:sign-in-otp:v1:${expectedDigest}`
+    const idempotencyKey = unwrapParseResult(
+      toEmailIdempotencyKey(`auth:sign-in-otp:v1:${expectedDigest}`)
     );
 
     expect(sendEmail).toHaveBeenCalledWith({
-      to: toEmailRecipientList('User@Example.com'),
+      to: unwrapParseResult(toEmailRecipientList('User@Example.com')),
       subject: 'translated:loginCode.subject',
       template: expect.any(Object),
       idempotencyKey,
@@ -77,9 +78,9 @@ describe('AuthEmailPortEmailGateway', () => {
       await import('@/composition/auth-email-port');
 
     const result = await new AuthEmailPortEmailGateway(gateway).sendSignInOtp({
-      email: toEmailAddress('user@example.com'),
-      otp: toOtpCode('123456'),
-      language: toLanguageCode('en'),
+      email: unwrapParseResult(toEmailAddress('user@example.com')),
+      otp: unwrapParseResult(toOtpCode('123456')),
+      language: unwrapParseResult(toLanguageCode('en')),
     });
 
     expect(result.match({ Ok: () => null, Error: (value) => value })).toBe(

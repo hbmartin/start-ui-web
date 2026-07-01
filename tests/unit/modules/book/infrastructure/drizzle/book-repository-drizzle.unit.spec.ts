@@ -1,8 +1,10 @@
+import { testBookAuthor, testBookTitle } from '@tests/support/branded-values';
 import { describe, expect, it } from 'vitest';
 
 import type { BookRepository } from '@/modules/book';
 import { BookRepositoryDrizzle } from '@/modules/book/testing';
 import { toBookId, toGenreId } from '@/modules/kernel';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 function getUpdateError(result: Awaited<ReturnType<BookRepository['update']>>) {
   if (result.isOk()) {
@@ -18,13 +20,16 @@ describe('BookRepositoryDrizzle', () => {
       $transactionCapable: true,
     } as never);
 
-    const result = await repository.update(toBookId('book-1'), {
-      title: 'Dune',
-      author: 'Frank Herbert',
-      genreId: toGenreId('genre-1'),
-      publisher: null,
-      coverId: null,
-    });
+    const result = await repository.update(
+      unwrapParseResult(toBookId('book-1')),
+      {
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
+        genreId: unwrapParseResult(toGenreId('genre-1')),
+        publisher: null,
+        coverId: null,
+      }
+    );
 
     expect(result.isError()).toBe(true);
     expect(getUpdateError(result)).toMatchObject({

@@ -2,11 +2,14 @@ import { Result } from '@bloodyowl/boxed';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { match, P } from 'ts-pattern';
 
+import { toGenreColor, toGenreName } from '@/modules/genre';
 import {
   AppError,
+  type ApplicationResult,
   type BookCoverObjectKey,
   type BookId,
   ConfigurationError,
+  type ParseResult,
   toBookCoverObjectKey,
   toBookId,
   toGenreId,
@@ -29,7 +32,8 @@ import type {
 import { isRootDatabase } from '@/modules/kernel/infrastructure/db/types';
 
 import type { BookRepository } from '../../application/ports/book-repository';
-import type { Book, BookWriteInput } from '../../domain/book';
+import type { Book, BookGenreSummary, BookWriteInput } from '../../domain/book';
+import { toBookAuthor, toBookTitle, toPublisherName } from '../../domain/book';
 import { normalizeBookDuplicateKeyPart } from '../../domain/book-policy';
 
 type BookRow = typeof bookTable.$inferSelect & {
@@ -42,26 +46,96 @@ type BookRow = typeof bookTable.$inferSelect & {
   } | null;
 };
 
-function toDomain(row: BookRow): Book {
-  return {
-    id: toBookId(row.id),
-    title: row.title,
-    author: row.author,
-    genreId: toGenreId(row.genreId),
-    genre: row.genre
-      ? {
-          id: toGenreId(row.genre.id),
-          name: row.genre.name,
-          color: row.genre.color,
-          createdAt: row.genre.createdAt,
-          updatedAt: row.genre.updatedAt,
-        }
-      : null,
-    publisher: row.publisher,
-    coverId: row.coverId ? toBookCoverObjectKey(row.coverId) : null,
+function invalidBookRowError(cause: unknown): AppError {
+  return new AppError({
+    code: 'BOOK_ROW_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Book row contains invalid data',
+    cause,
+  });
+}
+
+function parseBookRowValue<TValue>(
+  result: ParseResult<TValue>
+): ApplicationResult<TValue> {
+  return result.isError()
+    ? Result.Error(invalidBookRowError(result.getError()))
+    : Result.Ok(result.get());
+}
+
+function toDomain(row: BookRow): ApplicationResult<Book> {
+  const id = parseBookRowValue(toBookId(row.id));
+  if (id.isError()) return Result.Error(id.getError());
+
+  const genreId = parseBookRowValue(toGenreId(row.genreId));
+  if (genreId.isError()) return Result.Error(genreId.getError());
+
+  const title = parseBookRowValue(toBookTitle(row.title));
+  if (title.isError()) return Result.Error(title.getError());
+
+  const author = parseBookRowValue(toBookAuthor(row.author));
+  if (author.isError()) return Result.Error(author.getError());
+
+  let genre: BookGenreSummary | null = null;
+  if (row.genre) {
+    const summaryGenreId = parseBookRowValue(toGenreId(row.genre.id));
+    if (summaryGenreId.isError())
+      return Result.Error(summaryGenreId.getError());
+    const summaryGenreName = parseBookRowValue(toGenreName(row.genre.name));
+    if (summaryGenreName.isError()) {
+      return Result.Error(summaryGenreName.getError());
+    }
+    const summaryGenreColor = parseBookRowValue(toGenreColor(row.genre.color));
+    if (summaryGenreColor.isError()) {
+      return Result.Error(summaryGenreColor.getError());
+    }
+    genre = {
+      id: summaryGenreId.get(),
+      name: summaryGenreName.get(),
+      color: summaryGenreColor.get(),
+      createdAt: row.genre.createdAt,
+      updatedAt: row.genre.updatedAt,
+    };
+  }
+
+  let publisher: Book['publisher'] = null;
+  if (row.publisher) {
+    const parsedPublisher = parseBookRowValue(toPublisherName(row.publisher));
+    if (parsedPublisher.isError()) {
+      return Result.Error(parsedPublisher.getError());
+    }
+    publisher = parsedPublisher.get();
+  }
+
+  let coverId: BookCoverObjectKey | null = null;
+  if (row.coverId) {
+    const parsedCoverId = parseBookRowValue(toBookCoverObjectKey(row.coverId));
+    if (parsedCoverId.isError()) return Result.Error(parsedCoverId.getError());
+    coverId = parsedCoverId.get();
+  }
+
+  return Result.Ok({
+    id: id.get(),
+    title: title.get(),
+    author: author.get(),
+    genreId: genreId.get(),
+    genre,
+    publisher,
+    coverId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  };
+  });
+}
+
+function toDomainList(rows: readonly BookRow[]): ApplicationResult<Book[]> {
+  const books: Book[] = [];
+  for (const row of rows) {
+    const book = toDomain(row);
+    if (book.isError()) return Result.Error(book.getError());
+    books.push(book.get());
+  }
+  return Result.Ok(books);
 }
 
 function isBookDuplicateError(error: unknown) {
@@ -114,12 +188,15 @@ function mapDbError(error: unknown): AppError {
 export class BookRepositoryDrizzle implements BookRepository {
   constructor(private readonly db: DbLike) {}
 
-  private async getByIdWithDb(db: DbLike, id: BookId): Promise<Book | null> {
+  private async getByIdWithDb(
+    db: DbLike,
+    id: BookId
+  ): Promise<ApplicationResult<Book | null>> {
     const row = await db.query.book.findFirst({
       where: eq(bookTable.id, id),
       with: { genre: true },
     });
-    return row ? toDomain(row) : null;
+    return row ? toDomain(row) : Result.Ok(null);
   }
 
   private async runInSingleDbUnit<T>(
@@ -170,13 +247,24 @@ export class BookRepositoryDrizzle implements BookRepository {
     if (!updated) return null;
 
     const book = await this.getByIdWithDb(db, id);
-    if (!book) return null;
+    if (book.isError()) throw book.getError();
+    const parsedBook = book.get();
+    if (!parsedBook) return null;
+
+    let replacedCoverId: BookCoverObjectKey | null = null;
+    if (current.coverId) {
+      const parsedReplacedCoverId = parseBookRowValue(
+        toBookCoverObjectKey(current.coverId)
+      );
+      if (parsedReplacedCoverId.isError()) {
+        throw parsedReplacedCoverId.getError();
+      }
+      replacedCoverId = parsedReplacedCoverId.get();
+    }
 
     return {
-      book,
-      replacedCoverId: current.coverId
-        ? toBookCoverObjectKey(current.coverId)
-        : null,
+      book: parsedBook,
+      replacedCoverId,
     };
   }
 
@@ -236,14 +324,24 @@ export class BookRepositoryDrizzle implements BookRepository {
       const { pageRows, nextCursor } = takeCursorPage(
         rows,
         input.limit,
-        (row) => toBookId(row.id)
+        (row) => row.id
       );
+      let parsedNextCursor: BookId | undefined;
+      if (nextCursor) {
+        const cursor = parseBookRowValue(toBookId(nextCursor));
+        if (cursor.isError()) {
+          return Result.Error(cursor.getError());
+        }
+        parsedNextCursor = cursor.get();
+      }
+      const items = toDomainList(pageRows);
+      if (items.isError()) return Result.Error(items.getError());
 
       return Result.Ok({
         type: 'book_listed' as const,
         page: {
-          items: pageRows.map(toDomain),
-          nextCursor,
+          items: items.get(),
+          nextCursor: parsedNextCursor,
           total: total[0]?.count ?? 0,
         },
       });
@@ -266,14 +364,18 @@ export class BookRepositoryDrizzle implements BookRepository {
         with: { genre: true },
       });
 
-      return Result.Ok(
-        row
-          ? {
-              type: 'book_duplicate_candidate_found' as const,
-              book: toDomain(row),
-            }
-          : { type: 'book_duplicate_candidate_not_found' as const }
-      );
+      if (!row) {
+        return Result.Ok({
+          type: 'book_duplicate_candidate_not_found' as const,
+        });
+      }
+      const book = toDomain(row);
+      if (book.isError()) return Result.Error(book.getError());
+
+      return Result.Ok({
+        type: 'book_duplicate_candidate_found' as const,
+        book: book.get(),
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }
@@ -282,9 +384,11 @@ export class BookRepositoryDrizzle implements BookRepository {
   async getById(id: BookId) {
     try {
       const book = await this.getByIdWithDb(this.db, id);
+      if (book.isError()) return Result.Error(book.getError());
+      const parsedBook = book.get();
       return Result.Ok(
-        book
-          ? { type: 'book_found' as const, book }
+        parsedBook
+          ? { type: 'book_found' as const, book: parsedBook }
           : { type: 'book_not_found' as const }
       );
     } catch (error) {
@@ -316,9 +420,12 @@ export class BookRepositoryDrizzle implements BookRepository {
         );
       }
 
+      const book = toDomain(created);
+      if (book.isError()) return Result.Error(book.getError());
+
       return Result.Ok({
         type: 'book_created' as const,
-        book: toDomain(created),
+        book: book.get(),
       });
     } catch (error) {
       if (isBookDuplicateError(error)) {
@@ -357,16 +464,23 @@ export class BookRepositoryDrizzle implements BookRepository {
         .where(eq(bookTable.id, id))
         .returning({ id: bookTable.id, coverId: bookTable.coverId });
 
-      return Result.Ok(
-        deleted
-          ? {
-              type: 'book_deleted' as const,
-              deletedCoverId: deleted.coverId
-                ? toBookCoverObjectKey(deleted.coverId)
-                : null,
-            }
-          : { type: 'book_not_found' as const }
-      );
+      if (!deleted) return Result.Ok({ type: 'book_not_found' as const });
+
+      let deletedCoverId: BookCoverObjectKey | null = null;
+      if (deleted.coverId) {
+        const parsedDeletedCoverId = parseBookRowValue(
+          toBookCoverObjectKey(deleted.coverId)
+        );
+        if (parsedDeletedCoverId.isError()) {
+          return Result.Error(parsedDeletedCoverId.getError());
+        }
+        deletedCoverId = parsedDeletedCoverId.get();
+      }
+
+      return Result.Ok({
+        type: 'book_deleted' as const,
+        deletedCoverId,
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }

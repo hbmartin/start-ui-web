@@ -8,6 +8,12 @@ import { userQueries } from '@/modules/user/client';
 import { PageUsers } from '@/modules/user/presentation';
 import { observedLoader } from '@/platform/router/route-observability';
 
+const parseRouteScopeKey = (value: string) => {
+  const parsed = toScopeKey(value);
+  if (parsed.isError()) throw parsed.getError();
+  return parsed.get();
+};
+
 export const Route = createFileRoute('/manager/users/')({
   validateSearch: zodValidator(
     z.object({
@@ -24,7 +30,7 @@ export const Route = createFileRoute('/manager/users/')({
 
     return context.queryClient.ensureInfiniteQueryData(
       userQueries.getAllInfinite({
-        scopeKey: toScopeKey(context.scopeKey),
+        scopeKey: parseRouteScopeKey(context.scopeKey),
         searchTerm: deps.searchTerm,
       })
     );

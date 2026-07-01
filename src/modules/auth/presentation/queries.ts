@@ -40,6 +40,10 @@ export const createAuthQueries = <TFacade extends AuthQueryFacade>(
 
 type AuthQueries = ReturnType<typeof createAuthQueries>;
 
+const anonymousScopeKeyResult = toScopeKey('anonymous');
+if (anonymousScopeKeyResult.isError()) throw anonymousScopeKeyResult.getError();
+const anonymousScopeKey = anonymousScopeKeyResult.get();
+
 export const createAuthQueryHooks = (authQueries: AuthQueries) => ({
   useCurrentSessionQuery: (initialData?: CurrentSession | null) =>
     useQuery({
@@ -48,8 +52,7 @@ export const createAuthQueryHooks = (authQueries: AuthQueries) => ({
     }),
 
   useCurrentScopeKey: (): ScopeKey =>
-    useQuery(authQueries.currentSession()).data?.scopeKey ??
-    toScopeKey('anonymous'),
+    useQuery(authQueries.currentSession()).data?.scopeKey ?? anonymousScopeKey,
 });
 
 /**

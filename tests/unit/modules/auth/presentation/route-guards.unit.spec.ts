@@ -11,6 +11,7 @@ import {
   requireOnboardingRoute,
 } from '@/modules/auth/presentation/route-guards';
 import { toEmailAddress, toSessionId, toUserId } from '@/modules/kernel';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const location = {
   href: '/manager/books?searchTerm=du',
@@ -23,14 +24,14 @@ const makeSession = (
 ): CurrentSession => {
   const role = (overrides.role ?? 'admin') as CurrentSession['scope']['role'];
   const scope: CurrentSession['scope'] = {
-    userId: toUserId('user-1'),
+    userId: unwrapParseResult(toUserId('user-1')),
     role,
   };
 
   return {
     user: {
-      id: toUserId('user-1'),
-      email: toEmailAddress('user@example.com'),
+      id: unwrapParseResult(toUserId('user-1')),
+      email: unwrapParseResult(toEmailAddress('user@example.com')),
       name: 'User One',
       image: null,
       role: 'admin',
@@ -38,11 +39,11 @@ const makeSession = (
       ...overrides,
     },
     session: {
-      id: toSessionId('session-1'),
+      id: unwrapParseResult(toSessionId('session-1')),
       expiresAt: new Date('2024-01-02T00:00:00.000Z'),
     },
     scope,
-    scopeKey: scopeKeyFromScope(scope),
+    scopeKey: unwrapParseResult(scopeKeyFromScope(scope)),
   };
 };
 

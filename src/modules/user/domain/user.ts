@@ -1,14 +1,53 @@
+import { Result } from '@bloodyowl/boxed';
+import { z } from 'zod';
+
+import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-error';
 import type {
   EmailAddress,
+  ParseResult,
   SessionId,
   UserId,
 } from '@/modules/kernel/domain/ids';
+
+import { USER_NAME_MAX_LENGTH } from './user-policy';
+
+export const zUserDisplayNameSchema = z
+  .string()
+  .trim()
+  .max(USER_NAME_MAX_LENGTH)
+  .brand<'UserDisplayName'>();
+
+export type UserDisplayName = z.infer<typeof zUserDisplayNameSchema>;
+
+export const zUserDisplayName = () => zUserDisplayNameSchema;
+
+export const toUserDisplayName = (
+  name: string
+): ParseResult<UserDisplayName> => {
+  const result = zUserDisplayNameSchema.safeParse(name);
+  if (!result.success) {
+    return Result.Error(
+      new IdValidationError(
+        'UserDisplayName',
+        name,
+        'UserDisplayName is invalid'
+      )
+    );
+  }
+  return Result.Ok(result.data);
+};
+
+const emptyUserDisplayNameResult = toUserDisplayName('');
+if (emptyUserDisplayNameResult.isError()) {
+  throw emptyUserDisplayNameResult.getError();
+}
+export const emptyUserDisplayName = emptyUserDisplayNameResult.get();
 
 export type UserRole = 'admin' | 'user';
 
 export type User = {
   id: UserId;
-  name: string | null;
+  name: UserDisplayName | null;
   email: EmailAddress;
   emailVerified: boolean;
   role: UserRole;
@@ -40,19 +79,19 @@ export type UserSessionListPage = {
 };
 
 export type UserCreateInput = {
-  name?: string | null;
+  name?: UserDisplayName | null;
   email: EmailAddress;
   role?: UserRole | null;
 };
 
 export type UserUpdateInput = {
-  name?: string | null;
+  name?: UserDisplayName | null;
   email: EmailAddress;
   role?: UserRole | null;
 };
 
 export type UserUpdatePersistenceInput = {
-  name?: string;
+  name?: UserDisplayName;
   email: EmailAddress;
   role?: UserRole;
   emailVerified?: boolean;

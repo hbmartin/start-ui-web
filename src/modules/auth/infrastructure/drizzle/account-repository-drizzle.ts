@@ -6,9 +6,13 @@ import type {
   AccountProfileUpdate,
   AccountRepository,
 } from '@/modules/account';
+import type { ApplicationResult } from '@/modules/kernel/application/result';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import type { UserId } from '@/modules/kernel/domain/ids';
-import { toUserId } from '@/modules/kernel/domain/ids';
+import {
+  type ParseResult,
+  toUserId,
+  type UserId,
+} from '@/modules/kernel/domain/ids';
 import { extractDatabaseErrorDetails } from '@/modules/kernel/infrastructure/db/errors';
 import { observeRepository } from '@/modules/kernel/infrastructure/db/observability';
 import type { DbLike } from '@/modules/kernel/infrastructure/db/types';
@@ -17,6 +21,24 @@ import { user as userTable } from './schema';
 
 const isSqlStateCode = (code: unknown): code is string =>
   typeof code === 'string' && /^[A-Z0-9]{5}$/.test(code);
+
+function invalidAccountRowError(cause: unknown): AppError {
+  return new AppError({
+    code: 'ACCOUNT_ROW_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Account row contains invalid data',
+    cause,
+  });
+}
+
+function parseAccountRowValue<TValue>(
+  result: ParseResult<TValue>
+): ApplicationResult<TValue> {
+  return result.isError()
+    ? Result.Error(invalidAccountRowError(result.getError()))
+    : Result.Ok(result.get());
+}
 
 function mapDbError(error: unknown): AppError {
   if (error instanceof AppError) return error;
@@ -59,14 +81,15 @@ export class AccountRepositoryDrizzle implements AccountRepository {
         .where(eq(userTable.id, userId))
         .returning({ id: userTable.id });
 
-      return Result.Ok(
-        updatedUser
-          ? {
-              type: 'account_updated',
-              account: { id: toUserId(updatedUser.id) },
-            }
-          : { type: 'account_not_found' }
-      );
+      if (!updatedUser) return Result.Ok({ type: 'account_not_found' });
+
+      const id = parseAccountRowValue(toUserId(updatedUser.id));
+      if (id.isError()) return Result.Error(id.getError());
+
+      return Result.Ok({
+        type: 'account_updated',
+        account: { id: id.get() },
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }
@@ -83,14 +106,15 @@ export class AccountRepositoryDrizzle implements AccountRepository {
         .where(eq(userTable.id, userId))
         .returning({ id: userTable.id });
 
-      return Result.Ok(
-        updatedUser
-          ? {
-              type: 'account_updated',
-              account: { id: toUserId(updatedUser.id) },
-            }
-          : { type: 'account_not_found' }
-      );
+      if (!updatedUser) return Result.Ok({ type: 'account_not_found' });
+
+      const id = parseAccountRowValue(toUserId(updatedUser.id));
+      if (id.isError()) return Result.Error(id.getError());
+
+      return Result.Ok({
+        type: 'account_updated',
+        account: { id: id.get() },
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }

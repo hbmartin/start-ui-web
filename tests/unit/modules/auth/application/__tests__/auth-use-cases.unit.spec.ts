@@ -17,11 +17,12 @@ import {
   toUserId,
 } from '@/modules/kernel';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const session: AuthSession = {
   user: {
-    id: toUserId('user-1'),
-    email: toEmailAddress('user@example.com'),
+    id: unwrapParseResult(toUserId('user-1')),
+    email: unwrapParseResult(toEmailAddress('user@example.com')),
     name: 'Test',
     emailVerified: true,
     image: null,
@@ -29,8 +30,8 @@ const session: AuthSession = {
     onboardedAt: new Date('2026-01-01'),
   },
   session: {
-    id: toSessionId('session-1'),
-    userId: toUserId('user-1'),
+    id: unwrapParseResult(toSessionId('session-1')),
+    userId: unwrapParseResult(toUserId('user-1')),
     expiresAt: new Date('2026-12-31'),
   },
 };
@@ -110,14 +111,14 @@ describe('auth use cases', () => {
     const headers = new Headers();
 
     const allowed = await useCases.checkPermission({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       permissions: { book: ['create'] },
       headers,
     });
 
     expect(getOk(allowed)).toEqual({ type: 'auth_permission_granted' });
     expect(deps.authorizationGateway.userHasPermission).toHaveBeenCalledWith({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       permissions: { book: ['create'] },
       headers,
     });
@@ -128,16 +129,16 @@ describe('auth use cases', () => {
     const useCases = createAuthUseCases(deps);
 
     const result = await useCases.sendSignInOtp({
-      email: toEmailAddress('a@b.com'),
-      otp: toOtpCode('123456'),
-      language: toLanguageCode('en'),
+      email: unwrapParseResult(toEmailAddress('a@b.com')),
+      otp: unwrapParseResult(toOtpCode('123456')),
+      language: unwrapParseResult(toLanguageCode('en')),
     });
 
     expect(getOk(result)).toEqual({ type: 'auth_sign_in_otp_sent' });
     expect(deps.authEmailPort.sendSignInOtp).toHaveBeenCalledWith({
-      email: toEmailAddress('a@b.com'),
-      otp: toOtpCode('123456'),
-      language: toLanguageCode('en'),
+      email: unwrapParseResult(toEmailAddress('a@b.com')),
+      otp: unwrapParseResult(toOtpCode('123456')),
+      language: unwrapParseResult(toLanguageCode('en')),
     });
   });
 
@@ -147,16 +148,16 @@ describe('auth use cases', () => {
     const headers = new Headers();
 
     const removed = await useCases.removeUser({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       headers,
     });
     const revokedSessions = await useCases.revokeUserSessions({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       headers,
     });
     const revokedSession = await useCases.revokeUserSession({
-      userId: toUserId('user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers,
     });
 
@@ -168,16 +169,16 @@ describe('auth use cases', () => {
       type: 'auth_user_session_revoked',
     });
     expect(deps.userAdminGateway.removeUser).toHaveBeenCalledWith({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       headers,
     });
     expect(deps.userAdminGateway.revokeUserSessions).toHaveBeenCalledWith({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       headers,
     });
     expect(deps.userAdminGateway.revokeUserSession).toHaveBeenCalledWith({
-      userId: toUserId('user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers,
     });
   });

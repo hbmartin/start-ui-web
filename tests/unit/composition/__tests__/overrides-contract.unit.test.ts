@@ -12,6 +12,7 @@ import {
 } from '@/composition/index';
 import type { KernelOverrides } from '@/composition/kernel';
 import { toCacheKey } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const resetComposition = () => {
   __resetKernelComposition();
@@ -38,7 +39,7 @@ describe('composition override contract', () => {
   it('preserves the shared cache when only logger is overridden', async () => {
     const singleton = getKernel();
     const logger = makeTestKernel().logger;
-    const cacheKey = toCacheKey('books:list');
+    const cacheKey = unwrapParseResult(toCacheKey('books:list'));
     await singleton.cacheGateway.set(cacheKey, ['cached']);
 
     const overridden = getKernel({ logger });
@@ -82,7 +83,7 @@ describe('composition override contract', () => {
     };
     const kernel = getKernel({ clock });
 
-    const cacheKey = toCacheKey('short-lived');
+    const cacheKey = unwrapParseResult(toCacheKey('short-lived'));
     await kernel.cacheGateway.set(cacheKey, 'value', { ttlMs: 100 });
     nowMs = 99;
     expect((await kernel.cacheGateway.get(cacheKey)).toUndefined()).toBe(

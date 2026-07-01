@@ -19,12 +19,14 @@ import type {
   BookListOutcome,
   BookUpdateOutcome,
 } from '../../application/use-cases/types';
-import type { Book, BookListPage } from '../../domain/book';
 import {
-  BOOK_AUTHOR_MAX_LENGTH,
-  BOOK_PUBLISHER_MAX_LENGTH,
-  BOOK_TITLE_MAX_LENGTH,
-} from '../../domain/book-policy';
+  type Book,
+  type BookListPage,
+  type PublisherName,
+  zBookAuthor,
+  zBookTitle,
+  zPublisherName,
+} from '../../domain/book';
 
 export const zGetAllInput = () =>
   z
@@ -43,18 +45,36 @@ const zBookCoverInput = () =>
     .nullish()
     .transform((value) => value || null);
 
-const zBookWriteInput = () =>
+const normalizePublisherName = (
+  publisher: '' | PublisherName | null | undefined
+): PublisherName | null => publisher || null;
+
+const normalizeBookWriteInputPayload = <
+  TInput extends { publisher?: '' | PublisherName | null },
+>(
+  book: TInput
+) => ({
+  ...book,
+  publisher: normalizePublisherName(book.publisher),
+});
+
+const zBookWriteInputBase = () =>
   z.object({
-    title: z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH),
-    author: z.string().trim().min(1).max(BOOK_AUTHOR_MAX_LENGTH),
+    title: zBookTitle(),
+    author: zBookAuthor(),
     genreId: zGenreId(),
-    publisher: z.string().trim().max(BOOK_PUBLISHER_MAX_LENGTH).nullish(),
+    publisher: z.union([z.literal(''), zPublisherName()]).nullish(),
     coverId: zBookCoverInput(),
   });
 
+const zBookWriteInput = () =>
+  zBookWriteInputBase().transform(normalizeBookWriteInputPayload);
+
 export const zCreateInput = () => zBookWriteInput();
 export const zUpdateByIdInput = () =>
-  zBookWriteInput().extend({ id: zBookId() });
+  zBookWriteInputBase()
+    .extend({ id: zBookId() })
+    .transform(normalizeBookWriteInputPayload);
 export const zDeleteByIdInput = () => z.object({ id: zBookId() });
 
 type BookHandlerDeps = {

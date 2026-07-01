@@ -20,6 +20,7 @@ import {
   toEmailRecipientList,
   toEmailStatusId,
 } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const testState = vi.hoisted(() => {
   const makeSecret = (label: string) =>
@@ -53,14 +54,16 @@ type SmtpSession = {
   data: string;
 };
 
-const recipient = toEmailRecipientList('user@example.com');
-const idempotencyKey = toEmailIdempotencyKey('key-1');
-const sentExternalId = toEmailProviderMessageId('smtp_existing');
+const recipient = unwrapParseResult(toEmailRecipientList('user@example.com'));
+const idempotencyKey = unwrapParseResult(toEmailIdempotencyKey('key-1'));
+const sentExternalId = unwrapParseResult(
+  toEmailProviderMessageId('smtp_existing')
+);
 
 const makeEmailStatusRecord = (
   overrides: Partial<EmailStatusRecord> = {}
 ): EmailStatusRecord => ({
-  id: toEmailStatusId('status-1'),
+  id: unwrapParseResult(toEmailStatusId('status-1')),
   provider: 'smtp',
   externalId: null,
   recipient,

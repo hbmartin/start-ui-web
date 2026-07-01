@@ -2,7 +2,7 @@ import { getGlobalStartContext } from '@tanstack/react-start';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authQueries } from '@/modules/auth/client';
-import { toScopeKey } from '@/modules/kernel/testing';
+import { toScopeKey, unwrapParseResult } from '@/modules/kernel/testing';
 
 const getGlobalStartContextMock = vi.mocked(getGlobalStartContext);
 
@@ -46,7 +46,7 @@ describe('router composition', () => {
     const context = router.options.context;
     const session = {
       scope: { role: 'admin', userId: 'user-1' },
-      scopeKey: toScopeKey('user:user-1:role:admin'),
+      scopeKey: unwrapParseResult(toScopeKey('user:user-1:role:admin')),
       session: { id: 'session-1' },
       user: {
         email: 'admin@example.com',

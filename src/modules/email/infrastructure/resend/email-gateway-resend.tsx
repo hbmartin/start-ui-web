@@ -14,6 +14,7 @@ import {
 } from '@/modules/email';
 import {
   AppError,
+  type EmailRecipientList,
   toEmailProviderMessageId,
   toEmailRecipientList,
   type TransactionRunner,
@@ -30,9 +31,9 @@ type EmailGatewayResendDeps = {
 type SendEmailResult = Awaited<ReturnType<EmailGateway['sendEmail']>>;
 
 const recipientToStatusValue = (recipient: SendEmailParams['to']) =>
-  toEmailRecipientList(
-    Array.isArray(recipient) ? recipient.join(', ') : recipient
-  );
+  Array.isArray(recipient)
+    ? toEmailRecipientList(recipient.join(', '))
+    : Result.Ok(recipient);
 
 const idempotencyKeyError = () =>
   new AppError({
@@ -40,6 +41,15 @@ const idempotencyKeyError = () =>
     category: 'system',
     status: 500,
     message: 'Email sends require a non-empty idempotency key',
+  });
+
+const invalidProviderResponseError = (cause: unknown) =>
+  new AppError({
+    code: 'EMAIL_PROVIDER_RESPONSE_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Email provider returned invalid data',
+    cause,
   });
 
 const providerErrorMetadata = (error: unknown): EmailMetadata => {
@@ -111,9 +121,12 @@ export class EmailGatewayResend implements EmailGateway {
     }
 
     const recipient = recipientToStatusValue(input.to);
+    if (recipient.isError()) return Result.Error(recipient.getError());
+    const recipientValue: EmailRecipientList = recipient.get();
+
     const attemptResult = await this.recordSendAttempt({
       provider: EMAIL_PROVIDER_RESEND,
-      recipient,
+      recipient: recipientValue,
       subject: input.subject,
       idempotencyKey: input.idempotencyKey,
       metadata: input.metadata,
@@ -134,7 +147,7 @@ export class EmailGatewayResend implements EmailGateway {
     ): Promise<SendEmailResult | null> => {
       const failedAttemptResult = await this.recordSendAttempt({
         provider: EMAIL_PROVIDER_RESEND,
-        recipient,
+        recipient: recipientValue,
         subject: input.subject,
         idempotencyKey: input.idempotencyKey,
         status: 'send_failed',
@@ -261,10 +274,14 @@ export class EmailGatewayResend implements EmailGateway {
     }
 
     const externalId = toEmailProviderMessageId(data.id);
+    if (externalId.isError()) {
+      return Result.Error(invalidProviderResponseError(externalId.getError()));
+    }
+
     const upsertResult = await this.upsertStatusByExternalId({
       provider: EMAIL_PROVIDER_RESEND,
-      externalId,
-      recipient,
+      externalId: externalId.get(),
+      recipient: recipientValue,
       subject: input.subject,
       status: 'sent',
       idempotencyKey: input.idempotencyKey,
@@ -275,7 +292,7 @@ export class EmailGatewayResend implements EmailGateway {
     return Result.Ok({
       type: 'email_send_recorded',
       provider: EMAIL_PROVIDER_RESEND,
-      externalId,
+      externalId: externalId.get(),
     });
   }
 }

@@ -1,3 +1,4 @@
+import { type Result as BoxedResult, Result } from '@bloodyowl/boxed';
 import { z } from 'zod';
 
 import { IdValidationError } from './errors/id-validation-error';
@@ -60,12 +61,17 @@ export type RequestId = InternalBrand<string, 'RequestId'>;
 export type CorrelationId = InternalBrand<string, 'CorrelationId'>;
 export type CacheKey = InternalBrand<string, 'CacheKey'>;
 
-const ensureNonEmptyId = (value: string, typeName: string) => {
+export type ParseResult<TValue> = BoxedResult<TValue, IdValidationError>;
+
+const ensureNonEmptyId = (
+  value: string,
+  typeName: string
+): ParseResult<string> => {
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new IdValidationError(typeName, value);
+    return Result.Error(new IdValidationError(typeName, value));
   }
-  return trimmed;
+  return Result.Ok(trimmed);
 };
 
 const parseBrandedString = <TSchema extends z.ZodType>(
@@ -73,51 +79,59 @@ const parseBrandedString = <TSchema extends z.ZodType>(
   value: string,
   typeName: string,
   message?: string
-): z.output<TSchema> => {
+): ParseResult<z.output<TSchema>> => {
   const result = schema.safeParse(value);
   if (!result.success) {
-    throw new IdValidationError(typeName, value, message);
+    return Result.Error(new IdValidationError(typeName, value, message));
   }
-  return result.data;
+  return Result.Ok(result.data);
 };
 
-export const toUserId = (value: string): UserId =>
+export const toUserId = (value: string): ParseResult<UserId> =>
   parseBrandedString(zUserIdSchema, value, 'UserId');
-export const toBookId = (value: string): BookId =>
+export const toBookId = (value: string): ParseResult<BookId> =>
   parseBrandedString(zBookIdSchema, value, 'BookId');
-export const toGenreId = (value: string): GenreId =>
+export const toGenreId = (value: string): ParseResult<GenreId> =>
   parseBrandedString(zGenreIdSchema, value, 'GenreId');
-export const toSessionId = (value: string): SessionId =>
+export const toSessionId = (value: string): ParseResult<SessionId> =>
   parseBrandedString(zSessionIdSchema, value, 'SessionId');
-export const toScopeKey = (value: string): ScopeKey =>
+export const toScopeKey = (value: string): ParseResult<ScopeKey> =>
   parseBrandedString(zScopeKeySchema, value, 'ScopeKey');
-export const toAuthorId = (value: string): AuthorId =>
+export const toAuthorId = (value: string): ParseResult<AuthorId> =>
   parseBrandedString(zAuthorIdSchema, value, 'AuthorId');
-export const toPublisherId = (value: string): PublisherId =>
+export const toPublisherId = (value: string): ParseResult<PublisherId> =>
   parseBrandedString(zPublisherIdSchema, value, 'PublisherId');
-export const toBookCoverObjectKey = (value: string): BookCoverObjectKey =>
+export const toBookCoverObjectKey = (
+  value: string
+): ParseResult<BookCoverObjectKey> =>
   parseBrandedString(zBookCoverObjectKeySchema, value, 'BookCoverObjectKey');
-export const toEmailStatusId = (value: string): EmailStatusId =>
+export const toEmailStatusId = (value: string): ParseResult<EmailStatusId> =>
   parseBrandedString(zEmailStatusIdSchema, value, 'EmailStatusId');
 export const toEmailProviderMessageId = (
   value: string
-): EmailProviderMessageId =>
+): ParseResult<EmailProviderMessageId> =>
   parseBrandedString(
     zEmailProviderMessageIdSchema,
     value,
     'EmailProviderMessageId'
   );
-export const toEmailIdempotencyKey = (value: string): EmailIdempotencyKey =>
+export const toEmailIdempotencyKey = (
+  value: string
+): ParseResult<EmailIdempotencyKey> =>
   parseBrandedString(zEmailIdempotencyKeySchema, value, 'EmailIdempotencyKey');
-export const toEmailWebhookEventId = (value: string): EmailWebhookEventId =>
+export const toEmailWebhookEventId = (
+  value: string
+): ParseResult<EmailWebhookEventId> =>
   parseBrandedString(zEmailWebhookEventIdSchema, value, 'EmailWebhookEventId');
-export const toEmailRecipientList = (value: string): EmailRecipientList =>
+export const toEmailRecipientList = (
+  value: string
+): ParseResult<EmailRecipientList> =>
   parseBrandedString(zEmailRecipientListSchema, value, 'EmailRecipientList');
-export const toOtpCode = (value: string): OtpCode =>
+export const toOtpCode = (value: string): ParseResult<OtpCode> =>
   parseBrandedString(zOtpCodeSchema, value, 'OtpCode', 'OtpCode is invalid');
-export const toLanguageCode = (value: string): LanguageCode =>
+export const toLanguageCode = (value: string): ParseResult<LanguageCode> =>
   parseBrandedString(zLanguageCodeSchema, value, 'LanguageCode');
-export const toEmailAddress = (value: string): EmailAddress =>
+export const toEmailAddress = (value: string): ParseResult<EmailAddress> =>
   parseBrandedString(
     zEmailAddressSchema,
     value,
@@ -125,14 +139,30 @@ export const toEmailAddress = (value: string): EmailAddress =>
     'EmailAddress is invalid'
   );
 
-export const toGeneratedId = (value: string): GeneratedId =>
-  ensureNonEmptyId(value, 'GeneratedId') as GeneratedId;
-export const toRequestId = (value: string): RequestId =>
-  ensureNonEmptyId(value, 'RequestId') as RequestId;
-export const toCorrelationId = (value: string): CorrelationId =>
-  ensureNonEmptyId(value, 'CorrelationId') as CorrelationId;
-export const toCacheKey = (value: string): CacheKey =>
-  ensureNonEmptyId(value, 'CacheKey') as CacheKey;
+export const toGeneratedId = (value: string): ParseResult<GeneratedId> => {
+  const result = ensureNonEmptyId(value, 'GeneratedId');
+  return result.isError()
+    ? Result.Error(result.getError())
+    : Result.Ok(result.get() as GeneratedId);
+};
+export const toRequestId = (value: string): ParseResult<RequestId> => {
+  const result = ensureNonEmptyId(value, 'RequestId');
+  return result.isError()
+    ? Result.Error(result.getError())
+    : Result.Ok(result.get() as RequestId);
+};
+export const toCorrelationId = (value: string): ParseResult<CorrelationId> => {
+  const result = ensureNonEmptyId(value, 'CorrelationId');
+  return result.isError()
+    ? Result.Error(result.getError())
+    : Result.Ok(result.get() as CorrelationId);
+};
+export const toCacheKey = (value: string): ParseResult<CacheKey> => {
+  const result = ensureNonEmptyId(value, 'CacheKey');
+  return result.isError()
+    ? Result.Error(result.getError())
+    : Result.Ok(result.get() as CacheKey);
+};
 
 export const zUserId = () => zUserIdSchema;
 export const zBookId = () => zBookIdSchema;

@@ -15,6 +15,7 @@ import {
 } from '@/modules/auth/backend';
 import { toUserId } from '@/modules/kernel';
 import { ServerFnError } from '@/modules/kernel/client';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import { createNoOpTelemetry } from '@/platform/telemetry';
 
 const getGlobalStartContextMock = vi.mocked(getGlobalStartContext);
@@ -236,7 +237,9 @@ describe('server function middleware', () => {
     });
 
     await expect(
-      tools.assertPermission(toUserId('user-1'), { book: ['read'] })
+      tools.assertPermission(unwrapParseResult(toUserId('user-1')), {
+        book: ['read'],
+      })
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });

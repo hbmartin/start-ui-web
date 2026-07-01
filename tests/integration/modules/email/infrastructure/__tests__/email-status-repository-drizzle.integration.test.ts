@@ -14,13 +14,18 @@ import {
   type NewEmailStatus,
 } from '@/modules/kernel/infrastructure/db/schema';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
-const recipient = toEmailRecipientList('user@example.com');
-const otherRecipient = toEmailRecipientList('other@example.com');
-const idempotencyKey = toEmailIdempotencyKey('key-1');
-const providerMessageId = toEmailProviderMessageId('email_123');
-const webhookEventId = toEmailWebhookEventId('evt_1');
-const nextWebhookEventId = toEmailWebhookEventId('evt_2');
+const recipient = unwrapParseResult(toEmailRecipientList('user@example.com'));
+const otherRecipient = unwrapParseResult(
+  toEmailRecipientList('other@example.com')
+);
+const idempotencyKey = unwrapParseResult(toEmailIdempotencyKey('key-1'));
+const providerMessageId = unwrapParseResult(
+  toEmailProviderMessageId('email_123')
+);
+const webhookEventId = unwrapParseResult(toEmailWebhookEventId('evt_1'));
+const nextWebhookEventId = unwrapParseResult(toEmailWebhookEventId('evt_2'));
 
 const makeEmailStatusRow = (
   overrides: Partial<NewEmailStatus> = {}
@@ -293,7 +298,7 @@ describe('EmailStatusRepositoryDrizzle integration', () => {
       getError(
         await repository.getByExternalId(
           'resend',
-          toEmailProviderMessageId('email_1')
+          unwrapParseResult(toEmailProviderMessageId('email_1'))
         )
       )
     ).toMatchObject({
@@ -315,6 +320,29 @@ describe('EmailStatusRepositoryDrizzle integration', () => {
         metadata: {},
       },
     ]);
+  });
+
+  it('maps invalid persisted branded email fields to a system row error', async () => {
+    const repository = createEmailStatusRepository({ db: database.db });
+    await database.db.insert(emailStatusTable).values(
+      makeEmailStatusRow({
+        externalId: 'email_1',
+        recipient: '',
+      })
+    );
+
+    expect(
+      getError(
+        await repository.getByExternalId(
+          'resend',
+          unwrapParseResult(toEmailProviderMessageId('email_1'))
+        )
+      )
+    ).toMatchObject({
+      code: 'EMAIL_STATUS_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
   });
 
   it('dedupes webhook event IDs and keeps bounded metadata through the use case', async () => {

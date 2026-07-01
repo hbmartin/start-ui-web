@@ -4,9 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { hasScopePermission, scopeUserId } from '@/modules/auth/testing';
 import { toUserId } from '@/modules/kernel';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const scope = {
-  userId: toUserId('user-1'),
+  userId: unwrapParseResult(toUserId('user-1')),
   role: 'admin',
 } as const;
 

@@ -1,34 +1,49 @@
+import {
+  testBookAuthor,
+  testBookTitle,
+  testPublisherName,
+} from '@tests/support/branded-values';
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it } from 'vitest';
 
 import { normalizeBookWriteInput } from '@/modules/book/domain/book';
 import { isDuplicateBookCandidate } from '@/modules/book/domain/book-policy';
 import { toBookCoverObjectKey, toGenreId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const text = fc.string({ maxLength: 80 });
 const nonBlankText = text.filter((value) => value.trim().length > 0);
-const optionalText = fc.option(text, { nil: undefined });
-const genreId = nonBlankText.map((value) => toGenreId(value));
-const coverId = fc.option(nonBlankText.map(toBookCoverObjectKey), {
-  nil: null,
+const bookTitle = nonBlankText.map(testBookTitle);
+const bookAuthor = nonBlankText.map(testBookAuthor);
+const optionalPublisher = fc.option(nonBlankText.map(testPublisherName), {
+  nil: undefined,
 });
+const genreId = nonBlankText.map((value) =>
+  unwrapParseResult(toGenreId(value))
+);
+const coverId = fc.option(
+  nonBlankText.map((value) => unwrapParseResult(toBookCoverObjectKey(value))),
+  {
+    nil: null,
+  }
+);
 const duplicateText = fc.stringMatching(/^[a-z]{1,40}$/);
 
 describe('book domain', () => {
   it('normalizes writable book fields', () => {
     expect(
       normalizeBookWriteInput({
-        title: ' Title ',
-        author: ' Author ',
-        genreId: toGenreId('genre-1'),
-        publisher: ' ',
-        coverId: toBookCoverObjectKey(' cover '),
+        title: testBookTitle(' Title '),
+        author: testBookAuthor(' Author '),
+        genreId: unwrapParseResult(toGenreId('genre-1')),
+        publisher: testPublisherName(' Publisher '),
+        coverId: unwrapParseResult(toBookCoverObjectKey(' cover ')),
       })
     ).toEqual({
-      title: 'Title',
-      author: 'Author',
+      title: testBookTitle('Title'),
+      author: testBookAuthor('Author'),
       genreId: 'genre-1',
-      publisher: null,
+      publisher: testPublisherName('Publisher'),
       coverId: 'cover',
     });
   });
@@ -36,8 +51,14 @@ describe('book domain', () => {
   it('detects duplicate title and author candidates case-insensitively', () => {
     expect(
       isDuplicateBookCandidate(
-        { title: 'Dune', author: 'Frank Herbert' },
-        { title: ' dune ', author: 'frank herbert' }
+        {
+          title: testBookTitle('Dune'),
+          author: testBookAuthor('Frank Herbert'),
+        },
+        {
+          title: testBookTitle(' dune '),
+          author: testBookAuthor('frank herbert'),
+        }
       )
     ).toBe(true);
   });
@@ -45,21 +66,21 @@ describe('book domain', () => {
   test.prop(
     [
       fc.record({
-        title: text,
-        author: text,
+        title: bookTitle,
+        author: bookAuthor,
         genreId,
-        publisher: optionalText,
+        publisher: optionalPublisher,
         coverId,
       }),
     ],
     PROPERTY_DEFAULTS
   )('normalizes writable book fields for generated inputs', (input) => {
     expect(normalizeBookWriteInput(input)).toEqual({
-      title: input.title.trim(),
-      author: input.author.trim(),
+      title: input.title,
+      author: input.author,
       genreId: input.genreId,
-      publisher: input.publisher?.trim() || null,
-      coverId: input.coverId?.trim() || null,
+      publisher: input.publisher ?? null,
+      coverId: input.coverId ?? null,
     });
   });
 
@@ -68,10 +89,10 @@ describe('book domain', () => {
     (title, author) => {
       expect(
         isDuplicateBookCandidate(
-          { title, author },
+          { title: testBookTitle(title), author: testBookAuthor(author) },
           {
-            title: ` ${title.toUpperCase()} `,
-            author: ` ${author.toLowerCase()} `,
+            title: testBookTitle(` ${title.toUpperCase()} `),
+            author: testBookAuthor(` ${author.toLowerCase()} `),
           }
         )
       ).toBe(true);

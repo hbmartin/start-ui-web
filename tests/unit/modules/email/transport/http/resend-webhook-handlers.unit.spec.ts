@@ -8,6 +8,7 @@ import {
   toEmailRecipientList,
   toEmailWebhookEventId,
 } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import { createRateLimiter } from '@/platform/http/rate-limiter';
 
 const makeRequest = (body = 'raw-body', headers?: HeadersInit) =>
@@ -288,6 +289,67 @@ describe('Resend webhook HTTP handlers', () => {
     expect(processStatusEvent).not.toHaveBeenCalled();
   });
 
+  it('rejects malformed verified webhook events', async () => {
+    const processStatusEvent = vi.fn();
+    const handlers = createResendWebhookHandlers({
+      getUseCases: () => ({ processStatusEvent }),
+      verifier: {
+        verify: vi.fn(() => ({ data: {} })),
+      },
+    });
+
+    await expect(handlers.receive(makeRequest())).rejects.toMatchObject({
+      code: 'EMAIL_WEBHOOK_INVALID_EVENT',
+      status: 400,
+    });
+    expect(processStatusEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed tracked email events', async () => {
+    const processStatusEvent = vi.fn();
+    const handlers = createResendWebhookHandlers({
+      getUseCases: () => ({ processStatusEvent }),
+      verifier: {
+        verify: vi.fn(() => ({
+          type: 'email.delivered',
+          created_at: '2026-01-01T00:00:00.000Z',
+          data: {
+            email_id: 'email_123',
+            subject: 'Login code',
+          },
+        })),
+      },
+    });
+
+    await expect(handlers.receive(makeRequest())).rejects.toMatchObject({
+      code: 'EMAIL_WEBHOOK_INVALID_TRACKED_EVENT',
+      status: 400,
+    });
+    expect(processStatusEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects tracked email events with invalid branded fields', async () => {
+    const processStatusEvent = vi.fn();
+    const handlers = createResendWebhookHandlers({
+      getUseCases: () => ({ processStatusEvent }),
+      verifier: {
+        verify: vi.fn(() => ({
+          ...makeEmailEvent('email.delivered'),
+          data: {
+            ...makeEmailEvent('email.delivered').data,
+            email_id: '',
+          },
+        })),
+      },
+    });
+
+    await expect(handlers.receive(makeRequest())).rejects.toMatchObject({
+      code: 'EMAIL_WEBHOOK_INVALID_TRACKED_EVENT',
+      status: 400,
+    });
+    expect(processStatusEvent).not.toHaveBeenCalled();
+  });
+
   it('maps email events to status upserts by Resend email ID', async () => {
     const processStatusEvent = vi.fn(async () =>
       Result.Ok({
@@ -309,11 +371,11 @@ describe('Resend webhook HTTP handlers', () => {
     });
     expect(processStatusEvent).toHaveBeenCalledWith({
       provider: 'resend',
-      externalId: toEmailProviderMessageId('email_123'),
-      recipient: toEmailRecipientList('user@example.com'),
+      externalId: unwrapParseResult(toEmailProviderMessageId('email_123')),
+      recipient: unwrapParseResult(toEmailRecipientList('user@example.com')),
       subject: 'Login code',
       status: 'delivered',
-      webhookEventId: toEmailWebhookEventId('evt_1'),
+      webhookEventId: unwrapParseResult(toEmailWebhookEventId('evt_1')),
       providerEventType: 'email.delivered',
       providerEventCreatedAt: '2026-01-01T00:00:00.000Z',
       metadata: {

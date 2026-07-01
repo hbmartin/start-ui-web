@@ -79,6 +79,12 @@ const redirectToSafePath = (input: string | null | undefined) => {
 const safeRedirectFromLocation = (location: RouteLocation) =>
   normalizeInternalRedirect(internalRedirectFromLocation(location)) ?? '/';
 
+const parseRouteScopeKey = (scopeKey: string) => {
+  const parsed = toScopeKey(scopeKey);
+  if (parsed.isError()) throw parsed.getError();
+  return parsed.get();
+};
+
 export async function requireAuthenticatedRoute(input: {
   context: AuthRouteContext;
   location: RouteLocation;
@@ -118,7 +124,7 @@ export async function requireAuthenticatedRoute(input: {
     currentSession,
     session: currentSession,
     scope: currentSession.scope,
-    scopeKey: toScopeKey(currentSession.scopeKey),
+    scopeKey: parseRouteScopeKey(currentSession.scopeKey),
   };
 }
 
@@ -170,7 +176,7 @@ export async function requireOnboardingRoute(input: {
     currentSession,
     session: currentSession,
     scope: currentSession.scope,
-    scopeKey: toScopeKey(currentSession.scopeKey),
+    scopeKey: parseRouteScopeKey(currentSession.scopeKey),
   };
 }
 

@@ -9,12 +9,22 @@ import {
   user as userTable,
 } from '@/modules/kernel/infrastructure/db/schema';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
 ) {
   if (result.isError()) throw result.getError();
   return result.get();
+}
+
+function getError<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isOk()) {
+    throw new Error(`Expected Result.Error, got ${result.get().type}`);
+  }
+  return result.getError();
 }
 
 describe('UserRepositoryDrizzle integration', () => {
@@ -138,7 +148,7 @@ describe('UserRepositoryDrizzle integration', () => {
 
     const firstPage = getOk(
       await repository.listSessions({
-        userId: toUserId('user-1'),
+        userId: unwrapParseResult(toUserId('user-1')),
         limit: 2,
       })
     ).page;
@@ -153,7 +163,7 @@ describe('UserRepositoryDrizzle integration', () => {
 
     const secondPage = getOk(
       await repository.listSessions({
-        userId: toUserId('user-1'),
+        userId: unwrapParseResult(toUserId('user-1')),
         cursor: firstPage.nextCursor,
         limit: 2,
       })
@@ -164,5 +174,23 @@ describe('UserRepositoryDrizzle integration', () => {
     expect(secondPage.items.map((session) => session.id)).not.toContain(
       'session-x'
     );
+  });
+
+  it('maps invalid persisted user rows to a system row error', async () => {
+    const repository = createUserRepository({ db: database.db });
+    await database.db.insert(userTable).values(
+      makeUserRow({
+        id: 'user-1',
+        email: 'not-an-email',
+      })
+    );
+
+    expect(
+      getError(await repository.getById(unwrapParseResult(toUserId('user-1'))))
+    ).toMatchObject({
+      code: 'USER_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
   });
 });

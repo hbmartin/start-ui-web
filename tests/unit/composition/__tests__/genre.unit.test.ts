@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testGenreColor, testGenreName } from '@tests/support/branded-values';
 import { makeTestKernel, now } from '@tests/unit/composition/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,11 +7,12 @@ import { __resetGenreComposition, getGenreUseCases } from '@/composition/genre';
 import type { GenreRepository } from '@/modules/genre';
 import { toGenreId, toUserId } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const genre = {
-  id: toGenreId('genre-1'),
-  name: 'Fiction',
-  color: '#aabbcc',
+  id: unwrapParseResult(toGenreId('genre-1')),
+  name: testGenreName('Fiction'),
+  color: testGenreColor('#aabbcc'),
   createdAt: now,
   updatedAt: now,
 };
@@ -24,7 +26,7 @@ const makeGenreRepository = (
 });
 
 const scope = (userId: string) =>
-  ({ userId: toUserId(userId), role: 'user' }) as const;
+  ({ userId: unwrapParseResult(toUserId(userId)), role: 'user' }) as const;
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>

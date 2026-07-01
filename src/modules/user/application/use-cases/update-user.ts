@@ -5,7 +5,7 @@ import type { UserId } from '@/modules/kernel/domain/ids';
 
 import type { UserResult, UserUpdateOutcome, UserUseCaseDeps } from './types';
 import type { UserUpdateInput } from '../../domain/user';
-import { shouldUnverifyEmail } from '../../domain/user';
+import { emptyUserDisplayName, shouldUnverifyEmail } from '../../domain/user';
 
 export type UpdateUserInput = {
   currentUserId: UserId;
@@ -90,7 +90,9 @@ export async function updateUser(
     emailVerified: shouldUnverifyEmail(current.email, input.user.email)
       ? false
       : undefined,
-    ...(input.user.name === undefined ? {} : { name: input.user.name ?? '' }),
+    ...(input.user.name === undefined
+      ? {}
+      : { name: input.user.name ?? emptyUserDisplayName }),
   };
   const result = await deps.userRepository.update(input.id, {
     ...update,

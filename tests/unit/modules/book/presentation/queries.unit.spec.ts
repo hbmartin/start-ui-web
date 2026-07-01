@@ -6,11 +6,12 @@ import {
   createBookQueries,
 } from '@/modules/book/presentation/queries';
 import { toBookId, toScopeKey } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 describe('book query keys', () => {
   it('partitions protected read keys by scope', () => {
-    const scopeA = toScopeKey('scope-a');
-    const scopeB = toScopeKey('scope-b');
+    const scopeA = unwrapParseResult(toScopeKey('scope-a'));
+    const scopeB = unwrapParseResult(toScopeKey('scope-b'));
 
     expect(bookQueries.all()).toEqual(['book', 'v1']);
     expect(bookQueries.getAll(scopeA)).toEqual([
@@ -24,7 +25,10 @@ describe('book query keys', () => {
     ).not.toEqual(bookQueries.getAllInfinite({ scopeKey: scopeB }).queryKey);
 
     expect(
-      bookQueries.getById({ id: toBookId('book-1'), scopeKey: scopeA }).queryKey
+      bookQueries.getById({
+        id: unwrapParseResult(toBookId('book-1')),
+        scopeKey: scopeA,
+      }).queryKey
     ).toContainEqual({ scopeKey: scopeA });
   });
 
@@ -51,8 +55,8 @@ describe('book query keys', () => {
       bookUpdateById: vi.fn(async () => ({ type: 'updated' })),
     } as unknown as BookQueryFacade;
     const queries = createBookQueries(facade);
-    const scopeKey = toScopeKey('scope-a');
-    const id = toBookId('book-1');
+    const scopeKey = unwrapParseResult(toScopeKey('scope-a'));
+    const id = unwrapParseResult(toBookId('book-1'));
 
     await (
       queries.getAllList({ scopeKey }).queryFn as () => Promise<unknown>

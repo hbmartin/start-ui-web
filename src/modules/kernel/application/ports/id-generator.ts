@@ -1,5 +1,5 @@
-import type { GeneratedId } from '../../domain/ids';
+import type { GeneratedId, ParseResult } from '../../domain/ids';
 
 export interface IdGenerator {
-  createId(): GeneratedId;
+  createId(): ParseResult<GeneratedId>;
 }

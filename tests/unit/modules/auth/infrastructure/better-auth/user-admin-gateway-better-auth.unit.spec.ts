@@ -4,6 +4,7 @@ import type { Auth } from '@/modules/auth/infrastructure/better-auth/auth';
 import { UserAdminGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/user-admin-gateway-better-auth';
 import { toSessionId, toUserId } from '@/modules/kernel/domain/ids';
 import type { Database } from '@/modules/kernel/infrastructure/db/client';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 
 const startSpan = vi.fn((_options: unknown, fn: () => unknown) => fn());
@@ -50,8 +51,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     const headers = new Headers();
 
     const result = await gateway.revokeUserSession({
-      userId: toUserId('user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers,
     });
 
@@ -90,8 +91,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     );
 
     const result = await gateway.revokeUserSession({
-      userId: toUserId('app-user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('app-user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers: new Headers(),
     });
 
@@ -120,8 +121,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     );
 
     const result = await gateway.revokeUserSession({
-      userId: toUserId('user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers: new Headers(),
     });
 
@@ -147,8 +148,8 @@ describe('UserAdminGatewayBetterAuth', () => {
     );
 
     const result = await gateway.revokeUserSession({
-      userId: toUserId('user-1'),
-      sessionId: toSessionId('session-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
+      sessionId: unwrapParseResult(toSessionId('session-1')),
       headers: new Headers(),
     });
 

@@ -2,11 +2,13 @@ import { Option, Result } from '@bloodyowl/boxed';
 import { and, eq } from 'drizzle-orm';
 
 import type { Clock } from '@/modules/kernel/application/ports/clock';
+import type { ApplicationResult } from '@/modules/kernel/application/result';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
   toEmailAddress,
   toSessionId,
   toUserId,
+  type UserId,
 } from '@/modules/kernel/domain/ids';
 import { systemClock } from '@/modules/kernel/infrastructure/clock/system-clock';
 import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
@@ -49,27 +51,62 @@ const toAuthenticatedRole = (role: unknown): AuthenticatedUser['role'] => {
   return parsed.success ? parsed.data : defaultAuthenticatedRole;
 };
 
+const invalidAuthProviderResponse = (cause: unknown) =>
+  new AppError({
+    code: 'AUTH_SESSION_PROVIDER_RESPONSE_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Auth session provider returned invalid data',
+    cause,
+  });
+
 const toAuthenticatedUser = (
   user: AuthenticatedUserSource
-): AuthenticatedUser => ({
-  id: toUserId(user.id),
-  email: toEmailAddress(user.email),
-  name: user.name,
-  image: user.image,
-  emailVerified: user.emailVerified,
-  role: toAuthenticatedRole(user.role),
-  onboardedAt: user.onboardedAt,
-});
+): ApplicationResult<AuthenticatedUser> => {
+  const id = toUserId(user.id);
+  if (id.isError())
+    return Result.Error(invalidAuthProviderResponse(id.getError()));
+
+  const email = toEmailAddress(user.email);
+  if (email.isError()) {
+    return Result.Error(invalidAuthProviderResponse(email.getError()));
+  }
+
+  return Result.Ok({
+    id: id.get(),
+    email: email.get(),
+    name: user.name,
+    image: user.image,
+    emailVerified: user.emailVerified,
+    role: toAuthenticatedRole(user.role),
+    onboardedAt: user.onboardedAt,
+  });
+};
 
 const toAuthenticatedSession = (
   session: BetterAuthSessionRecord,
   userId?: string
-): AuthenticatedSession => ({
-  id: toSessionId(session.id),
-  userId: userId ? toUserId(userId) : undefined,
-  expiresAt: session.expiresAt,
-  createdAt: session.createdAt,
-});
+): ApplicationResult<AuthenticatedSession> => {
+  const id = toSessionId(session.id);
+  if (id.isError())
+    return Result.Error(invalidAuthProviderResponse(id.getError()));
+
+  let parsedUserId: UserId | undefined;
+  if (userId) {
+    const result = toUserId(userId);
+    if (result.isError()) {
+      return Result.Error(invalidAuthProviderResponse(result.getError()));
+    }
+    parsedUserId = result.get();
+  }
+
+  return Result.Ok({
+    id: id.get(),
+    userId: parsedUserId,
+    expiresAt: session.expiresAt,
+    createdAt: session.createdAt,
+  });
+};
 
 export class SessionGatewayBetterAuth implements SessionGateway {
   constructor(
@@ -149,14 +186,27 @@ export class SessionGatewayBetterAuth implements SessionGateway {
           }
           return (await this.resolveAppUser(session.user)).match({
             None: () => Result.Ok({ type: 'auth_session_missing' as const }),
-            Some: (user) =>
-              Result.Ok({
+            Some: (user) => {
+              const parsedUser = toAuthenticatedUser(user);
+              if (parsedUser.isError())
+                return Result.Error(parsedUser.getError());
+
+              const parsedSession = toAuthenticatedSession(
+                session.session,
+                user.id
+              );
+              if (parsedSession.isError()) {
+                return Result.Error(parsedSession.getError());
+              }
+
+              return Result.Ok({
                 type: 'auth_session_found' as const,
                 session: {
-                  user: toAuthenticatedUser(user),
-                  session: toAuthenticatedSession(session.session, user.id),
+                  user: parsedUser.get(),
+                  session: parsedSession.get(),
                 },
-              }),
+              });
+            },
           });
         } catch (error) {
           return Result.Error(

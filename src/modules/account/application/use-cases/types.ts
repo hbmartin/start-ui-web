@@ -17,7 +17,6 @@ export type AccountUseCaseDeps = {
 
 export type AccountUpdateOutcome =
   | AccountUpdateRepositoryOutcome
-  | { type: 'account_forbidden' }
-  | { type: 'account_invalid' };
+  | { type: 'account_forbidden' };
 
 export type AccountResult<TOutcome> = ApplicationResult<TOutcome>;

@@ -18,6 +18,8 @@ import {
 } from '@/modules/email';
 import {
   AppError,
+  type EmailProviderMessageId,
+  type EmailRecipientList,
   type Logger,
   toEmailProviderMessageId,
   toEmailRecipientList,
@@ -62,9 +64,9 @@ const SMTP_DIAGNOSTIC_SENSITIVE_KEYS = new Set([
 ]);
 
 const recipientToStatusValue = (recipient: SendEmailParams['to']) =>
-  toEmailRecipientList(
-    Array.isArray(recipient) ? recipient.join(', ') : recipient
-  );
+  Array.isArray(recipient)
+    ? toEmailRecipientList(recipient.join(', '))
+    : Result.Ok(recipient);
 
 const splitRecipients = (
   recipient: SendEmailParams['to'] | undefined
@@ -429,9 +431,9 @@ export class EmailGatewaySmtp implements EmailGateway {
 
   private upsertStatusByExternalId(
     input: SendEmailParams,
-    externalId: ReturnType<typeof smtpExternalId>
+    externalId: EmailProviderMessageId,
+    recipient: EmailRecipientList
   ) {
-    const recipient = recipientToStatusValue(input.to);
     return this.statusTransactionRunner.run(({ emailStatusRepository }) =>
       emailStatusRepository.upsertStatusByExternalId({
         provider: EMAIL_PROVIDER_SMTP,
@@ -482,6 +484,9 @@ export class EmailGatewaySmtp implements EmailGateway {
     }
 
     const recipient = recipientToStatusValue(input.to);
+    if (recipient.isError()) return Result.Error(recipient.getError());
+    const recipientValue = recipient.get();
+
     logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.record_attempt.start', {
       metadata: input.metadata,
       provider: EMAIL_PROVIDER_SMTP,
@@ -490,7 +495,7 @@ export class EmailGatewaySmtp implements EmailGateway {
     });
     const attemptResult = await this.recordSendAttempt({
       provider: EMAIL_PROVIDER_SMTP,
-      recipient,
+      recipient: recipientValue,
       subject: input.subject,
       idempotencyKey: input.idempotencyKey,
       metadata: input.metadata,
@@ -526,7 +531,7 @@ export class EmailGatewaySmtp implements EmailGateway {
     ): Promise<SendEmailResult | null> => {
       const failedAttemptResult = await this.recordSendAttempt({
         provider: EMAIL_PROVIDER_SMTP,
-        recipient,
+        recipient: recipientValue,
         subject: input.subject,
         idempotencyKey: input.idempotencyKey,
         status: 'send_failed',
@@ -612,6 +617,9 @@ export class EmailGatewaySmtp implements EmailGateway {
     const html = htmlResult.get();
     const text = textResult.get();
     const externalId = smtpExternalId(input.idempotencyKey);
+    if (externalId.isError()) return Result.Error(externalId.getError());
+    const externalIdValue = externalId.get();
+
     const serverResult = await Result.fromPromise(
       Promise.resolve().then(() => {
         const smtpServer = parseSmtpServer(emailServer);
@@ -619,7 +627,7 @@ export class EmailGatewaySmtp implements EmailGateway {
           this.logger,
           'email.smtp.send.smtp_delivery.start',
           {
-            externalId,
+            externalId: externalIdValue,
             provider: EMAIL_PROVIDER_SMTP,
             recipientCount: splitRecipients(input.to).length,
             serverHost: smtpServer.host,
@@ -638,7 +646,7 @@ export class EmailGatewaySmtp implements EmailGateway {
             subject: input.subject,
             html,
             text,
-            messageId: `${externalId}@start-ui.local`,
+            messageId: `${externalIdValue}@start-ui.local`,
             headers: input.headers,
           })
         );
@@ -647,7 +655,7 @@ export class EmailGatewaySmtp implements EmailGateway {
     if (serverResult.isError()) {
       logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.smtp_delivery.error', {
         ...smtpErrorDiagnostics(serverResult.getError()),
-        externalId,
+        externalId: externalIdValue,
         provider: EMAIL_PROVIDER_SMTP,
       });
       const failedAttempt = await recordFailedAttempt(
@@ -667,27 +675,31 @@ export class EmailGatewaySmtp implements EmailGateway {
     }
 
     logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.smtp_delivery.ok', {
-      externalId,
+      externalId: externalIdValue,
       provider: EMAIL_PROVIDER_SMTP,
     });
-    const upsertResult = await this.upsertStatusByExternalId(input, externalId);
+    const upsertResult = await this.upsertStatusByExternalId(
+      input,
+      externalIdValue,
+      recipientValue
+    );
     if (upsertResult.isError()) {
       logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.status_upsert.error', {
         ...smtpErrorDiagnostics(upsertResult.getError()),
-        externalId,
+        externalId: externalIdValue,
         provider: EMAIL_PROVIDER_SMTP,
       });
       return Result.Error(upsertResult.getError());
     }
 
     logE2eSmtpDiagnostic(this.logger, 'email.smtp.send.status_upsert.ok', {
-      externalId,
+      externalId: externalIdValue,
       provider: EMAIL_PROVIDER_SMTP,
     });
     return Result.Ok({
       type: 'email_send_recorded',
       provider: EMAIL_PROVIDER_SMTP,
-      externalId,
+      externalId: externalIdValue,
     });
   }
 }

@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testUserDisplayName } from '@tests/support/branded-values';
 import { makeTestKernel, now } from '@tests/unit/composition/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,12 +10,13 @@ import {
   toUserId,
 } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import type { UserAuthGateway, UserRepository } from '@/modules/user';
 
 const user = {
-  id: toUserId('user-1'),
-  name: 'User One',
-  email: toEmailAddress('user@example.com'),
+  id: unwrapParseResult(toUserId('user-1')),
+  name: testUserDisplayName('User One'),
+  email: unwrapParseResult(toEmailAddress('user@example.com')),
   emailVerified: true,
   role: 'user' as const,
   image: null,
@@ -24,7 +26,7 @@ const user = {
 };
 
 const session = {
-  id: toSessionId('session-1'),
+  id: unwrapParseResult(toSessionId('session-1')),
   createdAt: now,
   updatedAt: now,
   expiresAt: now,
@@ -73,7 +75,7 @@ const makeUserAuthGateway = (
 });
 
 const scope = (userId: string) =>
-  ({ userId: toUserId(userId), role: 'user' }) as const;
+  ({ userId: unwrapParseResult(toUserId(userId)), role: 'user' }) as const;
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>

@@ -27,10 +27,9 @@ import type {
   UserListPage,
   UserSessionListPage,
 } from '../../domain/user';
-import { USER_NAME_MAX_LENGTH } from '../../domain/user-policy';
+import { zUserDisplayName } from '../../domain/user';
 
 const zRole = () => z.enum(['admin', 'user']);
-const zUserName = () => z.string().trim().max(USER_NAME_MAX_LENGTH);
 
 export const zGetAllInput = () =>
   z
@@ -46,14 +45,14 @@ export const zGetByIdInput = () => z.object({ id: zUserId() });
 export const zUpdateByIdInput = () =>
   z.object({
     id: zUserId(),
-    name: zUserName().nullish(),
+    name: zUserDisplayName().nullish(),
     email: zEmailAddress(),
     role: zRole().nullish(),
   });
 
 export const zCreateInput = () =>
   z.object({
-    name: zUserName().nullish(),
+    name: zUserDisplayName().nullish(),
     email: zEmailAddress(),
     role: zRole().nullish(),
   });

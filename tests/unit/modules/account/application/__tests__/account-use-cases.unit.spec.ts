@@ -1,12 +1,13 @@
 import { Result } from '@bloodyowl/boxed';
+import { testAccountName } from '@tests/support/branded-values';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AccountRepository } from '@/modules/account/application/ports/account-repository';
-import { ACCOUNT_NAME_MAX_LENGTH } from '@/modules/account/domain/account-policy';
 import { createAccountUseCases } from '@/modules/account/factory';
 import type { PermissionChecker } from '@/modules/kernel/application/ports/permission-checker';
 import { toUserId } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const logger = {
   debug: () => {},
@@ -35,7 +36,7 @@ const forbidden: PermissionChecker = {
 };
 
 const scope = (userId: string) =>
-  ({ userId: toUserId(userId), role: 'user' }) as const;
+  ({ userId: unwrapParseResult(toUserId(userId)), role: 'user' }) as const;
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
@@ -55,11 +56,11 @@ describe('account use cases', () => {
 
     const submitted = await useCases.submitOnboarding({
       currentUserId: scope('user-1').userId,
-      name: ' User ',
+      name: testAccountName(' User '),
     });
     const updated = await useCases.updateInfo({
       currentUserId: scope('user-1').userId,
-      name: 'User',
+      name: testAccountName('User'),
     });
 
     expect(getOk(submitted)).toEqual({
@@ -85,78 +86,15 @@ describe('account use cases', () => {
 
     const submitted = await useCases.submitOnboarding({
       currentUserId: scope('missing').userId,
-      name: 'User',
+      name: testAccountName('User'),
     });
     const updated = await useCases.updateInfo({
       currentUserId: scope('missing').userId,
-      name: 'User',
+      name: testAccountName('User'),
     });
 
     expect(getOk(submitted)).toEqual({ type: 'account_not_found' });
     expect(getOk(updated)).toEqual({ type: 'account_not_found' });
-  });
-
-  it('rejects blank account names before repository writes', async () => {
-    const repositoryWithSpies: AccountRepository = {
-      submitOnboarding: async (id) =>
-        Result.Ok({ type: 'account_updated', account: { id } }),
-      updateInfo: async (id) =>
-        Result.Ok({ type: 'account_updated', account: { id } }),
-    };
-    const submitSpy = vi.spyOn(repositoryWithSpies, 'submitOnboarding');
-    const updateSpy = vi.spyOn(repositoryWithSpies, 'updateInfo');
-    const useCases = createAccountUseCases({
-      accountRepository: repositoryWithSpies,
-      clock,
-      logger,
-      permissionChecker: allowed,
-    });
-
-    const submitted = await useCases.submitOnboarding({
-      currentUserId: scope('user-1').userId,
-      name: '   ',
-    });
-    const updated = await useCases.updateInfo({
-      currentUserId: scope('user-1').userId,
-      name: '   ',
-    });
-
-    expect(getOk(submitted)).toEqual({ type: 'account_invalid' });
-    expect(getOk(updated)).toEqual({ type: 'account_invalid' });
-    expect(submitSpy).not.toHaveBeenCalled();
-    expect(updateSpy).not.toHaveBeenCalled();
-  });
-
-  it('rejects over-length account names before repository writes', async () => {
-    const repositoryWithSpies: AccountRepository = {
-      submitOnboarding: async (id) =>
-        Result.Ok({ type: 'account_updated', account: { id } }),
-      updateInfo: async (id) =>
-        Result.Ok({ type: 'account_updated', account: { id } }),
-    };
-    const submitSpy = vi.spyOn(repositoryWithSpies, 'submitOnboarding');
-    const updateSpy = vi.spyOn(repositoryWithSpies, 'updateInfo');
-    const useCases = createAccountUseCases({
-      accountRepository: repositoryWithSpies,
-      clock,
-      logger,
-      permissionChecker: allowed,
-    });
-    const tooLong = 'a'.repeat(ACCOUNT_NAME_MAX_LENGTH + 1);
-
-    const submitted = await useCases.submitOnboarding({
-      currentUserId: scope('user-1').userId,
-      name: tooLong,
-    });
-    const updated = await useCases.updateInfo({
-      currentUserId: scope('user-1').userId,
-      name: tooLong,
-    });
-
-    expect(getOk(submitted)).toEqual({ type: 'account_invalid' });
-    expect(getOk(updated)).toEqual({ type: 'account_invalid' });
-    expect(submitSpy).not.toHaveBeenCalled();
-    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   it('rejects account writes without account update permission', async () => {
@@ -177,11 +115,11 @@ describe('account use cases', () => {
 
     const submitted = await useCases.submitOnboarding({
       currentUserId: scope('user-1').userId,
-      name: 'User',
+      name: testAccountName('User'),
     });
     const updated = await useCases.updateInfo({
       currentUserId: scope('user-1').userId,
-      name: 'User',
+      name: testAccountName('User'),
     });
 
     expect(getOk(submitted)).toEqual({ type: 'account_forbidden' });

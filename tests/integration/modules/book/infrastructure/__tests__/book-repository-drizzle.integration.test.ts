@@ -1,5 +1,10 @@
 import { makeBookRow, makeGenreRow } from '@tests/server/db-fixtures';
 import { createPgliteTestDatabase } from '@tests/server/pglite';
+import {
+  testBookAuthor,
+  testBookTitle,
+  testPublisherName,
+} from '@tests/support/branded-values';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -10,12 +15,22 @@ import {
   genre as genreTable,
 } from '@/modules/kernel/infrastructure/db/schema';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
 ) {
   if (result.isError()) throw result.getError();
   return result.get();
+}
+
+function getError<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isOk()) {
+    throw new Error(`Expected Result.Error, got ${result.get().type}`);
+  }
+  return result.getError();
 }
 
 describe('BookRepositoryDrizzle integration', () => {
@@ -44,28 +59,28 @@ describe('BookRepositoryDrizzle integration', () => {
     await database.db.insert(bookTable).values([
       makeBookRow({
         id: 'book-a',
-        title: 'Alpha_ Old',
-        author: 'Author A Old',
+        title: testBookTitle('Alpha_ Old'),
+        author: testBookAuthor('Author A Old'),
         genreId: 'genre-1',
-        publisher: 'Old Publisher',
+        publisher: testPublisherName('Old Publisher'),
         coverId: 'old-cover-id',
       }),
       makeBookRow({
         id: 'book-b',
-        title: 'AlphaX',
-        author: 'Author B',
+        title: testBookTitle('AlphaX'),
+        author: testBookAuthor('Author B'),
         genreId: 'genre-1',
       }),
       makeBookRow({
         id: 'book-c',
-        title: 'Beta',
-        author: 'Author C',
+        title: testBookTitle('Beta'),
+        author: testBookAuthor('Author C'),
         genreId: 'genre-1',
       }),
       makeBookRow({
         id: 'book-d',
-        title: 'Gamma',
-        author: 'Author D',
+        title: testBookTitle('Gamma'),
+        author: testBookAuthor('Author D'),
         genreId: 'genre-1',
       }),
     ]);
@@ -100,10 +115,10 @@ describe('BookRepositoryDrizzle integration', () => {
     expect(escapedSearch.items.map((book) => book.id)).toEqual(['book-a']);
 
     const updated = getOk(
-      await repository.update(toBookId('book-a'), {
-        title: 'Alpha_ New',
-        author: 'Author A New',
-        genreId: toGenreId('genre-2'),
+      await repository.update(unwrapParseResult(toBookId('book-a')), {
+        title: testBookTitle('Alpha_ New'),
+        author: testBookAuthor('Author A New'),
+        genreId: unwrapParseResult(toGenreId('genre-2')),
         publisher: null,
         coverId: null,
       })
@@ -119,8 +134,8 @@ describe('BookRepositoryDrizzle integration', () => {
       with: { genre: true },
     });
     expect(persisted).toMatchObject({
-      title: 'Alpha_ New',
-      author: 'Author A New',
+      title: testBookTitle('Alpha_ New'),
+      author: testBookAuthor('Author A New'),
       publisher: null,
       coverId: null,
       genre: { id: 'genre-2', name: 'Two' },
@@ -135,16 +150,16 @@ describe('BookRepositoryDrizzle integration', () => {
     await database.db.insert(bookTable).values(
       makeBookRow({
         id: 'book-a',
-        title: 'Dune',
-        author: 'Frank Herbert',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
         genreId: 'genre-1',
       })
     );
 
     const duplicate = getOk(
       await repository.findDuplicateCandidate({
-        title: '  dune ',
-        author: 'FRANK HERBERT',
+        title: testBookTitle('  dune '),
+        author: testBookAuthor('FRANK HERBERT'),
       })
     );
     expect(duplicate).toMatchObject({
@@ -154,10 +169,37 @@ describe('BookRepositoryDrizzle integration', () => {
 
     const missing = getOk(
       await repository.findDuplicateCandidate({
-        title: 'Dune',
-        author: 'Someone Else',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Someone Else'),
       })
     );
     expect(missing).toEqual({ type: 'book_duplicate_candidate_not_found' });
+  });
+
+  it('maps invalid persisted book rows to a system row error', async () => {
+    const repository = createBookRepository({ db: database.db });
+    await database.db.insert(genreTable).values(
+      makeGenreRow({
+        id: 'genre-1',
+        name: 'One',
+        color: 'not-a-color',
+      })
+    );
+    await database.db.insert(bookTable).values(
+      makeBookRow({
+        id: 'book-1',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
+        genreId: 'genre-1',
+      })
+    );
+
+    expect(
+      getError(await repository.getById(unwrapParseResult(toBookId('book-1'))))
+    ).toMatchObject({
+      code: 'BOOK_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
   });
 });

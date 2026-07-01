@@ -2,6 +2,7 @@ import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it } from 'vitest';
 
 import { toEmailAddress, toUserId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import { shouldUnverifyEmail } from '@/modules/user/domain/user';
 import {
   assignsPrivilegedRole,
@@ -49,33 +50,45 @@ const localEmailCharacter = fc.constantFrom(
 );
 const safeEmail = fc
   .array(localEmailCharacter, { minLength: 1, maxLength: 24 })
-  .map((localPart) => toEmailAddress(`${localPart.join('')}@example.com`));
+  .map((localPart) =>
+    unwrapParseResult(toEmailAddress(`${localPart.join('')}@example.com`))
+  );
 const nonBlankUserId = fc
   .string({ maxLength: 40 })
   .filter((value) => value.trim().length > 0)
-  .map(toUserId);
+  .map((value) => unwrapParseResult(toUserId(value)));
 const role = fc.constantFrom('admin' as const, 'user' as const);
 
 describe('user domain', () => {
   it('unverifies users only when their email changes', () => {
     expect(
       shouldUnverifyEmail(
-        toEmailAddress('old@example.com'),
-        toEmailAddress('new@example.com')
+        unwrapParseResult(toEmailAddress('old@example.com')),
+        unwrapParseResult(toEmailAddress('new@example.com'))
       )
     ).toBe(true);
 
     expect(
       shouldUnverifyEmail(
-        toEmailAddress('same@example.com'),
-        toEmailAddress('same@example.com')
+        unwrapParseResult(toEmailAddress('same@example.com')),
+        unwrapParseResult(toEmailAddress('same@example.com'))
       )
     ).toBe(false);
   });
 
   it('detects self-target operations', () => {
-    expect(isSelfTarget(toUserId('user-1'), toUserId('user-1'))).toBe(true);
-    expect(isSelfTarget(toUserId('user-1'), toUserId('user-2'))).toBe(false);
+    expect(
+      isSelfTarget(
+        unwrapParseResult(toUserId('user-1')),
+        unwrapParseResult(toUserId('user-1'))
+      )
+    ).toBe(true);
+    expect(
+      isSelfTarget(
+        unwrapParseResult(toUserId('user-1')),
+        unwrapParseResult(toUserId('user-2'))
+      )
+    ).toBe(false);
   });
 
   it('flags only explicitly-requested privileged roles', () => {
@@ -88,8 +101,8 @@ describe('user domain', () => {
   it('allows role changes only for other users with a different requested role', () => {
     expect(
       canChangeRole({
-        currentUserId: toUserId('admin-1'),
-        userId: toUserId('user-1'),
+        currentUserId: unwrapParseResult(toUserId('admin-1')),
+        userId: unwrapParseResult(toUserId('user-1')),
         nextRole: 'admin',
         currentRole: 'user',
       })
@@ -97,24 +110,24 @@ describe('user domain', () => {
 
     expect(
       canChangeRole({
-        currentUserId: toUserId('user-1'),
-        userId: toUserId('user-1'),
+        currentUserId: unwrapParseResult(toUserId('user-1')),
+        userId: unwrapParseResult(toUserId('user-1')),
         nextRole: 'admin',
         currentRole: 'user',
       })
     ).toBe(false);
     expect(
       canChangeRole({
-        currentUserId: toUserId('admin-1'),
-        userId: toUserId('user-1'),
+        currentUserId: unwrapParseResult(toUserId('admin-1')),
+        userId: unwrapParseResult(toUserId('user-1')),
         nextRole: undefined,
         currentRole: 'user',
       })
     ).toBe(false);
     expect(
       canChangeRole({
-        currentUserId: toUserId('admin-1'),
-        userId: toUserId('user-1'),
+        currentUserId: unwrapParseResult(toUserId('admin-1')),
+        userId: unwrapParseResult(toUserId('user-1')),
         nextRole: 'user',
         currentRole: 'user',
       })

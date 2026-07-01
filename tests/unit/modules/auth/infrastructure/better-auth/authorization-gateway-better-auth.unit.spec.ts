@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Auth } from '@/modules/auth/infrastructure/better-auth/auth';
 import { AuthorizationGatewayBetterAuth } from '@/modules/auth/infrastructure/better-auth/authorization-gateway-better-auth';
 import { toUserId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 
 const startSpan = vi.fn((_options: unknown, fn: () => unknown) => fn());
@@ -19,7 +20,7 @@ const makeAuth = (userHasPermission: ReturnType<typeof vi.fn>): Auth =>
   }) as unknown as Auth;
 
 const makeInput = () => ({
-  userId: toUserId('user-1'),
+  userId: unwrapParseResult(toUserId('user-1')),
   permissions: { book: ['read'] },
   headers: new Headers(),
 });

@@ -7,12 +7,11 @@ import type {
   AccountUpdateOutcome,
   AccountUseCaseDeps,
 } from './types';
-import { normalizeAccountName } from '../../domain/account';
-import { isAccountNameValid } from '../../domain/account-policy';
+import { type AccountName, normalizeAccountName } from '../../domain/account';
 
 export type SubmitOnboardingInput = {
   currentUserId: UserId;
-  name: string;
+  name: AccountName;
 };
 
 export async function submitOnboarding(
@@ -26,10 +25,6 @@ export async function submitOnboarding(
   if (allowed.isError()) return Result.Error(allowed.getError());
   if (allowed.get().type === 'permission_denied') {
     return Result.Ok({ type: 'account_forbidden' });
-  }
-
-  if (!isAccountNameValid(input.name)) {
-    return Result.Ok({ type: 'account_invalid' });
   }
 
   deps.logger.info({

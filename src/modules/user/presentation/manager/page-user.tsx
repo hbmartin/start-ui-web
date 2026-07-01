@@ -59,11 +59,7 @@ import {
   WithPermissions,
 } from '@/modules/auth/client';
 import { isServerFnError } from '@/modules/kernel/client';
-import {
-  type SessionId,
-  toUserId,
-  type UserId,
-} from '@/modules/kernel/domain/ids';
+import { type SessionId, type UserId } from '@/modules/kernel/domain/ids';
 import { userQueries } from '@/modules/user/client';
 
 import { useReauthPrompt } from './use-reauth-prompt';
@@ -71,14 +67,14 @@ import { useReauthPrompt } from './use-reauth-prompt';
 const isNotFoundError = (error: unknown) =>
   isServerFnError(error) && error.code === 'NOT_FOUND';
 
-export const PageUser = (props: { params: { id: string } }) => {
+export const PageUser = (props: { userId: UserId }) => {
   const queryClient = useQueryClient();
   const { navigateBack } = useNavigateBack();
   const session = useAuthSession();
   const { t } = useTranslation(['user']);
   const scopeKey = useCurrentScopeKey();
   const promptReauth = useReauthPrompt();
-  const userId = toUserId(props.params.id);
+  const userId = props.userId;
   const userQuery = useQuery(userQueries.getById({ id: userId, scopeKey }));
 
   const deleteUserMutation = useMutation(userQueries.deleteById());
@@ -195,7 +191,7 @@ export const PageUser = (props: { params: { id: string } }) => {
                     <WithPermissions permissions={[{ user: ['update'] }]}>
                       <Link
                         to="/manager/users/$id/update"
-                        params={props.params}
+                        params={{ id: userId }}
                         className="-m-2 self-start"
                       >
                         <Button
