@@ -1,5 +1,8 @@
-import type { ApplicationResult } from '@/modules/kernel/application/result';
-import type { BookId } from '@/modules/kernel/domain/ids';
+import type {
+  ApplicationResult,
+  BookCoverObjectKey,
+  BookId,
+} from '@/modules/kernel';
 
 import type { Book, BookListPage, BookWriteInput } from '../../domain/book';
 
@@ -21,12 +24,16 @@ export type BookCreateRepositoryOutcome =
   | { type: 'book_duplicate' };
 
 export type BookUpdateRepositoryOutcome =
-  | { type: 'book_updated'; book: Book }
+  | {
+      type: 'book_updated';
+      book: Book;
+      replacedCoverId: BookCoverObjectKey | null;
+    }
   | { type: 'book_not_found' }
   | { type: 'book_duplicate' };
 
 export type BookDeleteRepositoryOutcome =
-  | { type: 'book_deleted' }
+  | { type: 'book_deleted'; deletedCoverId: BookCoverObjectKey | null }
   | { type: 'book_not_found' };
 
 export interface BookRepository {

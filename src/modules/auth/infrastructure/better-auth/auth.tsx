@@ -6,6 +6,7 @@ import { tanstackStartCookies } from 'better-auth/tanstack-start';
 import { match } from 'ts-pattern';
 
 import { AUTH_EMAIL_OTP_EXPIRATION_IN_MINUTES } from '@/modules/auth';
+import { isProdRuntimeEnvironment } from '@/modules/kernel/backend';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
   toEmailAddress,
@@ -13,7 +14,6 @@ import {
   toOtpCode,
 } from '@/modules/kernel/domain/ids';
 import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
-import { isProdRuntimeEnvironment } from '@/modules/kernel/infrastructure/config/env-schema';
 import {
   type Database,
   getDefaultDbClient,

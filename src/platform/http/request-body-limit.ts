@@ -12,12 +12,7 @@
  */
 export const MAX_SERVER_FN_BODY_BYTES = 1_048_576; // 1 MiB
 
-/**
- * True when the request's declared `Content-Length` exceeds `maxBytes`. A
- * missing or unparseable `Content-Length` returns `false`: the header is
- * advisory and a streamed body without it is out of scope for this cheap
- * pre-read check (mirroring the webhook handler's pre-read guard).
- */
+/** True when the request's declared `Content-Length` exceeds `maxBytes`. */
 export const exceedsDeclaredBodyLimit = (
   request: Request,
   maxBytes: number = MAX_SERVER_FN_BODY_BYTES
@@ -26,4 +21,24 @@ export const exceedsDeclaredBodyLimit = (
   if (header === null) return false;
   const length = Number(header);
   return Number.isFinite(length) && length > maxBytes;
+};
+
+const BODY_BEARING_METHODS = new Set(['DELETE', 'PATCH', 'POST', 'PUT']);
+
+/**
+ * Server request middleware cannot consume and replace the request body before
+ * TanStack parses server-function input, so body-bearing server-function calls
+ * fail closed unless they carry a valid, bounded `Content-Length`.
+ */
+export const violatesServerFnBodyLimit = (
+  request: Request,
+  maxBytes: number = MAX_SERVER_FN_BODY_BYTES
+): boolean => {
+  if (!BODY_BEARING_METHODS.has(request.method.toUpperCase())) return false;
+
+  const header = request.headers.get('Content-Length');
+  if (header === null) return true;
+
+  const length = Number(header);
+  return !Number.isFinite(length) || length < 0 || length > maxBytes;
 };

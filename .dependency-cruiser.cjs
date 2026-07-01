@@ -240,6 +240,14 @@ module.exports = {
       },
     },
     {
+      name: 'composition-uses-kernel-storage-public-gate',
+      severity: 'error',
+      comment:
+        'Composition must use kernel/backend for storage adapters instead of deep-importing kernel infrastructure storage internals.',
+      from: { path: '^src/composition' },
+      to: { path: '^src/modules/kernel/infrastructure/storage' },
+    },
+    {
       name: 'only-composition-imports-feature-infrastructure',
       severity: 'error',
       comment:

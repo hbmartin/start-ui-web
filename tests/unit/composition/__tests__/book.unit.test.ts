@@ -28,8 +28,9 @@ const makeBookRepository = (
     Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
   getById: async () => Result.Ok({ type: 'book_found', book }),
   create: async () => Result.Ok({ type: 'book_created', book }),
-  update: async () => Result.Ok({ type: 'book_updated', book }),
-  delete: async () => Result.Ok({ type: 'book_deleted' }),
+  update: async () =>
+    Result.Ok({ type: 'book_updated', book, replacedCoverId: null }),
+  delete: async () => Result.Ok({ type: 'book_deleted', deletedCoverId: null }),
   ...overrides,
 });
 

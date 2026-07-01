@@ -8,6 +8,10 @@ export type SecondaryStoreSetOutcome = { type: 'secondary_store_set' };
 
 export type SecondaryStoreDeleteOutcome = { type: 'secondary_store_deleted' };
 
+export type SecondaryStoreTakeOutcome =
+  | { type: 'secondary_store_taken'; value: string }
+  | { type: 'secondary_store_miss' };
+
 /**
  * Durable key/value port used for Better Auth's secondary storage and
  * rate-limit counters. Implementations decide the backend (in-process map,
@@ -23,5 +27,9 @@ export interface SecondaryStore {
     value: string,
     ttlSeconds?: number
   ): Promise<ApplicationResult<SecondaryStoreSetOutcome>>;
+  take(
+    key: string,
+    expectedValue: string
+  ): Promise<ApplicationResult<SecondaryStoreTakeOutcome>>;
   delete(key: string): Promise<ApplicationResult<SecondaryStoreDeleteOutcome>>;
 }

@@ -695,9 +695,12 @@ describe('user use cases', () => {
       expect(repo.update).not.toHaveBeenCalled();
     });
 
-    it('does not require set-role when the requested role is unchanged', async () => {
-      const { useCases, repo, permissionChecker } = makeContext({
-        permissionChecker: makePermissionChecker(userUpdatePermission),
+    it('requires set-role and revokes sessions for explicit unchanged role writes', async () => {
+      const { useCases, repo, auth, permissionChecker } = makeContext({
+        permissionChecker: makePermissionChecker(
+          userUpdatePermission,
+          userSetRolePermission
+        ),
         repo: {
           getUpdateSnapshot: vi.fn<UserRepository['getUpdateSnapshot']>(
             async () =>
@@ -725,12 +728,23 @@ describe('user use cases', () => {
         user: { role: 'user' },
       });
 
-      expect(permissionChecker.hasPermission).toHaveBeenCalledTimes(1);
+      expect(permissionChecker.hasPermission).toHaveBeenCalledTimes(2);
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        1,
+        adminId,
+        userUpdatePermission
+      );
+      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
+        2,
+        adminId,
+        userSetRolePermission
+      );
       expect(repo.update).toHaveBeenCalledWith(userId, {
         email: user.email,
         role: 'user',
         emailVerified: undefined,
       });
+      expect(auth.revokeUserSessions).toHaveBeenCalledWith(userId);
     });
 
     it('revokes the target sessions after a role change so the cached role is evicted', async () => {
@@ -770,7 +784,7 @@ describe('user use cases', () => {
       });
     });
 
-    it('does not revoke sessions when the role is unchanged', async () => {
+    it('does not revoke sessions when no role write is submitted', async () => {
       const { useCases, auth } = makeContext({
         permissionChecker: makePermissionChecker(userUpdatePermission),
         repo: {

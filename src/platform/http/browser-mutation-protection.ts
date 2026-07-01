@@ -1,3 +1,5 @@
+import { SIDE_EFFECT_ROUTE_PATHNAMES } from '@/platform/router/navigation-safety';
+
 import { appendVaryHeader } from './security-headers';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -13,7 +15,7 @@ const DEFAULT_PROTECTED_BROWSER_MUTATION_PATHNAMES = [
   '/api/telemetry/otel/v1/traces',
   '/api/telemetry/sentry-tunnel',
   '/api/upload',
-  '/logout',
+  ...SIDE_EFFECT_ROUTE_PATHNAMES,
 ] as const;
 
 export const browserMutationVaryHeaders = [

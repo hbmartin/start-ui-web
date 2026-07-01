@@ -43,6 +43,29 @@ describe('InMemorySecondaryStore', () => {
     await expectMiss(store.get('k'));
   });
 
+  it('atomically takes matching values once', async () => {
+    const store = new InMemorySecondaryStore();
+
+    await store.set('k', 'v');
+
+    await expect(store.take('k', 'other')).resolves.toMatchObject({
+      tag: 'Ok',
+      value: { type: 'secondary_store_miss' },
+    });
+    await expectHit(store.get('k'), 'v');
+
+    await expect(store.take('k', 'v')).resolves.toMatchObject({
+      tag: 'Ok',
+      value: { type: 'secondary_store_taken', value: 'v' },
+    });
+    await expectMiss(store.get('k'));
+
+    await expect(store.take('k', 'v')).resolves.toMatchObject({
+      tag: 'Ok',
+      value: { type: 'secondary_store_miss' },
+    });
+  });
+
   it('expires values lazily once the ttl has elapsed', async () => {
     expect.hasAssertions();
 

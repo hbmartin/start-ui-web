@@ -8,7 +8,7 @@ import {
   type BookCoverUploadDeps,
   bookCoverUploadRouteDefinition,
 } from '@/modules/book/transport/upload/book-cover';
-import { BetterUploadObjectStorage } from '@/modules/kernel/infrastructure/storage/better-upload';
+import { BetterUploadObjectStorage } from '@/modules/kernel/backend';
 import { getTelemetry } from '@/platform/telemetry';
 
 import { createCachedFactory } from './shared/singleton';

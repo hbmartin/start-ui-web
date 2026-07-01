@@ -110,6 +110,47 @@ describe('UpstashSecondaryStore', () => {
     );
   });
 
+  it('takes a matching value with one EVAL command', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ result: 'value-1' }));
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
+
+    await expectOk(store.take('key-1', 'value-1'), {
+      type: 'secondary_store_taken',
+      value: 'value-1',
+    });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      config.restUrl,
+      expect.objectContaining({
+        body: expect.stringContaining('"EVAL"'),
+      })
+    );
+    expect(fetchFn).toHaveBeenCalledWith(
+      config.restUrl,
+      expect.objectContaining({
+        body: expect.stringContaining('"key-1"'),
+      })
+    );
+    expect(fetchFn).toHaveBeenCalledWith(
+      config.restUrl,
+      expect.objectContaining({
+        body: expect.stringContaining('"value-1"'),
+      })
+    );
+  });
+
+  it('treats a non-matching take as a miss', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ result: null }));
+    const store = new UpstashSecondaryStore({ config, fetchFn, telemetry });
+
+    const result = await store.take('key-1', 'value-1');
+
+    expect(result).toMatchObject({
+      tag: 'Ok',
+      value: { type: 'secondary_store_miss' },
+    });
+  });
+
   it('returns and reports read failures on transport errors', async () => {
     const fetchFn = vi.fn(async () => {
       throw new Error('network down');

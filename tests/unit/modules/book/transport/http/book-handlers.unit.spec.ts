@@ -3,6 +3,7 @@ import { createAuthenticatedContext } from '@tests/server/test-utils';
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it, vi } from 'vitest';
 
+import { BOOK_PUBLISHER_MAX_LENGTH } from '@/modules/book/domain/book-policy';
 import {
   createBookHandlers,
   zCreateInput,
@@ -86,6 +87,19 @@ describe('book HTTP transport handlers', () => {
         coverId: 'cover-1',
       },
     });
+  });
+
+  it('trims publisher before enforcing its max length', () => {
+    const publisher = 'P'.repeat(BOOK_PUBLISHER_MAX_LENGTH);
+
+    expect(
+      zCreateInput().parse({
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genreId: 'genre-1',
+        publisher: ` ${publisher} `,
+      }).publisher
+    ).toBe(publisher);
   });
 
   test.prop([validPaginationLimit, fc.boolean()], PROPERTY_DEFAULTS)(

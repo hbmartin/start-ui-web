@@ -30,7 +30,7 @@ import type {
 import { USER_NAME_MAX_LENGTH } from '../../domain/user-policy';
 
 const zRole = () => z.enum(['admin', 'user']);
-const zUserName = () => z.string().max(USER_NAME_MAX_LENGTH);
+const zUserName = () => z.string().trim().max(USER_NAME_MAX_LENGTH);
 
 export const zGetAllInput = () =>
   z

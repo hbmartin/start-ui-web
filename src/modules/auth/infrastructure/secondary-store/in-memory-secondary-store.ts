@@ -118,6 +118,24 @@ export class InMemorySecondaryStore implements SecondaryStore {
     return Result.Ok({ type: 'secondary_store_set' });
   }
 
+  async take(
+    key: string,
+    expectedValue: string
+  ): ReturnType<SecondaryStore['take']> {
+    const entry = this.entries.get(key);
+    if (!entry) return Result.Ok({ type: 'secondary_store_miss' });
+    if (this.isExpired(entry, this.now())) {
+      this.entries.delete(key);
+      return Result.Ok({ type: 'secondary_store_miss' });
+    }
+    if (entry.value !== expectedValue) {
+      return Result.Ok({ type: 'secondary_store_miss' });
+    }
+
+    this.entries.delete(key);
+    return Result.Ok({ type: 'secondary_store_taken', value: entry.value });
+  }
+
   async delete(key: string): ReturnType<SecondaryStore['delete']> {
     this.entries.delete(key);
     return Result.Ok({ type: 'secondary_store_deleted' });

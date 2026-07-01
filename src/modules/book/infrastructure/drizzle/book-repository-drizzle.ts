@@ -3,7 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { match, P } from 'ts-pattern';
 
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import type { BookId } from '@/modules/kernel/domain/ids';
+import type { BookCoverObjectKey, BookId } from '@/modules/kernel/domain/ids';
 import {
   toBookCoverObjectKey,
   toBookId,
@@ -135,7 +135,18 @@ export class BookRepositoryDrizzle implements BookRepository {
     db: DbLike,
     id: BookId,
     input: BookWriteInput
-  ): Promise<Book | null> {
+  ): Promise<{
+    book: Book;
+    replacedCoverId: BookCoverObjectKey | null;
+  } | null> {
+    const [current] = await db
+      .select({ coverId: bookTable.coverId })
+      .from(bookTable)
+      .where(eq(bookTable.id, id))
+      .for('update');
+
+    if (!current) return null;
+
     const [updated] = await db
       .update(bookTable)
       .set({
@@ -150,7 +161,15 @@ export class BookRepositoryDrizzle implements BookRepository {
 
     if (!updated) return null;
 
-    return this.getByIdWithDb(db, id);
+    const book = await this.getByIdWithDb(db, id);
+    if (!book) return null;
+
+    return {
+      book,
+      replacedCoverId: current.coverId
+        ? toBookCoverObjectKey(current.coverId)
+        : null,
+    };
   }
 
   async list(input: Parameters<BookRepository['list']>[0]) {
@@ -303,12 +322,16 @@ export class BookRepositoryDrizzle implements BookRepository {
 
   async update(id: BookId, input: BookWriteInput) {
     try {
-      const book = await this.runInSingleDbUnit((db) =>
+      const update = await this.runInSingleDbUnit((db) =>
         this.updateWithDb(db, id, input)
       );
       return Result.Ok(
-        book
-          ? { type: 'book_updated' as const, book }
+        update
+          ? {
+              type: 'book_updated' as const,
+              book: update.book,
+              replacedCoverId: update.replacedCoverId,
+            }
           : { type: 'book_not_found' as const }
       );
     } catch (error) {
@@ -324,11 +347,16 @@ export class BookRepositoryDrizzle implements BookRepository {
       const [deleted] = await this.db
         .delete(bookTable)
         .where(eq(bookTable.id, id))
-        .returning({ id: bookTable.id });
+        .returning({ id: bookTable.id, coverId: bookTable.coverId });
 
       return Result.Ok(
         deleted
-          ? { type: 'book_deleted' as const }
+          ? {
+              type: 'book_deleted' as const,
+              deletedCoverId: deleted.coverId
+                ? toBookCoverObjectKey(deleted.coverId)
+                : null,
+            }
           : { type: 'book_not_found' as const }
       );
     } catch (error) {

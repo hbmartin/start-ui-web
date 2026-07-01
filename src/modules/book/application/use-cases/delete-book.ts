@@ -22,13 +22,6 @@ export async function deleteBook(
     return Result.Ok({ type: 'book_forbidden' });
   }
 
-  // Resolve the cover before deletion so the stored object can be reclaimed.
-  const currentResult = await deps.bookRepository.getById(input.id);
-  if (currentResult.isError()) return Result.Error(currentResult.getError());
-  const currentOutcome = currentResult.get();
-  const coverId =
-    currentOutcome.type === 'book_found' ? currentOutcome.book.coverId : null;
-
   deps.logger.info({
     event: 'book.delete',
     details: { bookId: input.id },
@@ -39,12 +32,14 @@ export async function deleteBook(
 
   // Reclaim the cover object. Best-effort: a delete failure is logged but does
   // not fail the book deletion.
-  if (deleted.type === 'book_deleted' && coverId) {
-    const removed = await deps.coverStorage.deleteObject(coverId);
+  if (deleted.type === 'book_deleted' && deleted.deletedCoverId) {
+    const removed = await deps.coverStorage.deleteObject(
+      deleted.deletedCoverId
+    );
     if (removed.isError()) {
       deps.logger.warn({
         event: 'book.cover_object.delete_failed',
-        details: { bookId: input.id, objectKey: coverId },
+        details: { bookId: input.id, objectKey: deleted.deletedCoverId },
       });
     }
   }

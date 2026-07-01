@@ -1,8 +1,7 @@
 import { Result } from '@bloodyowl/boxed';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { BookCoverStorage } from '@/modules/book/application/ports/book-cover-storage';
-import type { BookRepository } from '@/modules/book/application/ports/book-repository';
+import type { BookCoverStorage, BookRepository } from '@/modules/book';
 import type { BookUseCaseDeps } from '@/modules/book/application/use-cases/types';
 import type { Book } from '@/modules/book/domain/book';
 import { createBookUseCases } from '@/modules/book/factory';
@@ -63,8 +62,10 @@ function makeRepo(overrides: Partial<BookRepository> = {}): BookRepository {
       Result.Ok({ type: 'book_duplicate_candidate_not_found' }),
     getById: async () => Result.Ok({ type: 'book_found', book }),
     create: async () => Result.Ok({ type: 'book_created', book }),
-    update: async () => Result.Ok({ type: 'book_updated', book }),
-    delete: async () => Result.Ok({ type: 'book_deleted' }),
+    update: async () =>
+      Result.Ok({ type: 'book_updated', book, replacedCoverId: null }),
+    delete: async () =>
+      Result.Ok({ type: 'book_deleted', deletedCoverId: null }),
     ...overrides,
   };
 }
@@ -251,7 +252,8 @@ describe('book use cases', () => {
       },
     });
     const transactionRepository = makeRepo({
-      update: async () => Result.Ok({ type: 'book_updated', book }),
+      update: async () =>
+        Result.Ok({ type: 'book_updated', book, replacedCoverId: null }),
     });
     const useCases = createBookUseCases({
       ...makeDeps({ bookRepository: outsideRepository }),
@@ -266,7 +268,11 @@ describe('book use cases', () => {
       book,
     });
 
-    expect(getOk(updated)).toEqual({ type: 'book_updated', book });
+    expect(getOk(updated)).toEqual({
+      type: 'book_updated',
+      book,
+      replacedCoverId: null,
+    });
   });
 
   it('prepares cover uploads through permission and object-key policy', async () => {
@@ -350,6 +356,31 @@ describe('book use cases', () => {
       expect(consumeUpload).not.toHaveBeenCalled();
     });
 
+    it('reclaims a consumed cover when create is rejected after consumption', async () => {
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Ok({ type: 'cover_object_deleted' as const })
+      );
+
+      const result = await createBookUseCases(
+        makeDeps({
+          bookRepository: makeRepo({
+            create: async () => Result.Ok({ type: 'book_duplicate' }),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        })
+      ).create({
+        currentUserId: scope.userId,
+        book: { ...book, coverId: coverKey },
+      });
+
+      expect(getOk(result)).toEqual({ type: 'book_duplicate' });
+      expect(consumeUpload).toHaveBeenCalledWith(coverKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(coverKey);
+    });
+
     it('on update consumes the binding and reclaims the previous cover only when the cover changes', async () => {
       const consumeUpload = vi.fn(async () =>
         Result.Ok({ type: 'cover_upload_consumed' as const })
@@ -372,6 +403,7 @@ describe('book use cases', () => {
               Result.Ok({
                 type: 'book_updated',
                 book: { ...book, coverId: newKey },
+                replacedCoverId: previousKey,
               }),
           }),
           coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
@@ -385,6 +417,83 @@ describe('book use cases', () => {
       expect(getOk(result)).toMatchObject({ type: 'book_updated' });
       expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
       expect(deleteObject).toHaveBeenCalledWith(previousKey);
+    });
+
+    it('on update still succeeds when previous-cover reclamation fails', async () => {
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Error(
+          new AppError({
+            code: 'OBJECT_STORAGE_DELETE_FAILED',
+            category: 'system',
+            status: 502,
+          })
+        )
+      );
+      const previousKey = toBookCoverObjectKey('books/old-cover.png');
+      const newKey = toBookCoverObjectKey('books/new-cover.webp');
+
+      const result = await createBookUseCases(
+        makeDeps({
+          bookRepository: makeRepo({
+            getById: async () =>
+              Result.Ok({
+                type: 'book_found',
+                book: { ...book, coverId: previousKey },
+              }),
+            update: async () =>
+              Result.Ok({
+                type: 'book_updated',
+                book: { ...book, coverId: newKey },
+                replacedCoverId: previousKey,
+              }),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        })
+      ).update({
+        currentUserId: scope.userId,
+        id: book.id,
+        book: { ...book, coverId: newKey },
+      });
+
+      expect(getOk(result)).toMatchObject({ type: 'book_updated' });
+      expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(previousKey);
+    });
+
+    it('on update reclaims a consumed new cover when the write is rejected', async () => {
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Ok({ type: 'cover_object_deleted' as const })
+      );
+      const previousKey = toBookCoverObjectKey('books/old-cover.png');
+      const newKey = toBookCoverObjectKey('books/new-cover.webp');
+
+      const result = await createBookUseCases(
+        makeDeps({
+          bookRepository: makeRepo({
+            getById: async () =>
+              Result.Ok({
+                type: 'book_found',
+                book: { ...book, coverId: previousKey },
+              }),
+            update: async () => Result.Ok({ type: 'book_duplicate' }),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        })
+      ).update({
+        currentUserId: scope.userId,
+        id: book.id,
+        book: { ...book, coverId: newKey },
+      });
+
+      expect(getOk(result)).toEqual({ type: 'book_duplicate' });
+      expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(newKey);
     });
 
     it('on update with an unchanged cover neither consumes a binding nor deletes the object', async () => {
@@ -401,7 +510,11 @@ describe('book use cases', () => {
             getById: async () =>
               Result.Ok({ type: 'book_found', book: bookWithCover }),
             update: async () =>
-              Result.Ok({ type: 'book_updated', book: bookWithCover }),
+              Result.Ok({
+                type: 'book_updated',
+                book: bookWithCover,
+                replacedCoverId: coverKey,
+              }),
           }),
           coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
         })
@@ -425,7 +538,8 @@ describe('book use cases', () => {
           bookRepository: makeRepo({
             getById: async () =>
               Result.Ok({ type: 'book_found', book: bookWithCover }),
-            delete: async () => Result.Ok({ type: 'book_deleted' }),
+            delete: async () =>
+              Result.Ok({ type: 'book_deleted', deletedCoverId: coverKey }),
           }),
           coverStorage: makeCoverStorage({ deleteObject }),
         })
@@ -450,13 +564,17 @@ describe('book use cases', () => {
           bookRepository: makeRepo({
             getById: async () =>
               Result.Ok({ type: 'book_found', book: bookWithCover }),
-            delete: async () => Result.Ok({ type: 'book_deleted' }),
+            delete: async () =>
+              Result.Ok({ type: 'book_deleted', deletedCoverId: coverKey }),
           }),
           coverStorage: makeCoverStorage({ deleteObject }),
         })
       ).delete({ currentUserId: scope.userId, id: book.id });
 
-      expect(getOk(result)).toEqual({ type: 'book_deleted' });
+      expect(getOk(result)).toEqual({
+        type: 'book_deleted',
+        deletedCoverId: coverKey,
+      });
       expect(deleteObject).toHaveBeenCalled();
     });
   });
