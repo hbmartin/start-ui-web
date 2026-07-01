@@ -16,14 +16,17 @@ import {
   toEmailWebhookEventId,
 } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
-const statusId = toEmailStatusId('email-status-1');
-const externalId = toEmailProviderMessageId('email_123');
-const recipient = toEmailRecipientList('user@example.com');
-const webhookEventId = toEmailWebhookEventId('evt_1');
-const nextWebhookEventId = toEmailWebhookEventId('evt_2');
-const sendIdempotencyKey = toEmailIdempotencyKey('send-key-1');
+const statusId = unwrapParseResult(toEmailStatusId('email-status-1'));
+const externalId = unwrapParseResult(toEmailProviderMessageId('email_123'));
+const recipient = unwrapParseResult(toEmailRecipientList('user@example.com'));
+const webhookEventId = unwrapParseResult(toEmailWebhookEventId('evt_1'));
+const nextWebhookEventId = unwrapParseResult(toEmailWebhookEventId('evt_2'));
+const sendIdempotencyKey = unwrapParseResult(
+  toEmailIdempotencyKey('send-key-1')
+);
 const input = {
   provider: EMAIL_PROVIDER_RESEND,
   externalId,

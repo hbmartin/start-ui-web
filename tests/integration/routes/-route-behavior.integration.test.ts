@@ -91,7 +91,11 @@ import {
   isForbiddenRouteContext,
 } from '@/modules/auth/presentation';
 import { bookQueries } from '@/modules/book/client';
-import { toBookId, toScopeKey } from '@/modules/kernel/testing';
+import {
+  toBookId,
+  toScopeKey,
+  unwrapParseResult,
+} from '@/modules/kernel/testing';
 import { userQueries } from '@/modules/user/client';
 import { Route as AppBooksIndexRoute } from '@/routes/app/books/index';
 import { Route as LoginRoute } from '@/routes/login/route';
@@ -103,7 +107,7 @@ import { Route as ManagerUsersIdRoute } from '@/routes/manager/users/$id.index';
 import { Route as ManagerUsersUpdateRoute } from '@/routes/manager/users/$id.update.index';
 import { Route as ManagerUsersIndexRoute } from '@/routes/manager/users/index';
 
-const scopeKey = toScopeKey('user:admin-1:admin');
+const scopeKey = unwrapParseResult(toScopeKey('user:admin-1:admin'));
 
 const book = {
   author: 'J.R.R. Tolkien',
@@ -288,7 +292,10 @@ describe('route integration behavior', () => {
     expect(result).toEqual(book);
     expect(
       queryClient.getQueryData(
-        bookQueries.getById({ id: toBookId('book-1'), scopeKey }).queryKey
+        bookQueries.getById({
+          id: unwrapParseResult(toBookId('book-1')),
+          scopeKey,
+        }).queryKey
       )
     ).toEqual(book);
   });

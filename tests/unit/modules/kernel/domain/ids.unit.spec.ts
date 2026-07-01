@@ -6,6 +6,7 @@ import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-
 import {
   type BookId,
   type EmailAddress,
+  type ParseResult,
   type ScopeKey,
   toBookId,
   toEmailAddress,
@@ -21,6 +22,7 @@ import {
   zSessionId,
   zUserId,
 } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const nonBlankString = fc
   .string({ maxLength: 80 })
@@ -32,16 +34,6 @@ const whitespaceOnlyString = fc
     maxLength: 32,
   })
   .map((characters) => characters.join(''));
-
-function captureThrown(fn: () => unknown) {
-  try {
-    fn();
-  } catch (error) {
-    return error;
-  }
-
-  throw new Error('Expected function to throw.');
-}
 
 describe('kernel domain ids', () => {
   it('parses branded IDs from trimmed strings', () => {
@@ -59,32 +51,40 @@ describe('kernel domain ids', () => {
   });
 
   it('converts primitive strings into branded domain values', () => {
-    expect(toUserId(' user-1 ')).toBe('user-1');
-    expect(toBookId(' book-1 ')).toBe('book-1');
-    expect(toGenreId(' genre-1 ')).toBe('genre-1');
-    expect(toSessionId(' session-1 ')).toBe('session-1');
-    expect(toScopeKey(' anonymous ')).toBe('anonymous');
-    expect(toEmailAddress(' user@example.com ')).toBe('user@example.com');
-    expect(() => toEmailAddress('not-an-email')).toThrow(IdValidationError);
+    expect(unwrapParseResult(toUserId(' user-1 '))).toBe('user-1');
+    expect(unwrapParseResult(toBookId(' book-1 '))).toBe('book-1');
+    expect(unwrapParseResult(toGenreId(' genre-1 '))).toBe('genre-1');
+    expect(unwrapParseResult(toSessionId(' session-1 '))).toBe('session-1');
+    expect(unwrapParseResult(toScopeKey(' anonymous '))).toBe('anonymous');
+    expect(unwrapParseResult(toEmailAddress(' user@example.com '))).toBe(
+      'user@example.com'
+    );
+    expect(toEmailAddress('not-an-email').isError()).toBe(true);
   });
 
   it('keeps domain brands distinct at compile time', () => {
-    expectTypeOf(toUserId('user-1')).toEqualTypeOf<UserId>();
-    expectTypeOf(toBookId('book-1')).toEqualTypeOf<BookId>();
-    expectTypeOf(toScopeKey('anonymous')).toEqualTypeOf<ScopeKey>();
+    expectTypeOf(toUserId('user-1')).toEqualTypeOf<ParseResult<UserId>>();
+    expectTypeOf(toBookId('book-1')).toEqualTypeOf<ParseResult<BookId>>();
+    expectTypeOf(toScopeKey('anonymous')).toEqualTypeOf<
+      ParseResult<ScopeKey>
+    >();
+    expectTypeOf(toEmailAddress('user@example.com')).toEqualTypeOf<
+      ParseResult<EmailAddress>
+    >();
     expectTypeOf(
-      toEmailAddress('user@example.com')
-    ).toEqualTypeOf<EmailAddress>();
-    expectTypeOf(toUserId('user-1')).not.toEqualTypeOf<BookId>();
+      unwrapParseResult(toUserId('user-1'))
+    ).not.toEqualTypeOf<BookId>();
     expectTypeOf<string>().not.toExtend<UserId>();
     expectTypeOf<UserId>().toExtend<string>();
   });
 
-  it('throws first-class ID validation errors for blank IDs', () => {
-    expect(() => toUserId('  ')).toThrow(IdValidationError);
+  it('returns first-class ID validation errors for blank IDs', () => {
+    const result = toUserId('  ');
+    expect(result.isError()).toBe(true);
+    if (result.isOk()) throw new Error('Expected parser to fail.');
 
-    const error = captureThrown(() => toUserId('  '));
-    expect(error).toMatchObject({
+    expect(result.getError()).toBeInstanceOf(IdValidationError);
+    expect(result.getError()).toMatchObject({
       name: 'IdValidationError',
       code: 'INVALID_ID',
       details: {
@@ -97,8 +97,11 @@ describe('kernel domain ids', () => {
   it('truncates long invalid ID values in error details', () => {
     const invalidValue = 'x'.repeat(80);
 
-    const error = captureThrown(() => toEmailAddress(invalidValue));
-    expect(error).toMatchObject({
+    const result = toEmailAddress(invalidValue);
+    expect(result.isError()).toBe(true);
+    if (result.isOk()) throw new Error('Expected parser to fail.');
+
+    expect(result.getError()).toMatchObject({
       details: {
         typeName: 'EmailAddress',
         value: 'xxxxxxxxxxxxxxxxxxxxxxxx...<truncated:80>',
@@ -111,33 +114,37 @@ describe('kernel domain ids', () => {
     (value) => {
       const expected = value.trim();
 
-      expect(toUserId(value)).toBe(expected);
-      expect(toBookId(value)).toBe(expected);
-      expect(toGenreId(value)).toBe(expected);
-      expect(toSessionId(value)).toBe(expected);
-      expect(toScopeKey(value)).toBe(expected);
+      expect(unwrapParseResult(toUserId(value))).toBe(expected);
+      expect(unwrapParseResult(toBookId(value))).toBe(expected);
+      expect(unwrapParseResult(toGenreId(value))).toBe(expected);
+      expect(unwrapParseResult(toSessionId(value))).toBe(expected);
+      expect(unwrapParseResult(toScopeKey(value))).toBe(expected);
     }
   );
 
   test.prop([whitespaceOnlyString], PROPERTY_DEFAULTS)(
     'throws first-class validation errors for whitespace-only IDs',
     (value) => {
-      expect(() => toUserId(value)).toThrow(IdValidationError);
-      expect(() => toBookId(value)).toThrow(IdValidationError);
-      expect(() => toGenreId(value)).toThrow(IdValidationError);
-      expect(() => toSessionId(value)).toThrow(IdValidationError);
-      expect(() => toScopeKey(value)).toThrow(IdValidationError);
+      expect(toUserId(value).isError()).toBe(true);
+      expect(toBookId(value).isError()).toBe(true);
+      expect(toGenreId(value).isError()).toBe(true);
+      expect(toSessionId(value).isError()).toBe(true);
+      expect(toScopeKey(value).isError()).toBe(true);
     }
   );
 
   test.prop([nonBlankString], PROPERTY_DEFAULTS)(
     'keeps Zod ID schemas aligned with branded ID constructors',
     (value) => {
-      expect(zUserId().parse(value)).toBe(toUserId(value));
-      expect(zBookId().parse(value)).toBe(toBookId(value));
-      expect(zGenreId().parse(value)).toBe(toGenreId(value));
-      expect(zSessionId().parse(value)).toBe(toSessionId(value));
-      expect(zScopeKey().parse(value)).toBe(toScopeKey(value));
+      expect(zUserId().parse(value)).toBe(unwrapParseResult(toUserId(value)));
+      expect(zBookId().parse(value)).toBe(unwrapParseResult(toBookId(value)));
+      expect(zGenreId().parse(value)).toBe(unwrapParseResult(toGenreId(value)));
+      expect(zSessionId().parse(value)).toBe(
+        unwrapParseResult(toSessionId(value))
+      );
+      expect(zScopeKey().parse(value)).toBe(
+        unwrapParseResult(toScopeKey(value))
+      );
     }
   );
 });

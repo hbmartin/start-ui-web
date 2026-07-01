@@ -10,6 +10,7 @@ import {
   toUserId,
 } from '@/modules/kernel/domain/ids';
 import { createTelemetryLogger } from '@/modules/kernel/infrastructure/logger/telemetry';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import {
   createNoOpTelemetry,
   type TelemetryAdapter,
@@ -39,7 +40,7 @@ describe('createTelemetryLogger', () => {
     const logger = createTelemetryLogger({
       telemetry,
       consoleMirror: false,
-      defaultFields: { requestId: toRequestId('request-1') },
+      defaultFields: { requestId: unwrapParseResult(toRequestId('request-1')) },
       level: 'debug',
     });
     const fields = {
@@ -82,8 +83,8 @@ describe('createTelemetryLogger', () => {
 
     logger.error({
       event: 'email.send.failed',
-      requestId: toRequestId('request-1'),
-      correlationId: toCorrelationId('correlation-1'),
+      requestId: unwrapParseResult(toRequestId('request-1')),
+      correlationId: unwrapParseResult(toCorrelationId('correlation-1')),
       error: 'Provider rejected person@example.com',
       exception,
       details: {
@@ -304,14 +305,14 @@ describe('createTelemetryLogger', () => {
     };
     const requestLogger = createRequestLogger({
       logger,
-      requestId: toRequestId('request-1'),
-      userId: toUserId('actor-1'),
+      requestId: unwrapParseResult(toRequestId('request-1')),
+      userId: unwrapParseResult(toUserId('actor-1')),
     });
 
     requestLogger.info({
       event: 'user.update',
-      requestId: toRequestId('caller-request'),
-      userId: toUserId('target-1'),
+      requestId: unwrapParseResult(toRequestId('caller-request')),
+      userId: unwrapParseResult(toUserId('target-1')),
       details: { userId: 'target-1' },
     });
 

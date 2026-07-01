@@ -5,6 +5,7 @@ import { zu } from '@/platform/lib/zod/zod-utils';
 import { zGenre } from '@/modules/genre/presentation';
 import { zBookCoverObjectKey, zBookId } from '@/modules/kernel/domain/ids';
 
+import { zBookAuthor, zBookTitle, zPublisherName } from '../domain/book';
 import {
   BOOK_AUTHOR_MAX_LENGTH,
   BOOK_PUBLISHER_MAX_LENGTH,
@@ -16,10 +17,10 @@ export type Book = z.infer<ReturnType<typeof zBook>>;
 export const zBook = () =>
   z.object({
     id: zBookId(),
-    title: zu.fieldText.required({ error: 'book:common.title.required' }),
-    author: zu.fieldText.required(),
+    title: zBookTitle(),
+    author: zBookAuthor(),
     genre: zGenre().nullish(),
-    publisher: zu.fieldText.nullish(),
+    publisher: zPublisherName().nullish(),
     createdAt: z.date(),
     updatedAt: z.date(),
     coverId: zBookCoverObjectKey().nullish(),

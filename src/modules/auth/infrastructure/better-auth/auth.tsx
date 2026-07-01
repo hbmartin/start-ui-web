@@ -43,6 +43,15 @@ const missingAuthEmailPort = {
   },
 };
 
+const invalidAuthProviderResponse = (cause: unknown) =>
+  new AppError({
+    code: 'AUTH_PROVIDER_RESPONSE_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Auth provider returned invalid data',
+    cause,
+  });
+
 export function createAuth(input?: Database | CreateAuthOptions) {
   const options = normalizeCreateAuthInput(input);
   const database = options.database ?? getDefaultDbClient();
@@ -130,10 +139,23 @@ export function createAuth(input?: Database | CreateAuthOptions) {
         async sendVerificationOTP({ email, otp, type }) {
           await match(type)
             .with('sign-in', async () => {
+              const parsedEmail = toEmailAddress(email);
+              if (parsedEmail.isError()) {
+                throw invalidAuthProviderResponse(parsedEmail.getError());
+              }
+              const parsedOtp = toOtpCode(otp);
+              if (parsedOtp.isError()) {
+                throw invalidAuthProviderResponse(parsedOtp.getError());
+              }
+              const parsedLanguage = toLanguageCode(getUserLanguage());
+              if (parsedLanguage.isError()) {
+                throw invalidAuthProviderResponse(parsedLanguage.getError());
+              }
+
               const result = await authEmailPort.sendSignInOtp({
-                email: toEmailAddress(email),
-                otp: toOtpCode(otp),
-                language: toLanguageCode(getUserLanguage()),
+                email: parsedEmail.get(),
+                otp: parsedOtp.get(),
+                language: parsedLanguage.get(),
               });
               if (result.isError()) throw result.getError();
             })

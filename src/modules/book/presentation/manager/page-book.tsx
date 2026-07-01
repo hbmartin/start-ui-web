@@ -25,19 +25,19 @@ import { Spinner } from '@/platform/components/ui/spinner';
 import { useCurrentScopeKey, WithPermissions } from '@/modules/auth/client';
 import { bookQueries } from '@/modules/book/client';
 import { isServerFnError } from '@/modules/kernel/client';
-import { toBookId } from '@/modules/kernel/domain/ids';
+import type { BookId } from '@/modules/kernel/domain/ids';
 
 import { BookCover } from '../book-cover';
 
 const isNotFoundError = (error: unknown) =>
   isServerFnError(error) && error.code === 'NOT_FOUND';
 
-export const PageBook = (props: { params: { id: string } }) => {
+export const PageBook = (props: { bookId: BookId }) => {
   const { t } = useTranslation(['book']);
   const queryClient = useQueryClient();
   const { navigateBack } = useNavigateBack();
   const scopeKey = useCurrentScopeKey();
-  const bookId = toBookId(props.params.id);
+  const bookId = props.bookId;
   const bookQuery = useQuery(bookQueries.getById({ id: bookId, scopeKey }));
   const deleteBookMutation = useMutation(bookQueries.deleteById());
 

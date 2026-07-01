@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testBookAuthor, testBookTitle } from '@tests/support/branded-values';
 import { makeTestKernel, now } from '@tests/unit/composition/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,12 +7,13 @@ import { __resetBookComposition, getBookUseCases } from '@/composition/book';
 import type { BookRepository } from '@/modules/book';
 import { toBookId, toGenreId, toUserId } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const book = {
-  id: toBookId('book-1'),
-  title: 'Dune',
-  author: 'Frank Herbert',
-  genreId: toGenreId('genre-1'),
+  id: unwrapParseResult(toBookId('book-1')),
+  title: testBookTitle('Dune'),
+  author: testBookAuthor('Frank Herbert'),
+  genreId: unwrapParseResult(toGenreId('genre-1')),
   genre: null,
   publisher: null,
   coverId: null,
@@ -35,7 +37,7 @@ const makeBookRepository = (
 });
 
 const scope = (userId: string) =>
-  ({ userId: toUserId(userId), role: 'user' }) as const;
+  ({ userId: unwrapParseResult(toUserId(userId)), role: 'user' }) as const;
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>

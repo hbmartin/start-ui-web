@@ -15,10 +15,17 @@ import type {
   RecordEmailSendAttemptInput,
   UpsertEmailStatusInput,
 } from '@/modules/email';
+import {
+  EMAIL_PROVIDER_RESEND,
+  EMAIL_PROVIDER_SMTP,
+  emailStatusValues,
+} from '@/modules/email';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import type {
   EmailIdempotencyKey,
   EmailProviderMessageId,
+  EmailWebhookEventId,
+  ParseResult,
 } from '@/modules/kernel/domain/ids';
 import {
   toEmailIdempotencyKey,
@@ -41,6 +48,29 @@ import type { DbLike } from '@/modules/kernel/infrastructure/db/types';
 type EmailStatusRow = typeof emailStatusTable.$inferSelect;
 
 const emailMetadataSchema = z.record(z.string(), z.unknown());
+const emailProviderSchema = z.enum([
+  EMAIL_PROVIDER_RESEND,
+  EMAIL_PROVIDER_SMTP,
+]);
+const emailStatusSchema = z.enum(emailStatusValues);
+
+function invalidEmailStatusRowError(cause: unknown): AppError {
+  return new AppError({
+    code: 'EMAIL_STATUS_ROW_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'Email status row contains invalid data',
+    cause,
+  });
+}
+
+function parseEmailStatusRowValue<TValue>(
+  result: ParseResult<TValue>
+): BoxedResult<TValue, AppError> {
+  return result.isError()
+    ? Result.Error(invalidEmailStatusRowError(result.getError()))
+    : Result.Ok(result.get());
+}
 
 const toMetadata = (
   metadata: unknown
@@ -87,27 +117,76 @@ const toDomain = (
   row: EmailStatusRow,
   options?: { tolerateInvalidMetadata?: boolean }
 ): BoxedResult<EmailStatusRecord, AppError> => {
-  const metadata = options?.tolerateInvalidMetadata
-    ? Result.Ok(toMetadataOrEmpty(row.metadata))
-    : toMetadata(row.metadata);
-  if (metadata.isError()) return Result.Error(metadata.getError());
+  let metadata = toMetadataOrEmpty(row.metadata);
+  if (!options?.tolerateInvalidMetadata) {
+    const parsedMetadata = toMetadata(row.metadata);
+    if (parsedMetadata.isError()) {
+      return Result.Error(parsedMetadata.getError());
+    }
+    metadata = parsedMetadata.get();
+  }
+
+  const id = parseEmailStatusRowValue(toEmailStatusId(row.id));
+  if (id.isError()) return Result.Error(id.getError());
+
+  const provider = emailProviderSchema.safeParse(row.provider);
+  if (!provider.success) {
+    return Result.Error(invalidEmailStatusRowError(provider.error));
+  }
+
+  let externalId: EmailProviderMessageId | null = null;
+  if (row.externalId) {
+    const parsedExternalId = parseEmailStatusRowValue(
+      toEmailProviderMessageId(row.externalId)
+    );
+    if (parsedExternalId.isError()) {
+      return Result.Error(parsedExternalId.getError());
+    }
+    externalId = parsedExternalId.get();
+  }
+
+  const recipient = parseEmailStatusRowValue(
+    toEmailRecipientList(row.recipient)
+  );
+  if (recipient.isError()) return Result.Error(recipient.getError());
+
+  const status = emailStatusSchema.safeParse(row.status);
+  if (!status.success) {
+    return Result.Error(invalidEmailStatusRowError(status.error));
+  }
+
+  let idempotencyKey: EmailIdempotencyKey | null = null;
+  if (row.idempotencyKey) {
+    const parsedIdempotencyKey = parseEmailStatusRowValue(
+      toEmailIdempotencyKey(row.idempotencyKey)
+    );
+    if (parsedIdempotencyKey.isError()) {
+      return Result.Error(parsedIdempotencyKey.getError());
+    }
+    idempotencyKey = parsedIdempotencyKey.get();
+  }
+
+  let lastWebhookEventId: EmailWebhookEventId | null = null;
+  if (row.lastWebhookEventId) {
+    const parsedLastWebhookEventId = parseEmailStatusRowValue(
+      toEmailWebhookEventId(row.lastWebhookEventId)
+    );
+    if (parsedLastWebhookEventId.isError()) {
+      return Result.Error(parsedLastWebhookEventId.getError());
+    }
+    lastWebhookEventId = parsedLastWebhookEventId.get();
+  }
 
   return Result.Ok({
-    id: toEmailStatusId(row.id),
-    provider: row.provider as EmailProvider,
-    externalId: row.externalId
-      ? toEmailProviderMessageId(row.externalId)
-      : null,
-    recipient: toEmailRecipientList(row.recipient),
+    id: id.get(),
+    provider: provider.data,
+    externalId,
+    recipient: recipient.get(),
     subject: row.subject,
-    status: row.status as EmailStatus,
-    idempotencyKey: row.idempotencyKey
-      ? toEmailIdempotencyKey(row.idempotencyKey)
-      : null,
-    lastWebhookEventId: row.lastWebhookEventId
-      ? toEmailWebhookEventId(row.lastWebhookEventId)
-      : null,
-    metadata: metadata.get(),
+    status: status.data,
+    idempotencyKey,
+    lastWebhookEventId,
+    metadata,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });

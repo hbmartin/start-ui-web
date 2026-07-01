@@ -85,6 +85,7 @@ digraph ModuleLayerDependencies {
   }
 
   "account/application" -> "account/domain" [style="solid"];
+  "account/domain" -> "kernel/domain" [style="solid"];
   "account/presentation" -> "account/domain" [style="solid"];
   "account/presentation" -> "account/public" [style="solid"];
   "account/presentation" -> "auth/public" [style="solid"];
@@ -102,6 +103,7 @@ digraph ModuleLayerDependencies {
   "auth/infrastructure" -> "kernel/infrastructure" [style="solid"];
   "auth/infrastructure" -> "kernel/public" [style="solid"];
   "auth/infrastructure" -> "kernel/transport" [style="solid"];
+  "auth/infrastructure" -> "user/public" [style="solid"];
   "auth/presentation" -> "account/public" [style="solid"];
   "auth/presentation" -> "auth/domain" [style="solid"];
   "auth/presentation" -> "auth/public" [style="solid"];
@@ -121,8 +123,9 @@ digraph ModuleLayerDependencies {
   "book/domain" -> "kernel/domain" [style="solid"];
   "book/infrastructure" -> "book/domain" [style="solid"];
   "book/infrastructure" -> "genre/infrastructure" [style="solid"];
-  "book/infrastructure" -> "kernel/domain" [style="solid"];
+  "book/infrastructure" -> "genre/public" [style="solid"];
   "book/infrastructure" -> "kernel/infrastructure" [style="solid"];
+  "book/infrastructure" -> "kernel/public" [style="solid"];
   "book/presentation" -> "auth/public" [style="solid"];
   "book/presentation" -> "book/domain" [style="solid"];
   "book/presentation" -> "book/public" [style="solid"];
@@ -155,8 +158,11 @@ digraph ModuleLayerDependencies {
   "email/transport" -> "email/public" [style="solid"];
   "email/transport" -> "kernel/domain" [style="solid"];
   "genre/application" -> "genre/domain" [style="solid"];
+  "genre/domain" -> "kernel/domain" [style="solid"];
+  "genre/infrastructure" -> "genre/domain" [style="solid"];
   "genre/infrastructure" -> "kernel/domain" [style="solid"];
   "genre/infrastructure" -> "kernel/infrastructure" [style="solid"];
+  "genre/presentation" -> "genre/domain" [style="solid"];
   "genre/presentation" -> "genre/public" [style="solid"];
   "genre/presentation" -> "kernel/domain" [style="solid"];
   "genre/public" -> "genre/application" [style="solid"];
@@ -179,6 +185,7 @@ digraph ModuleLayerDependencies {
   "kernel/public" -> "kernel/transport" [style="dashed"];
   "kernel/transport" -> "kernel/domain" [style="solid"];
   "user/application" -> "user/domain" [style="solid"];
+  "user/domain" -> "kernel/domain" [style="solid"];
   "user/presentation" -> "auth/public" [style="solid"];
   "user/presentation" -> "kernel/domain" [style="solid"];
   "user/presentation" -> "kernel/public" [style="solid"];

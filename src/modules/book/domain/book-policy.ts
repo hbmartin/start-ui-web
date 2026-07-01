@@ -1,6 +1,9 @@
+import { Result } from '@bloodyowl/boxed';
+
 import type {
   BookCoverObjectKey,
   GeneratedId,
+  ParseResult,
 } from '@/modules/kernel/domain/ids';
 import { toBookCoverObjectKey } from '@/modules/kernel/domain/ids';
 
@@ -64,9 +67,9 @@ export const getBookCoverFileExtension = (fileType: string) =>
 export const createBookCoverObjectKey = (input: {
   fileId: GeneratedId;
   fileType: string;
-}): BookCoverObjectKey | null => {
+}): ParseResult<BookCoverObjectKey | null> => {
   const extension = getBookCoverFileExtension(input.fileType);
-  if (!extension) return null;
+  if (!extension) return Result.Ok(null);
   return toBookCoverObjectKey(`books/${input.fileId}.${extension}`);
 };
 

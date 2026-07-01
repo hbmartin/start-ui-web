@@ -1,5 +1,6 @@
-import { Result } from '@bloodyowl/boxed';
+import { type Result as BoxedResult, Result } from '@bloodyowl/boxed';
 import { match, P } from 'ts-pattern';
+import { z } from 'zod';
 
 import {
   EMAIL_PROVIDER_RESEND,
@@ -28,23 +29,8 @@ type VerifyResendWebhookInput = {
   };
 };
 
-type ResendWebhookEvent = {
-  created_at: string;
-  data: unknown;
-  type: string;
-};
-
-type TrackedResendEmailEvent = ResendWebhookEvent & {
-  data: {
-    email_id: string;
-    subject: string;
-    to: string[];
-  };
-  type: keyof typeof resendEmailStatusByEventType;
-};
-
 type ResendWebhookVerifier = {
-  verify(input: VerifyResendWebhookInput): ResendWebhookEvent;
+  verify(input: VerifyResendWebhookInput): unknown;
 };
 
 type ResendWebhookHandlerDeps = {
@@ -72,6 +58,20 @@ const DEFAULT_RESEND_WEBHOOK_MAX_BYTES = 1_000_000;
 const DEFAULT_RESEND_WEBHOOK_RATE_LIMIT_PER_MINUTE = 120;
 const RESEND_WEBHOOK_RATE_LIMIT_WINDOW_MS = 60_000;
 
+const resendTrackedEmailEventTypes = [
+  'email.sent',
+  'email.scheduled',
+  'email.delivered',
+  'email.delivery_delayed',
+  'email.complained',
+  'email.bounced',
+  'email.opened',
+  'email.clicked',
+  'email.received',
+  'email.failed',
+  'email.suppressed',
+] as const;
+
 const resendEmailStatusByEventType = {
   'email.sent': 'sent',
   'email.scheduled': 'scheduled',
@@ -84,7 +84,29 @@ const resendEmailStatusByEventType = {
   'email.received': 'received',
   'email.failed': 'failed',
   'email.suppressed': 'suppressed',
-} satisfies Record<string, EmailStatus>;
+} satisfies Record<(typeof resendTrackedEmailEventTypes)[number], EmailStatus>;
+
+const resendWebhookBaseEventSchema = z
+  .object({
+    created_at: z.string(),
+    data: z.unknown(),
+    type: z.string(),
+  })
+  .passthrough();
+
+const trackedResendEmailEventSchema = resendWebhookBaseEventSchema.extend({
+  data: z
+    .object({
+      email_id: z.string(),
+      subject: z.string(),
+      to: z.array(z.string()),
+    })
+    .passthrough(),
+  type: z.enum(resendTrackedEmailEventTypes),
+});
+
+type ResendWebhookEvent = z.infer<typeof resendWebhookBaseEventSchema>;
+type TrackedResendEmailEvent = z.infer<typeof trackedResendEmailEventSchema>;
 
 const requiredHeader = (headers: Headers, name: string) => {
   const value = headers.get(name);
@@ -116,6 +138,24 @@ const invalidBodyError = (cause: unknown) =>
     category: 'bad_request',
     status: 400,
     message: 'Invalid email webhook request body',
+    cause,
+  });
+
+const invalidEventError = (cause: unknown) =>
+  new AppError({
+    code: 'EMAIL_WEBHOOK_INVALID_EVENT',
+    category: 'bad_request',
+    status: 400,
+    message: 'Invalid email webhook event',
+    cause,
+  });
+
+const invalidTrackedEventError = (cause: unknown) =>
+  new AppError({
+    code: 'EMAIL_WEBHOOK_INVALID_TRACKED_EVENT',
+    category: 'bad_request',
+    status: 400,
+    message: 'Invalid tracked email webhook event',
     cause,
   });
 
@@ -179,22 +219,33 @@ const readBoundedTextBody = async (request: Request, maxBodyBytes: number) => {
   return decodeChunks(chunks, totalBytes);
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const isTrackedEmailEvent = (
-  event: ResendWebhookEvent
-): event is TrackedResendEmailEvent =>
-  event.type in resendEmailStatusByEventType &&
-  typeof event.created_at === 'string' &&
-  isRecord(event.data) &&
-  typeof event.data.email_id === 'string' &&
-  typeof event.data.subject === 'string' &&
-  Array.isArray(event.data.to) &&
-  event.data.to.every((recipient) => typeof recipient === 'string');
-
 const recipientFromEvent = (event: TrackedResendEmailEvent) =>
   toEmailRecipientList(event.data.to.join(', '));
+
+const parseVerifiedEvent = (
+  event: unknown
+): BoxedResult<ResendWebhookEvent, AppError> => {
+  const parsed = resendWebhookBaseEventSchema.safeParse(event);
+  if (!parsed.success) return Result.Error(invalidEventError(parsed.error));
+  return Result.Ok(parsed.data);
+};
+
+const trackedStatusFromEventType = (eventType: string) =>
+  Object.hasOwn(resendEmailStatusByEventType, eventType)
+    ? resendEmailStatusByEventType[
+        eventType as keyof typeof resendEmailStatusByEventType
+      ]
+    : undefined;
+
+const parseTrackedEvent = (
+  event: ResendWebhookEvent
+): BoxedResult<TrackedResendEmailEvent, AppError> => {
+  const parsed = trackedResendEmailEventSchema.safeParse(event);
+  if (!parsed.success) {
+    return Result.Error(invalidTrackedEventError(parsed.error));
+  }
+  return Result.Ok(parsed.data);
+};
 
 export const createResendWebhookHandlers = ({
   getUseCases,
@@ -242,7 +293,7 @@ export const createResendWebhookHandlers = ({
 
   const receive = async (request: Request) => {
     let resendSdkHeaders: VerifyResendWebhookInput['headers'];
-    let event: ResendWebhookEvent;
+    let verifiedEvent: unknown;
 
     const rateLimited = enforceRateLimit(request);
     if (rateLimited) return rateLimited;
@@ -267,7 +318,7 @@ export const createResendWebhookHandlers = ({
     const payload = await readBoundedTextBody(request, boundedMaxBodyBytes);
 
     try {
-      event = verifier.verify({ payload, headers: resendSdkHeaders });
+      verifiedEvent = verifier.verify({ payload, headers: resendSdkHeaders });
     } catch (error) {
       logger?.warn({
         details: {
@@ -279,21 +330,45 @@ export const createResendWebhookHandlers = ({
       throw error;
     }
 
-    if (!isTrackedEmailEvent(event)) {
+    const event = parseVerifiedEvent(verifiedEvent);
+    if (event.isError()) throw event.getError();
+
+    const trackedStatus = trackedStatusFromEventType(event.get().type);
+    if (!trackedStatus) {
       return Response.json({ ok: true, ignored: true });
+    }
+
+    const trackedEvent = parseTrackedEvent(event.get());
+    if (trackedEvent.isError()) throw trackedEvent.getError();
+
+    const externalId = toEmailProviderMessageId(
+      trackedEvent.get().data.email_id
+    );
+    if (externalId.isError()) {
+      throw invalidTrackedEventError(externalId.getError());
+    }
+
+    const recipient = recipientFromEvent(trackedEvent.get());
+    if (recipient.isError()) {
+      throw invalidTrackedEventError(recipient.getError());
+    }
+
+    const webhookEventId = toEmailWebhookEventId(resendSdkHeaders.id);
+    if (webhookEventId.isError()) {
+      throw invalidTrackedEventError(webhookEventId.getError());
     }
 
     const result = await getUseCases().processStatusEvent({
       provider: EMAIL_PROVIDER_RESEND,
-      externalId: toEmailProviderMessageId(event.data.email_id),
-      recipient: recipientFromEvent(event),
-      subject: event.data.subject,
-      status: resendEmailStatusByEventType[event.type],
-      webhookEventId: toEmailWebhookEventId(resendSdkHeaders.id),
-      providerEventType: event.type,
-      providerEventCreatedAt: event.created_at,
+      externalId: externalId.get(),
+      recipient: recipient.get(),
+      subject: trackedEvent.get().data.subject,
+      status: trackedStatus,
+      webhookEventId: webhookEventId.get(),
+      providerEventType: trackedEvent.get().type,
+      providerEventCreatedAt: trackedEvent.get().created_at,
       metadata: {
-        resendEvent: event,
+        resendEvent: trackedEvent.get(),
       },
     });
 

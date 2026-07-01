@@ -13,6 +13,8 @@ export const mockUserHasPermission = hoisted.mockUserHasPermission;
 
 import type { Mock } from 'vitest';
 
+import { unwrapParseResult } from '@/modules/kernel/testing';
+
 type DrizzleQueryMock = {
   findFirst: Mock;
   findMany: Mock;
@@ -105,16 +107,16 @@ export function resetMockDb() {
 }
 
 export const mockUser = {
-  id: toUserId('user-1'),
+  id: unwrapParseResult(toUserId('user-1')),
   name: 'Test User',
-  email: toEmailAddress('user@example.com'),
+  email: unwrapParseResult(toEmailAddress('user@example.com')),
   emailVerified: true,
   image: null,
   role: 'user' as const,
   onboardedAt: new Date('2024-01-01T00:00:00.000Z'),
 };
 export const mockSession = {
-  id: toSessionId('session-1'),
+  id: unwrapParseResult(toSessionId('session-1')),
   token: 'session-token-1',
   createdAt: new Date(),
   expiresAt: new Date('2099-01-02T00:00:00.000Z'),

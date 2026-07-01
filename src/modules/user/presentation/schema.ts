@@ -8,6 +8,7 @@ import {
   zUserId,
 } from '@/modules/kernel/domain/ids';
 
+import { zUserDisplayName } from '../domain/user';
 import { USER_NAME_MAX_LENGTH } from '../domain/user-policy';
 
 export type User = z.infer<ReturnType<typeof zUser>>;
@@ -16,7 +17,7 @@ export const zRole = () => z.enum(['admin', 'user']);
 export const zUser = () =>
   z.object({
     id: zUserId(),
-    name: zu.fieldText.nullish(),
+    name: zUserDisplayName().nullish(),
     email: zEmailAddress(),
     emailVerified: z.boolean(),
     role: zRole().nullish(),

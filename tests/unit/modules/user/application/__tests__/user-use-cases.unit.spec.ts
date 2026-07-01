@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testUserDisplayName } from '@tests/support/branded-values';
 import { describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -13,6 +14,7 @@ import {
   toUserId,
 } from '@/modules/kernel';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import {
   createUserUseCases,
   type User,
@@ -21,14 +23,14 @@ import {
 } from '@/modules/user/testing';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
-const userId = toUserId('user-1');
-const adminId = toUserId('admin-1');
-const targetSessionId = toSessionId('session-2');
-const currentSessionId = toSessionId('current-session');
+const userId = unwrapParseResult(toUserId('user-1'));
+const adminId = unwrapParseResult(toUserId('admin-1'));
+const targetSessionId = unwrapParseResult(toSessionId('session-2'));
+const currentSessionId = unwrapParseResult(toSessionId('current-session'));
 const user: User = {
   id: userId,
-  name: 'User',
-  email: toEmailAddress('user@example.com'),
+  name: testUserDisplayName('User'),
+  email: unwrapParseResult(toEmailAddress('user@example.com')),
   emailVerified: true,
   role: 'user',
   image: null,
@@ -133,7 +135,7 @@ function makeRepo(overrides: Partial<UserRepository> = {}) {
       Result.Ok({
         type: 'user_update_snapshot_found',
         snapshot: {
-          email: toEmailAddress('old@example.com'),
+          email: unwrapParseResult(toEmailAddress('old@example.com')),
           role: 'user',
         },
       })
@@ -247,7 +249,7 @@ async function expectFailure<TOutcome extends { type: string }>(
 describe('user use cases', () => {
   describe('list', () => {
     it('lists users after checking the exact user list permission', async () => {
-      const cursor = toUserId('cursor-1');
+      const cursor = unwrapParseResult(toUserId('cursor-1'));
       const { useCases, repo, permissionChecker, logger } = makeContext({
         permissionChecker: makePermissionChecker(userListPermission),
       });
@@ -344,7 +346,10 @@ describe('user use cases', () => {
 
       await expect(
         expectOk(
-          useCases.get({ currentUserId: adminId, id: toUserId('missing') })
+          useCases.get({
+            currentUserId: adminId,
+            id: unwrapParseResult(toUserId('missing')),
+          })
         )
       ).resolves.toEqual({ type: 'user_not_found' });
     });
@@ -353,8 +358,8 @@ describe('user use cases', () => {
   describe('create', () => {
     it('creates users after checking the exact create permission', async () => {
       const input = {
-        name: 'New User',
-        email: toEmailAddress('new@example.com'),
+        name: testUserDisplayName('New User'),
+        email: unwrapParseResult(toEmailAddress('new@example.com')),
         role: 'admin' as const,
       };
       const { useCases, repo, permissionChecker, logger } = makeContext({
@@ -371,8 +376,8 @@ describe('user use cases', () => {
       ).resolves.toMatchObject({
         type: 'user_created',
         user: {
-          name: 'New User',
-          email: toEmailAddress('new@example.com'),
+          name: testUserDisplayName('New User'),
+          email: unwrapParseResult(toEmailAddress('new@example.com')),
           role: 'admin',
         },
       });
@@ -394,7 +399,10 @@ describe('user use cases', () => {
         expectOk(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('new@example.com'), role: 'user' },
+            user: {
+              email: unwrapParseResult(toEmailAddress('new@example.com')),
+              role: 'user',
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_forbidden' });
@@ -417,7 +425,10 @@ describe('user use cases', () => {
         expectOk(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('user@example.com'), role: 'user' },
+            user: {
+              email: unwrapParseResult(toEmailAddress('user@example.com')),
+              role: 'user',
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_duplicate' });
@@ -437,7 +448,10 @@ describe('user use cases', () => {
         expectFailure(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('user@example.com'), role: 'user' },
+            user: {
+              email: unwrapParseResult(toEmailAddress('user@example.com')),
+              role: 'user',
+            },
           })
         )
       ).resolves.toMatchObject({ code: 'OTHER_CONFLICT' });
@@ -452,7 +466,10 @@ describe('user use cases', () => {
         expectOk(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('new@example.com'), role: 'admin' },
+            user: {
+              email: unwrapParseResult(toEmailAddress('new@example.com')),
+              role: 'admin',
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_forbidden' });
@@ -472,8 +489,8 @@ describe('user use cases', () => {
 
     it('creates a privileged user when both create and set-role are granted', async () => {
       const input = {
-        name: 'New Admin',
-        email: toEmailAddress('admin2@example.com'),
+        name: testUserDisplayName('New Admin'),
+        email: unwrapParseResult(toEmailAddress('admin2@example.com')),
         role: 'admin' as const,
       };
       const { useCases, repo, permissionChecker } = makeContext({
@@ -512,7 +529,9 @@ describe('user use cases', () => {
         expectOk(
           useCases.create({
             currentUserId: adminId,
-            user: { email: toEmailAddress('member@example.com') },
+            user: {
+              email: unwrapParseResult(toEmailAddress('member@example.com')),
+            },
           })
         )
       ).resolves.toMatchObject({
@@ -526,7 +545,7 @@ describe('user use cases', () => {
         userCreatePermission
       );
       expect(repo.create).toHaveBeenCalledWith({
-        email: toEmailAddress('member@example.com'),
+        email: unwrapParseResult(toEmailAddress('member@example.com')),
       });
     });
   });
@@ -542,7 +561,9 @@ describe('user use cases', () => {
           useCases.update({
             currentUserId: adminId,
             id: userId,
-            user: { email: toEmailAddress('next@example.com') },
+            user: {
+              email: unwrapParseResult(toEmailAddress('next@example.com')),
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_forbidden' });
@@ -565,8 +586,10 @@ describe('user use cases', () => {
         expectOk(
           useCases.update({
             currentUserId: adminId,
-            id: toUserId('missing'),
-            user: { email: toEmailAddress('next@example.com') },
+            id: unwrapParseResult(toUserId('missing')),
+            user: {
+              email: unwrapParseResult(toEmailAddress('next@example.com')),
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_not_found' });
@@ -575,7 +598,7 @@ describe('user use cases', () => {
     });
 
     it('updates self without applying submitted role changes', async () => {
-      const nextEmail = toEmailAddress('next@example.com');
+      const nextEmail = unwrapParseResult(toEmailAddress('next@example.com'));
       const { useCases, repo, permissionChecker, logger } = makeContext({
         permissionChecker: makePermissionChecker(userUpdatePermission),
       });
@@ -635,7 +658,7 @@ describe('user use cases', () => {
             currentUserId: adminId,
             id: userId,
             user: {
-              name: 'Updated User',
+              name: testUserDisplayName('Updated User'),
               email: user.email,
               role: 'admin',
             },
@@ -643,7 +666,11 @@ describe('user use cases', () => {
         )
       ).resolves.toMatchObject({
         type: 'user_updated',
-        user: { name: 'Updated User', role: 'admin', emailVerified: true },
+        user: {
+          name: testUserDisplayName('Updated User'),
+          role: 'admin',
+          emailVerified: true,
+        },
       });
 
       expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
@@ -660,7 +687,7 @@ describe('user use cases', () => {
         email: user.email,
         role: 'admin',
         emailVerified: undefined,
-        name: 'Updated User',
+        name: testUserDisplayName('Updated User'),
       });
     });
 
@@ -695,12 +722,9 @@ describe('user use cases', () => {
       expect(repo.update).not.toHaveBeenCalled();
     });
 
-    it('requires set-role and revokes sessions for explicit unchanged role writes', async () => {
+    it('does not require set-role or revoke sessions for an unchanged submitted role', async () => {
       const { useCases, repo, auth, permissionChecker } = makeContext({
-        permissionChecker: makePermissionChecker(
-          userUpdatePermission,
-          userSetRolePermission
-        ),
+        permissionChecker: makePermissionChecker(userUpdatePermission),
         repo: {
           getUpdateSnapshot: vi.fn<UserRepository['getUpdateSnapshot']>(
             async () =>
@@ -728,23 +752,18 @@ describe('user use cases', () => {
         user: { role: 'user' },
       });
 
-      expect(permissionChecker.hasPermission).toHaveBeenCalledTimes(2);
+      expect(permissionChecker.hasPermission).toHaveBeenCalledTimes(1);
       expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
         1,
         adminId,
         userUpdatePermission
       );
-      expect(permissionChecker.hasPermission).toHaveBeenNthCalledWith(
-        2,
-        adminId,
-        userSetRolePermission
-      );
       expect(repo.update).toHaveBeenCalledWith(userId, {
         email: user.email,
-        role: 'user',
+        role: undefined,
         emailVerified: undefined,
       });
-      expect(auth.revokeUserSessions).toHaveBeenCalledWith(userId);
+      expect(auth.revokeUserSessions).not.toHaveBeenCalled();
     });
 
     it('revokes the target sessions after a role change so the cached role is evicted', async () => {
@@ -877,14 +896,14 @@ describe('user use cases', () => {
         )
       ).resolves.toMatchObject({
         type: 'user_updated',
-        user: { name: '' },
+        user: { name: testUserDisplayName('') },
       });
 
       expect(repo.update).toHaveBeenCalledWith(userId, {
         email: user.email,
         role: undefined,
         emailVerified: undefined,
-        name: '',
+        name: testUserDisplayName(''),
       });
     });
 
@@ -924,7 +943,9 @@ describe('user use cases', () => {
           useCases.update({
             currentUserId: adminId,
             id: userId,
-            user: { email: toEmailAddress('duplicate@example.com') },
+            user: {
+              email: unwrapParseResult(toEmailAddress('duplicate@example.com')),
+            },
           })
         )
       ).resolves.toEqual({ type: 'user_duplicate' });
@@ -945,7 +966,9 @@ describe('user use cases', () => {
           useCases.update({
             currentUserId: adminId,
             id: userId,
-            user: { email: toEmailAddress('duplicate@example.com') },
+            user: {
+              email: unwrapParseResult(toEmailAddress('duplicate@example.com')),
+            },
           })
         )
       ).resolves.toMatchObject({ code: 'OTHER_CONFLICT' });
@@ -1026,7 +1049,7 @@ describe('user use cases', () => {
 
   describe('listSessions', () => {
     it('lists sessions after checking the exact session list permission', async () => {
-      const cursor = toSessionId('cursor-session');
+      const cursor = unwrapParseResult(toSessionId('cursor-session'));
       const { useCases, repo, permissionChecker, logger } = makeContext({
         permissionChecker: makePermissionChecker(sessionListPermission),
       });

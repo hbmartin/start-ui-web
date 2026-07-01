@@ -2,6 +2,9 @@ import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toUserId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
+
 type UpdatedUser = {
   email: string;
   id: string;
@@ -175,7 +178,9 @@ describe('PageUserUpdate', () => {
     } satisfies UpdatedUser;
 
     renderToStaticMarkup(
-      createElement(PageUserUpdate, { params: { id: 'user-1' } })
+      createElement(PageUserUpdate, {
+        userId: unwrapParseResult(toUserId('user-1')),
+      })
     );
 
     expect(pageMocks.mutationOptions).toEqual(

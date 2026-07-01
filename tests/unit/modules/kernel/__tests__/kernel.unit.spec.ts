@@ -7,6 +7,7 @@ import { AppError, isAppError } from '@/modules/kernel/domain/errors/app-error';
 import { DomainError } from '@/modules/kernel/domain/errors/domain-error';
 import { toCacheKey } from '@/modules/kernel/domain/ids';
 import { escapeLikePattern } from '@/modules/kernel/infrastructure/db/like';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import { appErrorToResponse } from '@/modules/kernel/transport/http/error-mapper';
 
 function getTestCacheEntry<T>(store: Map<string, unknown>, key: string) {
@@ -117,7 +118,7 @@ describe('kernel primitives', () => {
         store.delete(key);
       },
     };
-    const key = toCacheKey('k');
+    const key = unwrapParseResult(toCacheKey('k'));
 
     await expect(cacheAside({ cache, key, load, ttlMs: 30_000 })).resolves.toBe(
       'value'

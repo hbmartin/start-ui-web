@@ -56,9 +56,11 @@ describe('violatesServerFnBodyLimit', () => {
   });
 
   it('fails closed for invalid Content-Length values', () => {
-    expect(
-      violatesServerFnBodyLimit(requestWithContentLength('not-a-number'))
-    ).toBe(true);
+    for (const value of ['', ' ', '-1', '1.5', '1e6', '0x10', 'not-a-number']) {
+      expect(violatesServerFnBodyLimit(requestWithContentLength(value))).toBe(
+        true
+      );
+    }
   });
 
   it('allows safe methods without Content-Length', () => {

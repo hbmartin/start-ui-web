@@ -1,5 +1,7 @@
+import { Result } from '@bloodyowl/boxed';
+
 import type { ScopeKey, UserId } from '@/modules/kernel/domain/ids';
-import { toScopeKey } from '@/modules/kernel/domain/ids';
+import { type ParseResult, toScopeKey } from '@/modules/kernel/domain/ids';
 
 import type { Role } from './permissions';
 import type { AuthenticatedUser, AuthSession } from './session';
@@ -31,19 +33,21 @@ export const scopeKeyFromScope = (scope: RequestScope) =>
 
 export const scopeKeyFromSession = (
   session: Pick<AuthSession, 'user'> | CurrentSession | null | undefined
-) => {
+): ParseResult<ScopeKey> => {
   if (!session?.user) return toScopeKey('anonymous');
   return scopeKeyFromScope(scopeFromUser(session.user));
 };
 
 export const sanitizeCurrentSession = (
   authSession: AuthSession | null
-): CurrentSession | null => {
-  if (!authSession) return null;
+): ParseResult<CurrentSession | null> => {
+  if (!authSession) return Result.Ok(null);
 
   const scope = scopeFromUser(authSession.user);
+  const scopeKey = scopeKeyFromScope(scope);
+  if (scopeKey.isError()) return Result.Error(scopeKey.getError());
 
-  return {
+  return Result.Ok({
     user: {
       id: authSession.user.id,
       email: authSession.user.email,
@@ -58,6 +62,6 @@ export const sanitizeCurrentSession = (
       expiresAt: authSession.session.expiresAt,
     },
     scope,
-    scopeKey: scopeKeyFromScope(scope),
-  };
+    scopeKey: scopeKey.get(),
+  });
 };

@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testAccountName } from '@tests/support/branded-values';
 import { makeTestKernel } from '@tests/unit/composition/helpers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +10,7 @@ import {
 import type { AccountRepository } from '@/modules/account';
 import { toUserId } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const makeAccountRepository = (
   overrides: Partial<AccountRepository> = {}
@@ -21,7 +23,7 @@ const makeAccountRepository = (
 });
 
 const scope = (userId: string) =>
-  ({ userId: toUserId(userId), role: 'user' }) as const;
+  ({ userId: unwrapParseResult(toUserId(userId)), role: 'user' }) as const;
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
@@ -64,7 +66,7 @@ describe('account composition', () => {
 
     const result = await useCases.updateInfo({
       currentUserId: scope('user-1').userId,
-      name: 'Updated User',
+      name: testAccountName('Updated User'),
     });
 
     expect(getOk(result)).toEqual({
@@ -72,7 +74,7 @@ describe('account composition', () => {
       account: { id: 'user-1' },
     });
     expect(updateInfo).toHaveBeenCalledWith('user-1', {
-      name: 'Updated User',
+      name: testAccountName('Updated User'),
     });
   });
 });

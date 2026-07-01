@@ -1,5 +1,6 @@
 import { makeUserRow } from '@tests/server/db-fixtures';
 import { createPgliteTestDatabase } from '@tests/server/pglite';
+import { testAccountName } from '@tests/support/branded-values';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -7,6 +8,7 @@ import { createAccountRepository } from '@/modules/auth/infrastructure/drizzle/a
 import { toUserId } from '@/modules/kernel/domain/ids';
 import { user as userTable } from '@/modules/kernel/infrastructure/db/schema';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
@@ -36,17 +38,20 @@ describe('AccountRepositoryDrizzle integration', () => {
     await database.db.insert(userTable).values(
       makeUserRow({
         id: 'user-1',
-        name: 'Old Name',
+        name: testAccountName('Old Name'),
         email: 'user@example.com',
       })
     );
 
     expect(
       getOk(
-        await repository.submitOnboarding(toUserId('user-1'), {
-          name: 'New Name',
-          onboardedAt: now,
-        })
+        await repository.submitOnboarding(
+          unwrapParseResult(toUserId('user-1')),
+          {
+            name: testAccountName('New Name'),
+            onboardedAt: now,
+          }
+        )
       )
     ).toEqual({ type: 'account_updated', account: { id: 'user-1' } });
 
@@ -54,28 +59,32 @@ describe('AccountRepositoryDrizzle integration', () => {
       where: eq(userTable.id, 'user-1'),
     });
     expect(onboarded).toMatchObject({
-      name: 'New Name',
+      name: testAccountName('New Name'),
       onboardedAt: now,
     });
 
     expect(
       getOk(
-        await repository.updateInfo(toUserId('user-1'), { name: 'Final Name' })
+        await repository.updateInfo(unwrapParseResult(toUserId('user-1')), {
+          name: testAccountName('Final Name'),
+        })
       )
     ).toEqual({ type: 'account_updated', account: { id: 'user-1' } });
     const updatedUser = await database.db.query.user.findFirst({
       where: eq(userTable.id, 'user-1'),
     });
-    expect(updatedUser).toMatchObject({ name: 'Final Name' });
+    expect(updatedUser).toMatchObject({ name: testAccountName('Final Name') });
 
     expect(
       getOk(
-        await repository.updateInfo(toUserId('missing'), { name: 'Missing' })
+        await repository.updateInfo(unwrapParseResult(toUserId('missing')), {
+          name: testAccountName('Missing'),
+        })
       )
     ).toEqual({ type: 'account_not_found' });
     const finalUser = await database.db.query.user.findFirst({
       where: eq(userTable.id, 'user-1'),
     });
-    expect(finalUser).toMatchObject({ name: 'Final Name' });
+    expect(finalUser).toMatchObject({ name: testAccountName('Final Name') });
   });
 });

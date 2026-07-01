@@ -119,6 +119,19 @@ describe('BridgeLink', () => {
     expect(linkMocks.props).toEqual([]);
   });
 
+  it('throws for protected routes after resolving dot segments and relatives', () => {
+    for (const props of [
+      { to: '/app/../logout' },
+      { from: '/app', to: '../logout' },
+    ]) {
+      expect(() =>
+        renderToStaticMarkup(<BridgeLink {...props}>Logout</BridgeLink>)
+      ).toThrow(/protected side-effect route "\/logout"/);
+    }
+
+    expect(linkMocks.props).toEqual([]);
+  });
+
   it('does not allow explicit preloading to bypass a protected route block', () => {
     expect(() =>
       renderToStaticMarkup(

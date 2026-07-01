@@ -1,35 +1,94 @@
+import { Result } from '@bloodyowl/boxed';
+import { z } from 'zod';
+
+import type { GenreColor, GenreName } from '@/modules/genre';
+import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-error';
 import type {
   BookCoverObjectKey,
   BookId,
   GenreId,
+  ParseResult,
 } from '@/modules/kernel/domain/ids';
-import { toBookCoverObjectKey } from '@/modules/kernel/domain/ids';
+
+import {
+  BOOK_AUTHOR_MAX_LENGTH,
+  BOOK_PUBLISHER_MAX_LENGTH,
+  BOOK_TITLE_MAX_LENGTH,
+} from './book-policy';
+
+export const zBookTitleSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(BOOK_TITLE_MAX_LENGTH)
+  .brand<'BookTitle'>();
+export const zBookAuthorSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(BOOK_AUTHOR_MAX_LENGTH)
+  .brand<'BookAuthor'>();
+export const zPublisherNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(BOOK_PUBLISHER_MAX_LENGTH)
+  .brand<'PublisherName'>();
+
+export type BookTitle = z.infer<typeof zBookTitleSchema>;
+export type BookAuthor = z.infer<typeof zBookAuthorSchema>;
+export type PublisherName = z.infer<typeof zPublisherNameSchema>;
+
+export const zBookTitle = () => zBookTitleSchema;
+export const zBookAuthor = () => zBookAuthorSchema;
+export const zPublisherName = () => zPublisherNameSchema;
+
+const parseBookString = <TSchema extends z.ZodType>(
+  schema: TSchema,
+  value: string,
+  typeName: string
+): ParseResult<z.output<TSchema>> => {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    return Result.Error(
+      new IdValidationError(typeName, value, `${typeName} is invalid`)
+    );
+  }
+  return Result.Ok(result.data);
+};
+
+export const toBookTitle = (value: string): ParseResult<BookTitle> =>
+  parseBookString(zBookTitleSchema, value, 'BookTitle');
+export const toBookAuthor = (value: string): ParseResult<BookAuthor> =>
+  parseBookString(zBookAuthorSchema, value, 'BookAuthor');
+export const toPublisherName = (value: string): ParseResult<PublisherName> =>
+  parseBookString(zPublisherNameSchema, value, 'PublisherName');
 
 export type BookGenreSummary = {
   id: GenreId;
-  name: string;
-  color: string;
+  name: GenreName;
+  color: GenreColor;
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type Book = {
   id: BookId;
-  title: string;
-  author: string;
+  title: BookTitle;
+  author: BookAuthor;
   genreId: GenreId;
   genre: BookGenreSummary | null;
-  publisher: string | null;
+  publisher: PublisherName | null;
   coverId: BookCoverObjectKey | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
 export type BookWriteInput = {
-  title: string;
-  author: string;
+  title: BookTitle;
+  author: BookAuthor;
   genreId: GenreId;
-  publisher?: string | null;
+  publisher?: PublisherName | null;
   coverId?: BookCoverObjectKey | null;
 };
 
@@ -40,13 +99,11 @@ export type BookListPage = {
 };
 
 export function normalizeBookWriteInput(input: BookWriteInput): BookWriteInput {
-  const coverId = input.coverId?.trim();
-
   return {
-    title: input.title.trim(),
-    author: input.author.trim(),
+    title: input.title,
+    author: input.author,
     genreId: input.genreId,
-    publisher: input.publisher?.trim() || null,
-    coverId: coverId ? toBookCoverObjectKey(coverId) : null,
+    publisher: input.publisher ?? null,
+    coverId: input.coverId ?? null,
   };
 }

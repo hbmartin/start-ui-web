@@ -10,7 +10,10 @@ import {
   bookCoverUploadConstraints,
   handleBookCoverBeforeUpload,
 } from '@/modules/book/transport/upload/book-cover';
-import { toBookCoverObjectKey } from '@/modules/kernel/testing';
+import {
+  toBookCoverObjectKey,
+  unwrapParseResult,
+} from '@/modules/kernel/testing';
 import type { TelemetryAdapter } from '@/platform/telemetry';
 
 const headers = new Headers();
@@ -53,7 +56,11 @@ describe('book cover upload transport', () => {
     const prepareCoverUpload = vi.fn(async () =>
       Result.Ok({
         type: 'book_cover_upload_prepared' as const,
-        upload: { objectKey: toBookCoverObjectKey('books/generated.webp') },
+        upload: {
+          objectKey: unwrapParseResult(
+            toBookCoverObjectKey('books/generated.webp')
+          ),
+        },
       })
     );
 

@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testBookAuthor, testBookTitle } from '@tests/support/branded-values';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { BookCoverStorage, BookRepository } from '@/modules/book';
@@ -14,13 +15,14 @@ import {
   toUserId,
 } from '@/modules/kernel';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const book: Book = {
-  id: toBookId('book-1'),
-  title: 'Dune',
-  author: 'Frank Herbert',
-  genreId: toGenreId('genre-1'),
+  id: unwrapParseResult(toBookId('book-1')),
+  title: testBookTitle('Dune'),
+  author: testBookAuthor('Frank Herbert'),
+  genreId: unwrapParseResult(toGenreId('genre-1')),
   genre: null,
   publisher: null,
   coverId: null,
@@ -47,7 +49,7 @@ const forbidden: PermissionChecker = {
 };
 
 const scope = {
-  userId: toUserId('user-1'),
+  userId: unwrapParseResult(toUserId('user-1')),
   role: 'user',
 } as const;
 
@@ -116,6 +118,15 @@ function getOk<TOutcome extends { type: string }>(
   return result.get();
 }
 
+function getError<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isOk()) {
+    throw new Error(`Expected Result.Error, got ${result.get().type}`);
+  }
+  return result.getError();
+}
+
 describe('book use cases', () => {
   it('lists books and returns forbidden when permission is missing', async () => {
     const listed = await createBookUseCases(makeDeps()).list({
@@ -147,7 +158,10 @@ describe('book use cases', () => {
           getById: async () => Result.Ok({ type: 'book_not_found' }),
         }),
       })
-    ).get({ currentUserId: scope.userId, id: toBookId('missing') });
+    ).get({
+      currentUserId: scope.userId,
+      id: unwrapParseResult(toBookId('missing')),
+    });
 
     expect(getOk(missing)).toEqual({ type: 'book_not_found' });
   });
@@ -206,7 +220,11 @@ describe('book use cases', () => {
       makeDeps({ bookRepository: repo })
     ).create({
       currentUserId: scope.userId,
-      book: { ...book, title: '  dune ', author: 'FRANK HERBERT' },
+      book: {
+        ...book,
+        title: testBookTitle('  dune '),
+        author: testBookAuthor('FRANK HERBERT'),
+      },
     });
 
     expect(getOk(duplicate)).toEqual({ type: 'book_duplicate' });
@@ -230,7 +248,7 @@ describe('book use cases', () => {
 
     const updated = await useCases.update({
       currentUserId: scope.userId,
-      id: toBookId('missing'),
+      id: unwrapParseResult(toBookId('missing')),
       book,
     });
 
@@ -238,7 +256,7 @@ describe('book use cases', () => {
     expect(transactionRuns).toBe(1);
     const deleted = await useCases.delete({
       currentUserId: scope.userId,
-      id: toBookId('missing'),
+      id: unwrapParseResult(toBookId('missing')),
     });
 
     expect(getOk(deleted)).toEqual({ type: 'book_not_found' });
@@ -264,7 +282,7 @@ describe('book use cases', () => {
 
     const updated = await useCases.update({
       currentUserId: scope.userId,
-      id: toBookId('book-1'),
+      id: unwrapParseResult(toBookId('book-1')),
       book,
     });
 
@@ -303,7 +321,9 @@ describe('book use cases', () => {
   });
 
   describe('cover upload-key binding and object reclamation', () => {
-    const coverKey = toBookCoverObjectKey('books/generated-cover-id.webp');
+    const coverKey = unwrapParseResult(
+      toBookCoverObjectKey('books/generated-cover-id.webp')
+    );
     const bookWithCover = { ...book, coverId: coverKey };
 
     it('remembers the issued key against the caller when preparing an upload', async () => {
@@ -381,6 +401,36 @@ describe('book use cases', () => {
       expect(deleteObject).toHaveBeenCalledWith(coverKey);
     });
 
+    it('reclaims a consumed cover when create fails after consumption', async () => {
+      const error = new AppError({
+        code: 'BOOK_CREATE_FAILED',
+        category: 'system',
+        status: 500,
+      });
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Ok({ type: 'cover_object_deleted' as const })
+      );
+
+      const result = await createBookUseCases(
+        makeDeps({
+          bookRepository: makeRepo({
+            create: async () => Result.Error(error),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        })
+      ).create({
+        currentUserId: scope.userId,
+        book: { ...book, coverId: coverKey },
+      });
+
+      expect(getError(result)).toBe(error);
+      expect(consumeUpload).toHaveBeenCalledWith(coverKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(coverKey);
+    });
+
     it('on update consumes the binding and reclaims the previous cover only when the cover changes', async () => {
       const consumeUpload = vi.fn(async () =>
         Result.Ok({ type: 'cover_upload_consumed' as const })
@@ -388,8 +438,12 @@ describe('book use cases', () => {
       const deleteObject = vi.fn(async () =>
         Result.Ok({ type: 'cover_object_deleted' as const })
       );
-      const previousKey = toBookCoverObjectKey('books/old-cover.png');
-      const newKey = toBookCoverObjectKey('books/new-cover.webp');
+      const previousKey = unwrapParseResult(
+        toBookCoverObjectKey('books/old-cover.png')
+      );
+      const newKey = unwrapParseResult(
+        toBookCoverObjectKey('books/new-cover.webp')
+      );
 
       const result = await createBookUseCases(
         makeDeps({
@@ -432,8 +486,12 @@ describe('book use cases', () => {
           })
         )
       );
-      const previousKey = toBookCoverObjectKey('books/old-cover.png');
-      const newKey = toBookCoverObjectKey('books/new-cover.webp');
+      const previousKey = unwrapParseResult(
+        toBookCoverObjectKey('books/old-cover.png')
+      );
+      const newKey = unwrapParseResult(
+        toBookCoverObjectKey('books/new-cover.webp')
+      );
 
       const result = await createBookUseCases(
         makeDeps({
@@ -470,8 +528,12 @@ describe('book use cases', () => {
       const deleteObject = vi.fn(async () =>
         Result.Ok({ type: 'cover_object_deleted' as const })
       );
-      const previousKey = toBookCoverObjectKey('books/old-cover.png');
-      const newKey = toBookCoverObjectKey('books/new-cover.webp');
+      const previousKey = unwrapParseResult(
+        toBookCoverObjectKey('books/old-cover.png')
+      );
+      const newKey = unwrapParseResult(
+        toBookCoverObjectKey('books/new-cover.webp')
+      );
 
       const result = await createBookUseCases(
         makeDeps({
@@ -492,6 +554,94 @@ describe('book use cases', () => {
       });
 
       expect(getOk(result)).toEqual({ type: 'book_duplicate' });
+      expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(newKey);
+    });
+
+    it('on update reclaims a consumed new cover when the write fails', async () => {
+      const error = new AppError({
+        code: 'BOOK_UPDATE_FAILED',
+        category: 'system',
+        status: 500,
+      });
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Ok({ type: 'cover_object_deleted' as const })
+      );
+      const previousKey = unwrapParseResult(
+        toBookCoverObjectKey('books/old-cover.png')
+      );
+      const newKey = unwrapParseResult(
+        toBookCoverObjectKey('books/new-cover.webp')
+      );
+
+      const result = await createBookUseCases(
+        makeDeps({
+          bookRepository: makeRepo({
+            getById: async () =>
+              Result.Ok({
+                type: 'book_found',
+                book: { ...book, coverId: previousKey },
+              }),
+            update: async () => Result.Error(error),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        })
+      ).update({
+        currentUserId: scope.userId,
+        id: book.id,
+        book: { ...book, coverId: newKey },
+      });
+
+      expect(getError(result)).toBe(error);
+      expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
+      expect(deleteObject).toHaveBeenCalledWith(newKey);
+    });
+
+    it('on update reclaims a consumed new cover when the transaction throws', async () => {
+      const error = new AppError({
+        code: 'BOOK_TRANSACTION_FAILED',
+        category: 'system',
+        status: 500,
+      });
+      const consumeUpload = vi.fn(async () =>
+        Result.Ok({ type: 'cover_upload_consumed' as const })
+      );
+      const deleteObject = vi.fn(async () =>
+        Result.Ok({ type: 'cover_object_deleted' as const })
+      );
+      const previousKey = unwrapParseResult(
+        toBookCoverObjectKey('books/old-cover.png')
+      );
+      const newKey = unwrapParseResult(
+        toBookCoverObjectKey('books/new-cover.webp')
+      );
+
+      const result = await createBookUseCases({
+        ...makeDeps({
+          bookRepository: makeRepo({
+            getById: async () =>
+              Result.Ok({
+                type: 'book_found',
+                book: { ...book, coverId: previousKey },
+              }),
+          }),
+          coverStorage: makeCoverStorage({ consumeUpload, deleteObject }),
+        }),
+        transactionRunner: {
+          run: async () => {
+            throw error;
+          },
+        },
+      }).update({
+        currentUserId: scope.userId,
+        id: book.id,
+        book: { ...book, coverId: newKey },
+      });
+
+      expect(getError(result)).toBe(error);
       expect(consumeUpload).toHaveBeenCalledWith(newKey, scope.userId);
       expect(deleteObject).toHaveBeenCalledWith(newKey);
     });

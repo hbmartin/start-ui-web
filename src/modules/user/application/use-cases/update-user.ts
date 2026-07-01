@@ -5,7 +5,7 @@ import type { UserId } from '@/modules/kernel/domain/ids';
 
 import type { UserResult, UserUpdateOutcome, UserUseCaseDeps } from './types';
 import type { UserUpdateInput } from '../../domain/user';
-import { shouldUnverifyEmail } from '../../domain/user';
+import { emptyUserDisplayName, shouldUnverifyEmail } from '../../domain/user';
 
 export type UpdateUserInput = {
   currentUserId: UserId;
@@ -54,13 +54,16 @@ export async function updateUser(
   if (currentResultBranch.type === 'return') return currentResultBranch.result;
   const current = currentResultBranch.snapshot;
 
-  const nextRole =
+  const submittedRole =
     input.currentUserId === input.id
       ? undefined
       : (input.user.role ?? undefined);
+  const nextRole =
+    submittedRole !== undefined && submittedRole !== current.role
+      ? submittedRole
+      : undefined;
 
-  const roleWriteRequested =
-    input.currentUserId !== input.id && nextRole !== undefined;
+  const roleWriteRequested = nextRole !== undefined;
 
   if (roleWriteRequested) {
     const canSetRole = await deps.permissionChecker.hasPermission(
@@ -87,7 +90,9 @@ export async function updateUser(
     emailVerified: shouldUnverifyEmail(current.email, input.user.email)
       ? false
       : undefined,
-    ...(input.user.name === undefined ? {} : { name: input.user.name ?? '' }),
+    ...(input.user.name === undefined
+      ? {}
+      : { name: input.user.name ?? emptyUserDisplayName }),
   };
   const result = await deps.userRepository.update(input.id, {
     ...update,

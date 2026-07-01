@@ -13,6 +13,15 @@ function getOk<TOutcome extends { type: string }>(
   return result.get();
 }
 
+function getError<TOutcome extends { type: string }>(
+  result: ApplicationResult<TOutcome>
+) {
+  if (result.isOk()) {
+    throw new Error(`Expected Result.Error, got ${result.get().type}`);
+  }
+  return result.getError();
+}
+
 describe('GenreRepositoryDrizzle integration', () => {
   let database: Awaited<ReturnType<typeof createPgliteTestDatabase>>;
 
@@ -67,5 +76,24 @@ describe('GenreRepositoryDrizzle integration', () => {
       })
     ).page;
     expect(escapedSearch.items.map((genre) => genre.id)).toEqual(['genre-a']);
+  });
+
+  it('maps invalid persisted genre rows to a system row error', async () => {
+    const repository = createGenreRepository({ db: database.db });
+    await database.db.insert(genreTable).values(
+      makeGenreRow({
+        id: 'genre-1',
+        name: 'Broken',
+        color: 'not-a-color',
+      })
+    );
+
+    expect(
+      getError(await repository.list({ limit: 10, searchTerm: '' }))
+    ).toMatchObject({
+      code: 'GENRE_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
   });
 });

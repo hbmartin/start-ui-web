@@ -5,11 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EmailOverrides } from '@/composition/email';
 import type { EmailStatusRepository } from '@/modules/email';
 import { toEmailIdempotencyKey, toEmailRecipientList } from '@/modules/kernel';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const testState = vi.hoisted(() => {
   const makeEmailConfig = () => ({
-    resendApiKey: 'resend-api-key',
-    resendWebhookSecret: 'resend-webhook-secret',
+    resendApiKey: 'resend-api-key', // pragma: allowlist secret
+    resendWebhookSecret: 'resend-webhook-secret', // pragma: allowlist secret
     resendWebhookMaxBytes: 1_000_000,
     server: undefined as string | undefined,
     from: 'Start UI <noreply@example.com>',
@@ -64,10 +65,10 @@ describe('email composition', () => {
     const { getEmailGateway } = await import('@/composition/email');
 
     const result = await getEmailGateway(makeOverrides()).sendEmail({
-      to: toEmailRecipientList('user@example.com'),
+      to: unwrapParseResult(toEmailRecipientList('user@example.com')),
       subject: 'Login code',
       template: createElement('div', null, '123456'),
-      idempotencyKey: toEmailIdempotencyKey('key-1'),
+      idempotencyKey: unwrapParseResult(toEmailIdempotencyKey('key-1')),
     });
 
     expect(result).toMatchObject({
@@ -83,10 +84,10 @@ describe('email composition', () => {
     const { getEmailGateway } = await import('@/composition/email');
 
     const result = await getEmailGateway(makeOverrides()).sendEmail({
-      to: toEmailRecipientList('user@example.com'),
+      to: unwrapParseResult(toEmailRecipientList('user@example.com')),
       subject: 'Login code',
       template: createElement('div', null, '123456'),
-      idempotencyKey: toEmailIdempotencyKey('key-1'),
+      idempotencyKey: unwrapParseResult(toEmailIdempotencyKey('key-1')),
     });
 
     expect(result).toMatchObject({

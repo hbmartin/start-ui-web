@@ -1,5 +1,6 @@
 import { Result } from '@bloodyowl/boxed';
 import { createAuthenticatedContext } from '@tests/server/test-utils';
+import { testUserDisplayName } from '@tests/support/branded-values';
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,7 +9,8 @@ import {
   toSessionId,
   toUserId,
 } from '@/modules/kernel/domain/ids';
-import { USER_NAME_MAX_LENGTH } from '@/modules/user/domain/user-policy';
+import { unwrapParseResult } from '@/modules/kernel/testing';
+import { USER_NAME_MAX_LENGTH } from '@/modules/user';
 import {
   createUserHandlers,
   zGetAllInput,
@@ -31,7 +33,7 @@ describe('user HTTP transport handlers', () => {
     const update = vi.fn(async () =>
       Result.Ok({
         type: 'user_updated' as const,
-        user: { id: toUserId('user-2') },
+        user: { id: unwrapParseResult(toUserId('user-2')) },
       })
     );
     const handlers = createUserHandlers({
@@ -42,7 +44,7 @@ describe('user HTTP transport handlers', () => {
       ctx,
       zUpdateByIdInput().parse({
         id: 'user-2',
-        name: 'Ada',
+        name: testUserDisplayName('Ada'),
         email: 'ada@example.com',
         role: 'admin',
       })
@@ -50,10 +52,10 @@ describe('user HTTP transport handlers', () => {
 
     expect(update).toHaveBeenCalledWith({
       currentUserId: ctx.scope.userId,
-      id: toUserId('user-2'),
+      id: unwrapParseResult(toUserId('user-2')),
       user: {
-        name: 'Ada',
-        email: toEmailAddress('ada@example.com'),
+        name: testUserDisplayName('Ada'),
+        email: unwrapParseResult(toEmailAddress('ada@example.com')),
         role: 'admin',
       },
     });
@@ -82,8 +84,8 @@ describe('user HTTP transport handlers', () => {
 
     expect(listSessions).toHaveBeenCalledWith({
       currentUserId: ctx.scope.userId,
-      userId: toUserId('user-2'),
-      cursor: toSessionId('session-2'),
+      userId: unwrapParseResult(toUserId('user-2')),
+      cursor: unwrapParseResult(toSessionId('session-2')),
       limit: 5,
     });
   });

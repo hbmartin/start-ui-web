@@ -92,13 +92,20 @@ export class AuthEmailPortEmailGateway implements AuthEmailPort {
       },
     });
 
+    const recipientList = toEmailRecipientList(input.email);
+    if (recipientList.isError()) return Result.Error(recipientList.getError());
+
+    const idempotencyKey = signInOtpIdempotencyKey(input);
+    if (idempotencyKey.isError())
+      return Result.Error(idempotencyKey.getError());
+
     const result = await this.emailGateway.sendEmail({
-      to: toEmailRecipientList(input.email),
+      to: recipientList.get(),
       subject: t('loginCode.subject'),
       template: (
         <TemplateLoginCode language={input.language} code={input.otp} />
       ),
-      idempotencyKey: signInOtpIdempotencyKey(input),
+      idempotencyKey: idempotencyKey.get(),
       metadata,
     });
     if (result.isError()) {

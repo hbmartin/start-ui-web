@@ -14,6 +14,7 @@ import type {
   UserAdminGateway,
 } from '@/modules/auth';
 import { toUserId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const makeAuthOverrides = (): Required<AuthOverrides> => ({
   sessionGateway: {
@@ -60,7 +61,7 @@ describe('auth composition', () => {
     expect(second).not.toBe(first);
 
     await first.checkPermission({
-      userId: toUserId('user-1'),
+      userId: unwrapParseResult(toUserId('user-1')),
       permissions: { book: ['read'] },
       headers: new Headers(),
     });

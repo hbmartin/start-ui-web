@@ -1,4 +1,9 @@
 import { Result } from '@bloodyowl/boxed';
+import {
+  testBookAuthor,
+  testBookTitle,
+  testPublisherName,
+} from '@tests/support/branded-values';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,10 +25,11 @@ import {
   toGenreId,
   toUserId,
 } from '@/modules/kernel';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
-const genreId = toGenreId('genre-1');
-const currentUserId = toUserId('admin-1');
+const genreId = unwrapParseResult(toGenreId('genre-1'));
+const currentUserId = unwrapParseResult(toUserId('admin-1'));
 const logger: Logger = {
   debug: () => {},
   error: () => {},
@@ -100,7 +106,7 @@ class InMemoryBookRepository implements BookRepository {
       return Result.Ok({ type: 'book_duplicate' as const });
     }
 
-    const id = toBookId(`book-${this.#nextId}`);
+    const id = unwrapParseResult(toBookId(`book-${this.#nextId}`));
     this.#nextId += 1;
     const book = this.#toBook(id, input);
     this.books.set(id, book);
@@ -180,11 +186,11 @@ describe('book public workflow integration', () => {
 
     const created = await useCases.create({
       book: {
-        author: ' Frank Herbert ',
-        coverId: toBookCoverObjectKey(' cover-1 '),
+        author: testBookAuthor(' Frank Herbert '),
+        coverId: unwrapParseResult(toBookCoverObjectKey(' cover-1 ')),
         genreId,
-        publisher: ' Ace ',
-        title: ' Dune ',
+        publisher: testPublisherName(' Ace '),
+        title: testBookTitle(' Dune '),
       },
       currentUserId,
     });
@@ -192,10 +198,10 @@ describe('book public workflow integration', () => {
     expect(getOk(created)).toMatchObject({
       type: 'book_created',
       book: {
-        author: 'Frank Herbert',
+        author: testBookAuthor('Frank Herbert'),
         coverId: 'cover-1',
-        publisher: 'Ace',
-        title: 'Dune',
+        publisher: testPublisherName('Ace'),
+        title: testBookTitle('Dune'),
       },
     });
 
@@ -209,17 +215,17 @@ describe('book public workflow integration', () => {
     expect(getOk(listed)).toMatchObject({
       type: 'book_listed',
       page: {
-        items: [{ id: createdId, title: 'Dune' }],
+        items: [{ id: createdId, title: testBookTitle('Dune') }],
         total: 1,
       },
     });
 
     const updated = await useCases.update({
       book: {
-        author: 'Ursula K. Le Guin',
+        author: testBookAuthor('Ursula K. Le Guin'),
         genreId,
-        publisher: ' ',
-        title: ' A Wizard of Earthsea ',
+        publisher: null,
+        title: testBookTitle(' A Wizard of Earthsea '),
       },
       currentUserId,
       id: createdId,
@@ -227,17 +233,17 @@ describe('book public workflow integration', () => {
     expect(getOk(updated)).toMatchObject({
       type: 'book_updated',
       book: {
-        author: 'Ursula K. Le Guin',
+        author: testBookAuthor('Ursula K. Le Guin'),
         publisher: null,
-        title: 'A Wizard of Earthsea',
+        title: testBookTitle('A Wizard of Earthsea'),
       },
     });
 
     const duplicate = await useCases.create({
       book: {
-        author: ' ursula k. le guin ',
+        author: testBookAuthor(' ursula k. le guin '),
         genreId,
-        title: ' a wizard of earthsea ',
+        title: testBookTitle(' a wizard of earthsea '),
       },
       currentUserId,
     });

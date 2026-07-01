@@ -15,6 +15,7 @@ describe('navigation safety', () => {
     expect(normalizeNavigationPathname('/logout')).toBe('/logout');
     expect(normalizeNavigationPathname('/logout/')).toBe('/logout');
     expect(normalizeNavigationPathname('/logout//')).toBe('/logout');
+    expect(normalizeNavigationPathname('/app/../logout')).toBe('/logout');
     expect(normalizeNavigationPathname('/logout/?next=/manager#top')).toBe(
       '/logout'
     );
@@ -33,6 +34,7 @@ describe('navigation safety', () => {
   it('protects logout route variants', () => {
     expect(isProtectedNavigationPath('/logout')).toBe(true);
     expect(isProtectedNavigationPath('/logout/')).toBe(true);
+    expect(isProtectedNavigationPath('/app/../logout')).toBe(true);
   });
 
   it('does not protect ordinary declarative routes or external-looking values', () => {

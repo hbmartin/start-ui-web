@@ -28,7 +28,7 @@ import {
   useCurrentScopeKey,
 } from '@/modules/auth/client';
 import { isServerFnError } from '@/modules/kernel/client';
-import { toUserId } from '@/modules/kernel/domain/ids';
+import type { UserId } from '@/modules/kernel/domain/ids';
 import { userQueries } from '@/modules/user/client';
 
 import {
@@ -41,7 +41,7 @@ import { useReauthPrompt } from './use-reauth-prompt';
 const isNotFoundError = (error: unknown) =>
   isServerFnError(error) && error.code === 'NOT_FOUND';
 
-export const PageUserUpdate = (props: { params: { id: string } }) => {
+export const PageUserUpdate = (props: { userId: UserId }) => {
   const { t } = useTranslation(['user']);
   const { navigateBack } = useNavigateBack();
   const session = useAuthSession();
@@ -49,7 +49,7 @@ export const PageUserUpdate = (props: { params: { id: string } }) => {
   const router = useRouter();
   const scopeKey = useCurrentScopeKey();
   const promptReauth = useReauthPrompt();
-  const userId = toUserId(props.params.id);
+  const userId = props.userId;
   const userDetailQuery = userQueries.getById({ id: userId, scopeKey });
   const userQuery = useQuery(userDetailQuery);
   const userUpdate = useMutation({

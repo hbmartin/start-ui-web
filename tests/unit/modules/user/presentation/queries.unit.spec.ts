@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { toScopeKey, toUserId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 import { userQueries } from '@/modules/user/client';
 import {
   createUserQueries,
@@ -9,8 +10,8 @@ import {
 
 describe('user query keys', () => {
   it('partitions protected read keys by scope', () => {
-    const scopeA = toScopeKey('scope-a');
-    const scopeB = toScopeKey('scope-b');
+    const scopeA = unwrapParseResult(toScopeKey('scope-a'));
+    const scopeB = unwrapParseResult(toScopeKey('scope-b'));
 
     expect(userQueries.all()).toEqual(['user', 'v1']);
     expect(userQueries.getAll(scopeA)).toEqual([
@@ -25,7 +26,7 @@ describe('user query keys', () => {
 
     expect(
       userQueries.getUserSessionsInfinite({
-        userId: toUserId('user-1'),
+        userId: unwrapParseResult(toUserId('user-1')),
         scopeKey: scopeA,
       }).queryKey
     ).toContainEqual({ scopeKey: scopeA });
@@ -67,8 +68,8 @@ describe('user query keys', () => {
       userUpdateById: vi.fn(async () => ({ type: 'updated' })),
     } as unknown as UserQueryFacade;
     const queries = createUserQueries(facade);
-    const scopeKey = toScopeKey('scope-a');
-    const userId = toUserId('user-1');
+    const scopeKey = unwrapParseResult(toScopeKey('scope-a'));
+    const userId = unwrapParseResult(toUserId('user-1'));
 
     await (
       queries.getAllList({ scopeKey }).queryFn as () => Promise<unknown>

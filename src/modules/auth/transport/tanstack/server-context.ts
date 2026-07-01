@@ -240,16 +240,26 @@ const getStartRequestId = () => {
   const requestId = getStartRequestContext()?.requestId;
   if (typeof requestId !== 'string') return undefined;
 
-  try {
-    return toRequestId(requestId);
-  } catch {
-    return undefined;
-  }
+  const parsed = toRequestId(requestId);
+  return parsed.isOk() ? parsed.get() : undefined;
 };
 
 const getStartAuthSession = () => {
   const auth = getStartRequestContext()?.auth;
   return typeof auth?.getSession === 'function' ? auth.getSession() : undefined;
+};
+
+const requestIdFromRuntime = () => {
+  const startRequestId = getStartRequestId();
+  if (startRequestId) return startRequestId;
+
+  const parsed = toRequestId(randomUUID());
+  if (parsed.isOk()) return parsed.get();
+
+  const fallback = toRequestId(randomUUID());
+  if (fallback.isOk()) return fallback.get();
+
+  throw new ServerFnError('INTERNAL_SERVER_ERROR');
 };
 
 const getSessionCreatedAtMs = (
@@ -297,7 +307,7 @@ export const createServerContextTools = ({
     fn: (ctx: PublicContext) => Promise<T>
   ): Promise<T> => {
     const start = performance.now();
-    const requestId = getStartRequestId() ?? toRequestId(randomUUID());
+    const requestId = requestIdFromRuntime();
     const timings: ServerTimingEntry[] = [];
     let procedureLogger = createRequestLogger({ logger, requestId });
     procedureLogger.info({
@@ -316,12 +326,14 @@ export const createServerContextTools = ({
             role: session.user.role,
           });
           const scope = scopeFromUser(session.user);
+          const scopeKey = scopeKeyFromScope(scope);
+          if (scopeKey.isError()) throw scopeKey.getError();
           procedureLogger = createRequestLogger({
             logger,
             requestId,
             userId: session.user.id,
             sessionId: session.session.id,
-            scopeKey: scopeKeyFromScope(scope),
+            scopeKey: scopeKey.get(),
           });
         } else {
           telemetry.setUser(null);

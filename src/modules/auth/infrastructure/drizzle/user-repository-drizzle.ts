@@ -2,12 +2,15 @@ import { Result } from '@bloodyowl/boxed';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { match, P } from 'ts-pattern';
 
+import type { ApplicationResult } from '@/modules/kernel/application/result';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import type { SessionId, UserId } from '@/modules/kernel/domain/ids';
 import {
+  type ParseResult,
+  type SessionId,
   toEmailAddress,
   toSessionId,
   toUserId,
+  type UserId,
 } from '@/modules/kernel/domain/ids';
 import {
   getConstraintName,
@@ -28,21 +31,55 @@ import type {
   UserSession,
   UserUpdatePersistenceInput,
 } from '@/modules/user';
+import { toUserDisplayName } from '@/modules/user';
 
 import { session as sessionTable, user as userTable } from './schema';
 
-function toDomainUser(row: typeof userTable.$inferSelect): User {
-  return {
-    id: toUserId(row.id),
-    name: row.name,
-    email: toEmailAddress(row.email),
+function invalidUserRowError(cause: unknown): AppError {
+  return new AppError({
+    code: 'USER_ROW_INVALID',
+    category: 'system',
+    status: 500,
+    message: 'User row contains invalid data',
+    cause,
+  });
+}
+
+function parseUserRowValue<TValue>(
+  result: ParseResult<TValue>
+): ApplicationResult<TValue> {
+  return result.isError()
+    ? Result.Error(invalidUserRowError(result.getError()))
+    : Result.Ok(result.get());
+}
+
+function toDomainUser(
+  row: typeof userTable.$inferSelect
+): ApplicationResult<User> {
+  const id = parseUserRowValue(toUserId(row.id));
+  if (id.isError()) return Result.Error(id.getError());
+
+  const email = parseUserRowValue(toEmailAddress(row.email));
+  if (email.isError()) return Result.Error(email.getError());
+
+  let name: User['name'] = null;
+  if (row.name) {
+    const parsedName = parseUserRowValue(toUserDisplayName(row.name));
+    if (parsedName.isError()) return Result.Error(parsedName.getError());
+    name = parsedName.get();
+  }
+
+  return Result.Ok({
+    id: id.get(),
+    name,
+    email: email.get(),
     emailVerified: row.emailVerified,
     role: row.role,
     image: row.image,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     onboardedAt: row.onboardedAt,
-  };
+  });
 }
 
 function toDomainSession(
@@ -50,15 +87,45 @@ function toDomainSession(
     typeof sessionTable.$inferSelect,
     'id' | 'createdAt' | 'updatedAt' | 'expiresAt' | 'ipAddress' | 'userAgent'
   >
-): UserSession {
-  return {
-    id: toSessionId(row.id),
+): ApplicationResult<UserSession> {
+  const id = parseUserRowValue(toSessionId(row.id));
+  if (id.isError()) return Result.Error(id.getError());
+
+  return Result.Ok({
+    id: id.get(),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     expiresAt: row.expiresAt,
     ipAddress: row.ipAddress,
     userAgent: row.userAgent,
-  };
+  });
+}
+
+function toDomainUserList(
+  rows: readonly (typeof userTable.$inferSelect)[]
+): ApplicationResult<User[]> {
+  const users: User[] = [];
+  for (const row of rows) {
+    const user = toDomainUser(row);
+    if (user.isError()) return Result.Error(user.getError());
+    users.push(user.get());
+  }
+  return Result.Ok(users);
+}
+
+function toDomainSessionList(
+  rows: readonly Pick<
+    typeof sessionTable.$inferSelect,
+    'id' | 'createdAt' | 'updatedAt' | 'expiresAt' | 'ipAddress' | 'userAgent'
+  >[]
+): ApplicationResult<UserSession[]> {
+  const sessions: UserSession[] = [];
+  for (const row of rows) {
+    const session = toDomainSession(row);
+    if (session.isError()) return Result.Error(session.getError());
+    sessions.push(session.get());
+  }
+  return Result.Ok(sessions);
 }
 
 function isUserDuplicateError(error: unknown) {
@@ -168,14 +235,24 @@ export class UserRepositoryDrizzle implements UserRepository {
       const { pageRows, nextCursor } = takeCursorPage(
         rows,
         input.limit,
-        (row) => toUserId(row.id)
+        (row) => row.id
       );
+      let parsedNextCursor: UserId | undefined;
+      if (nextCursor) {
+        const cursor = parseUserRowValue(toUserId(nextCursor));
+        if (cursor.isError()) {
+          return Result.Error(cursor.getError());
+        }
+        parsedNextCursor = cursor.get();
+      }
+      const items = toDomainUserList(pageRows);
+      if (items.isError()) return Result.Error(items.getError());
 
       return Result.Ok({
         type: 'user_listed',
         page: {
-          items: pageRows.map(toDomainUser),
-          nextCursor,
+          items: items.get(),
+          nextCursor: parsedNextCursor,
           total: total[0]?.count ?? 0,
         },
       });
@@ -189,11 +266,12 @@ export class UserRepositoryDrizzle implements UserRepository {
       const row = await this.db.query.user.findFirst({
         where: eq(userTable.id, id),
       });
-      return Result.Ok(
-        row
-          ? { type: 'user_found', user: toDomainUser(row) }
-          : { type: 'user_not_found' }
-      );
+      if (!row) return Result.Ok({ type: 'user_not_found' });
+
+      const user = toDomainUser(row);
+      if (user.isError()) return Result.Error(user.getError());
+
+      return Result.Ok({ type: 'user_found', user: user.get() });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }
@@ -222,7 +300,10 @@ export class UserRepositoryDrizzle implements UserRepository {
         );
       }
 
-      return Result.Ok({ type: 'user_created', user: toDomainUser(created) });
+      const user = toDomainUser(created);
+      if (user.isError()) return Result.Error(user.getError());
+
+      return Result.Ok({ type: 'user_created', user: user.get() });
     } catch (error) {
       if (isUserDuplicateError(error))
         return Result.Ok({ type: 'user_duplicate' });
@@ -238,14 +319,15 @@ export class UserRepositoryDrizzle implements UserRepository {
         where: eq(userTable.id, id),
         columns: { email: true, role: true },
       });
-      return Result.Ok(
-        row
-          ? {
-              type: 'user_update_snapshot_found',
-              snapshot: { email: toEmailAddress(row.email), role: row.role },
-            }
-          : { type: 'user_not_found' }
-      );
+      if (!row) return Result.Ok({ type: 'user_not_found' });
+
+      const email = parseUserRowValue(toEmailAddress(row.email));
+      if (email.isError()) return Result.Error(email.getError());
+
+      return Result.Ok({
+        type: 'user_update_snapshot_found',
+        snapshot: { email: email.get(), role: row.role },
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }
@@ -267,11 +349,12 @@ export class UserRepositoryDrizzle implements UserRepository {
         .where(eq(userTable.id, id))
         .returning();
 
-      return Result.Ok(
-        updated
-          ? { type: 'user_updated', user: toDomainUser(updated) }
-          : { type: 'user_not_found' }
-      );
+      if (!updated) return Result.Ok({ type: 'user_not_found' });
+
+      const user = toDomainUser(updated);
+      if (user.isError()) return Result.Error(user.getError());
+
+      return Result.Ok({ type: 'user_updated', user: user.get() });
     } catch (error) {
       if (isUserDuplicateError(error))
         return Result.Ok({ type: 'user_duplicate' });
@@ -346,14 +429,24 @@ export class UserRepositoryDrizzle implements UserRepository {
       const { pageRows, nextCursor } = takeCursorPage(
         rows,
         input.limit,
-        (row) => toSessionId(row.id)
+        (row) => row.id
       );
+      let parsedNextCursor: SessionId | undefined;
+      if (nextCursor) {
+        const cursor = parseUserRowValue(toSessionId(nextCursor));
+        if (cursor.isError()) {
+          return Result.Error(cursor.getError());
+        }
+        parsedNextCursor = cursor.get();
+      }
+      const items = toDomainSessionList(pageRows);
+      if (items.isError()) return Result.Error(items.getError());
 
       return Result.Ok({
         type: 'user_sessions_listed',
         page: {
-          items: pageRows.map(toDomainSession),
-          nextCursor,
+          items: items.get(),
+          nextCursor: parsedNextCursor,
           total: total[0]?.count ?? 0,
         },
       });
@@ -375,14 +468,15 @@ export class UserRepositoryDrizzle implements UserRepository {
         columns: { id: true },
       });
 
-      return Result.Ok(
-        row
-          ? {
-              type: 'user_session_revocation_target_found',
-              target: { id: toSessionId(row.id) },
-            }
-          : { type: 'user_session_not_found' }
-      );
+      if (!row) return Result.Ok({ type: 'user_session_not_found' });
+
+      const id = parseUserRowValue(toSessionId(row.id));
+      if (id.isError()) return Result.Error(id.getError());
+
+      return Result.Ok({
+        type: 'user_session_revocation_target_found',
+        target: { id: id.get() },
+      });
     } catch (error) {
       return Result.Error(mapDbError(error));
     }

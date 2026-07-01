@@ -1,8 +1,10 @@
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it } from 'vitest';
 
-import { normalizeGenreSearchTerm } from '@/modules/genre/domain/genre';
-import { isValidGenreColor } from '@/modules/genre/domain/genre-policy';
+import {
+  normalizeGenreSearchTerm,
+  toGenreColor,
+} from '@/modules/genre/domain/genre';
 
 const hexCharacter = fc.constantFrom(
   '0',
@@ -33,8 +35,8 @@ describe('genre domain', () => {
   it('normalizes search terms and validates hex colors', () => {
     expect(normalizeGenreSearchTerm(' fiction ')).toBe('fiction');
     expect(normalizeGenreSearchTerm(undefined)).toBe('');
-    expect(isValidGenreColor('#aabbcc')).toBe(true);
-    expect(isValidGenreColor('aabbcc')).toBe(false);
+    expect(toGenreColor('#aabbcc').isOk()).toBe(true);
+    expect(toGenreColor('aabbcc').isError()).toBe(true);
   });
 
   test.prop([fc.string({ maxLength: 80 })], PROPERTY_DEFAULTS)(
@@ -48,6 +50,6 @@ describe('genre domain', () => {
     [fc.array(hexCharacter, { minLength: 6, maxLength: 6 })],
     PROPERTY_DEFAULTS
   )('accepts generated six-digit hex colors with a leading hash', (digits) => {
-    expect(isValidGenreColor(`#${digits.join('')}`)).toBe(true);
+    expect(toGenreColor(`#${digits.join('')}`).isOk()).toBe(true);
   });
 });

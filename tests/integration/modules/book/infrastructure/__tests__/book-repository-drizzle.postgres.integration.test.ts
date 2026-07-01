@@ -2,6 +2,7 @@ import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { makeBookRow, makeGenreRow } from '@tests/server/db-fixtures';
 import { POSTGRES_TESTCONTAINER_IMAGE } from '@tests/server/docker-images';
+import { testBookAuthor, testBookTitle } from '@tests/support/branded-values';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createBookRepository } from '@/modules/book/infrastructure/drizzle/book-repository-drizzle';
@@ -20,6 +21,7 @@ import {
 } from '@/modules/kernel/infrastructure/db/schema';
 import type { DbLike } from '@/modules/kernel/infrastructure/db/types';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 function getOk<TOutcome extends { type: string }>(
   result: ApplicationResult<TOutcome>
@@ -98,8 +100,8 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
     await initializedDb.insert(bookTable).values(
       makeBookRow({
         id: 'book-1',
-        title: 'Original Title',
-        author: 'Original Author',
+        title: testBookTitle('Original Title'),
+        author: testBookAuthor('Original Author'),
         genreId: 'genre-1',
       })
     );
@@ -107,10 +109,10 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
     await expect(
       initializedDb.transaction(async (tx) => {
         const repository = createBookRepository({ db: tx as DbLike });
-        await repository.update(toBookId('book-1'), {
-          title: 'Updated Title',
-          author: 'Updated Author',
-          genreId: toGenreId('genre-1'),
+        await repository.update(unwrapParseResult(toBookId('book-1')), {
+          title: testBookTitle('Updated Title'),
+          author: testBookAuthor('Updated Author'),
+          genreId: unwrapParseResult(toGenreId('genre-1')),
           publisher: null,
           coverId: null,
         });
@@ -123,8 +125,8 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
         where: (book, { eq }) => eq(book.id, 'book-1'),
       })
     ).resolves.toMatchObject({
-      title: 'Original Title',
-      author: 'Original Author',
+      title: testBookTitle('Original Title'),
+      author: testBookAuthor('Original Author'),
     });
   });
 
@@ -138,16 +140,16 @@ describe('BookRepositoryDrizzle PostgreSQL integration', () => {
     await initializedDb.insert(bookTable).values(
       makeBookRow({
         id: 'book-1',
-        title: 'Dune',
-        author: 'Frank Herbert',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
         genreId: 'genre-1',
       })
     );
 
     const result = await repository.create({
-      title: '  dune ',
-      author: 'FRANK HERBERT',
-      genreId: toGenreId('genre-1'),
+      title: testBookTitle('  dune '),
+      author: testBookAuthor('FRANK HERBERT'),
+      genreId: unwrapParseResult(toGenreId('genre-1')),
       publisher: null,
       coverId: null,
     });

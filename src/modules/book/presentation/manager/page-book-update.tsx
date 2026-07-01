@@ -22,7 +22,7 @@ import { useIsUploadingFiles } from '@/platform/components/upload/utils';
 import { useCurrentScopeKey } from '@/modules/auth/client';
 import { bookQueries } from '@/modules/book/client';
 import { isServerFnError } from '@/modules/kernel/client';
-import { toBookId } from '@/modules/kernel/domain/ids';
+import type { BookId } from '@/modules/kernel/domain/ids';
 
 import {
   FormBook,
@@ -31,12 +31,12 @@ import {
 } from './form-book';
 import { FormBookCover } from './form-book-cover';
 
-export const PageBookUpdate = (props: { params: { id: string } }) => {
+export const PageBookUpdate = (props: { bookId: BookId }) => {
   const { t } = useTranslation(['book']);
   const { navigateBack } = useNavigateBack();
   const queryClient = useQueryClient();
   const scopeKey = useCurrentScopeKey();
-  const bookId = toBookId(props.params.id);
+  const bookId = props.bookId;
   const bookQuery = useQuery(bookQueries.getById({ id: bookId, scopeKey }));
 
   const isUploadingFiles = useIsUploadingFiles('bookCover');

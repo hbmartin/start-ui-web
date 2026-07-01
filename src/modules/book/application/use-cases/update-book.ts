@@ -53,6 +53,18 @@ export async function updateBook(
     consumedCoverId = book.coverId;
   }
 
+  const reclaimConsumedCover = async () => {
+    if (!consumedCoverId) return;
+
+    const deleted = await deps.coverStorage.deleteObject(consumedCoverId);
+    if (deleted.isError()) {
+      deps.logger.warn({
+        event: 'book.cover_object.delete_failed',
+        details: { bookId: input.id, objectKey: consumedCoverId },
+      });
+    }
+  };
+
   try {
     deps.logger.info({
       event: 'book.update',
@@ -61,17 +73,14 @@ export async function updateBook(
     const result = await deps.transactionRunner.run(({ bookRepository }) =>
       bookRepository.update(input.id, book)
     );
-    if (result.isError()) return Result.Error(result.getError());
+    if (result.isError()) {
+      await reclaimConsumedCover();
+      return Result.Error(result.getError());
+    }
     const updated = result.get();
 
     if (updated.type !== 'book_updated' && consumedCoverId) {
-      const deleted = await deps.coverStorage.deleteObject(consumedCoverId);
-      if (deleted.isError()) {
-        deps.logger.warn({
-          event: 'book.cover_object.delete_failed',
-          details: { bookId: input.id, objectKey: consumedCoverId },
-        });
-      }
+      await reclaimConsumedCover();
     }
 
     // Reclaim the superseded cover object. Best-effort: a delete failure is
@@ -94,6 +103,8 @@ export async function updateBook(
 
     return Result.Ok(updated);
   } catch (error) {
+    await reclaimConsumedCover();
+
     return Result.Error(
       error instanceof AppError
         ? error

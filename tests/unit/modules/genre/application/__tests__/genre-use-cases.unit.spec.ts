@@ -1,4 +1,5 @@
 import { Result } from '@bloodyowl/boxed';
+import { testGenreColor, testGenreName } from '@tests/support/branded-values';
 import { describe, expect, it } from 'vitest';
 
 import type { GenreRepository } from '@/modules/genre/application/ports/genre-repository';
@@ -7,12 +8,13 @@ import { createGenreUseCases } from '@/modules/genre/factory';
 import type { PermissionChecker } from '@/modules/kernel/application/ports/permission-checker';
 import { toGenreId, toUserId } from '@/modules/kernel/domain/ids';
 import type { ApplicationResult } from '@/modules/kernel/testing';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const now = new Date('2026-01-01T00:00:00.000Z');
 const genre: Genre = {
-  id: toGenreId('genre-1'),
-  name: 'Fiction',
-  color: '#aabbcc',
+  id: unwrapParseResult(toGenreId('genre-1')),
+  name: testGenreName('Fiction'),
+  color: testGenreColor('#aabbcc'),
   createdAt: now,
   updatedAt: now,
 };
@@ -37,7 +39,7 @@ const allowed: PermissionChecker = {
 };
 
 const scope = {
-  userId: toUserId('user-1'),
+  userId: unwrapParseResult(toUserId('user-1')),
   role: 'user',
 } as const;
 

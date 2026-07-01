@@ -27,11 +27,16 @@ export async function prepareBookCoverUpload(
     return Result.Ok({ type: 'book_cover_upload_forbidden' });
   }
 
+  const fileId = deps.idGenerator.createId();
+  if (fileId.isError()) return Result.Error(fileId.getError());
+
   const objectKey = createBookCoverObjectKey({
-    fileId: deps.idGenerator.createId(),
+    fileId: fileId.get(),
     fileType: input.fileType,
   });
-  if (!objectKey) {
+  if (objectKey.isError()) return Result.Error(objectKey.getError());
+  const parsedObjectKey = objectKey.get();
+  if (!parsedObjectKey) {
     return Result.Ok({ type: 'book_cover_upload_invalid_file_type' });
   }
 
@@ -39,7 +44,7 @@ export async function prepareBookCoverUpload(
   // book; the binding is verified and consumed on write
   // (`coverStorage.consumeUpload`). (CWE-472 / CWE-639.)
   const remembered = await deps.coverStorage.rememberUpload(
-    objectKey,
+    parsedObjectKey,
     input.currentUserId
   );
   if (remembered.isError()) return Result.Error(remembered.getError());
@@ -52,6 +57,6 @@ export async function prepareBookCoverUpload(
   });
   return Result.Ok({
     type: 'book_cover_upload_prepared',
-    upload: { objectKey },
+    upload: { objectKey: parsedObjectKey },
   });
 }

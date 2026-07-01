@@ -8,6 +8,7 @@ import {
   zGetAllInput,
 } from '@/modules/genre/transport/http/genre-handlers';
 import { toGenreId } from '@/modules/kernel/domain/ids';
+import { unwrapParseResult } from '@/modules/kernel/testing';
 
 const validPaginationLimit = fc.integer({ max: 100, min: 1 });
 const invalidPaginationLimit = fc.oneof(
@@ -42,7 +43,7 @@ describe('genre HTTP transport handlers', () => {
 
     expect(list).toHaveBeenCalledWith({
       currentUserId: ctx.scope.userId,
-      cursor: toGenreId('genre-1'),
+      cursor: unwrapParseResult(toGenreId('genre-1')),
       limit: 3,
       searchTerm: 'sci-fi',
     });
