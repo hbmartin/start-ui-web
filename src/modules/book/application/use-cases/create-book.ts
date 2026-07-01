@@ -60,7 +60,19 @@ export async function createBook(
 
   deps.logger.info({ event: 'book.create' });
   const result = await deps.bookRepository.create(book);
-  if (result.isError()) return Result.Error(result.getError());
+  if (result.isError()) {
+    if (consumedCoverId) {
+      const removed = await deps.coverStorage.deleteObject(consumedCoverId);
+      if (removed.isError()) {
+        deps.logger.warn({
+          event: 'book.cover_object.delete_failed',
+          details: { objectKey: consumedCoverId },
+        });
+      }
+    }
+
+    return Result.Error(result.getError());
+  }
   const created = result.get();
 
   if (created.type !== 'book_created' && consumedCoverId) {

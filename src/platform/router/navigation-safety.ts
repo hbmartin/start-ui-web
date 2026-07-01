@@ -12,17 +12,19 @@ const stripTrailingSlashes = (pathname: string) => {
   return pathname.slice(0, end);
 };
 
+const localNavigationUrlBase = 'https://local.navigation';
+
 export const normalizeNavigationPathname = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
 
-  const hashIndex = trimmed.indexOf('#');
-  const withoutHash = hashIndex === -1 ? trimmed : trimmed.slice(0, hashIndex);
-  const searchIndex = withoutHash.indexOf('?');
-  const pathname =
-    searchIndex === -1 ? withoutHash : withoutHash.slice(0, searchIndex);
-
-  return stripTrailingSlashes(pathname);
+  try {
+    return stripTrailingSlashes(
+      new URL(trimmed, localNavigationUrlBase).pathname
+    );
+  } catch {
+    return null;
+  }
 };
 
 export const isProtectedNavigationPath = (pathname: string) => {

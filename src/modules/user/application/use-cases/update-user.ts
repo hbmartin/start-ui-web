@@ -54,13 +54,16 @@ export async function updateUser(
   if (currentResultBranch.type === 'return') return currentResultBranch.result;
   const current = currentResultBranch.snapshot;
 
-  const nextRole =
+  const submittedRole =
     input.currentUserId === input.id
       ? undefined
       : (input.user.role ?? undefined);
+  const nextRole =
+    submittedRole !== undefined && submittedRole !== current.role
+      ? submittedRole
+      : undefined;
 
-  const roleWriteRequested =
-    input.currentUserId !== input.id && nextRole !== undefined;
+  const roleWriteRequested = nextRole !== undefined;
 
   if (roleWriteRequested) {
     const canSetRole = await deps.permissionChecker.hasPermission(

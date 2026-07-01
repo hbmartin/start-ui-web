@@ -121,8 +121,8 @@ digraph ModuleLayerDependencies {
   "book/domain" -> "kernel/domain" [style="solid"];
   "book/infrastructure" -> "book/domain" [style="solid"];
   "book/infrastructure" -> "genre/infrastructure" [style="solid"];
-  "book/infrastructure" -> "kernel/domain" [style="solid"];
   "book/infrastructure" -> "kernel/infrastructure" [style="solid"];
+  "book/infrastructure" -> "kernel/public" [style="solid"];
   "book/presentation" -> "auth/public" [style="solid"];
   "book/presentation" -> "book/domain" [style="solid"];
   "book/presentation" -> "book/public" [style="solid"];

@@ -8,7 +8,7 @@ import {
   toSessionId,
   toUserId,
 } from '@/modules/kernel/domain/ids';
-import { USER_NAME_MAX_LENGTH } from '@/modules/user/domain/user-policy';
+import { USER_NAME_MAX_LENGTH } from '@/modules/user';
 import {
   createUserHandlers,
   zGetAllInput,

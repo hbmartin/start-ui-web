@@ -1,4 +1,4 @@
-import { SIDE_EFFECT_ROUTE_PATHNAMES } from '@/platform/router/navigation-safety';
+import { SIDE_EFFECT_ROUTE_PATHNAMES } from '@/platform/router';
 
 import { appendVaryHeader } from './security-headers';
 

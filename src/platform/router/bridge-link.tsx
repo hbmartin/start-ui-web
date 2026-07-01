@@ -2,7 +2,10 @@ import { useForesight } from '@foresightjs/react';
 import { Link, type LinkProps, useRouter } from '@tanstack/react-router';
 import * as React from 'react';
 
-import { isProtectedNavigationPath } from './navigation-safety';
+import {
+  isProtectedNavigationPath,
+  normalizeNavigationPathname,
+} from './navigation-safety';
 
 export type BridgeLinkProps = LinkProps;
 
@@ -14,8 +17,39 @@ const protectedNavigationErrorMessage = (target: string) =>
 const isProductionBuild = () =>
   Boolean((import.meta as ImportMeta & { env?: { PROD?: boolean } }).env?.PROD);
 
-const protectedNavigationTarget = (to: unknown) =>
-  typeof to === 'string' && isProtectedNavigationPath(to) ? to : undefined;
+const SCHEME_PATTERN = /^[A-Za-z][A-Za-z\d+.-]*:/;
+
+const hasScheme = (value: string) => SCHEME_PATTERN.test(value);
+
+const toDirectoryPath = (pathname: string) =>
+  pathname.endsWith('/') ? pathname : `${pathname}/`;
+
+const resolveNavigationPathname = (
+  props: Pick<BridgeLinkProps, 'from' | 'to'>
+) => {
+  if (typeof props.to !== 'string') return undefined;
+  if (props.to.startsWith('//') || hasScheme(props.to)) return undefined;
+
+  try {
+    const basePathname =
+      typeof props.from === 'string'
+        ? (normalizeNavigationPathname(props.from) ?? '/')
+        : '/';
+    return new URL(
+      props.to,
+      `https://local.navigation${toDirectoryPath(basePathname)}`
+    ).pathname;
+  } catch {
+    return undefined;
+  }
+};
+
+const protectedNavigationTarget = (
+  props: Pick<BridgeLinkProps, 'from' | 'to'>
+) => {
+  const pathname = resolveNavigationPathname(props);
+  return pathname && isProtectedNavigationPath(pathname) ? pathname : undefined;
+};
 
 const shouldUsePredictedPreload = (
   props: BridgeLinkProps,
@@ -80,7 +114,7 @@ const BridgeLinkComponent = React.forwardRef<
   BridgeLinkProps
 >((props, forwardedRef) => {
   const router = useRouter();
-  const protectedTarget = protectedNavigationTarget(props.to);
+  const protectedTarget = protectedNavigationTarget(props);
   const usePredictedPreload = shouldUsePredictedPreload(props, protectedTarget);
   const routePreloadOptions = toRouterPreloadOptions(props);
   const { elementRef } = useForesight<HTMLAnchorElement>({

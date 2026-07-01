@@ -3,7 +3,7 @@ import { createAuthenticatedContext } from '@tests/server/test-utils';
 import { fc, PROPERTY_DEFAULTS, test } from '@tests/support/property-testing';
 import { describe, expect, it, vi } from 'vitest';
 
-import { BOOK_PUBLISHER_MAX_LENGTH } from '@/modules/book/domain/book-policy';
+import { BOOK_PUBLISHER_MAX_LENGTH } from '@/modules/book';
 import {
   createBookHandlers,
   zCreateInput,

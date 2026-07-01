@@ -2,13 +2,15 @@ import { Result } from '@bloodyowl/boxed';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { match, P } from 'ts-pattern';
 
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
-import type { BookCoverObjectKey, BookId } from '@/modules/kernel/domain/ids';
 import {
+  AppError,
+  type BookCoverObjectKey,
+  type BookId,
+  ConfigurationError,
   toBookCoverObjectKey,
   toBookId,
   toGenreId,
-} from '@/modules/kernel/domain/ids';
+} from '@/modules/kernel';
 import {
   getConstraintName,
   isUniqueConstraintViolation,
@@ -24,6 +26,7 @@ import type {
   DbLike,
   RunInTransaction,
 } from '@/modules/kernel/infrastructure/db/types';
+import { isRootDatabase } from '@/modules/kernel/infrastructure/db/types';
 
 import type { BookRepository } from '../../application/ports/book-repository';
 import type { Book, BookWriteInput } from '../../domain/book';
@@ -127,6 +130,11 @@ export class BookRepositoryDrizzle implements BookRepository {
     ).$runInTransaction;
 
     if (runInTransaction) return runInTransaction(work);
+    if (isRootDatabase(this.db)) {
+      throw new ConfigurationError(
+        'Book cover replacement requires an interactive database transaction.'
+      );
+    }
 
     return work(this.db);
   }

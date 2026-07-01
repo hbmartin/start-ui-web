@@ -12,6 +12,15 @@
  */
 export const MAX_SERVER_FN_BODY_BYTES = 1_048_576; // 1 MiB
 
+const DECIMAL_CONTENT_LENGTH_PATTERN = /^\d+$/;
+
+const parseContentLength = (header: string) => {
+  if (!DECIMAL_CONTENT_LENGTH_PATTERN.test(header)) return null;
+
+  const length = Number(header);
+  return Number.isFinite(length) && length >= 0 ? length : null;
+};
+
 /** True when the request's declared `Content-Length` exceeds `maxBytes`. */
 export const exceedsDeclaredBodyLimit = (
   request: Request,
@@ -19,8 +28,8 @@ export const exceedsDeclaredBodyLimit = (
 ): boolean => {
   const header = request.headers.get('Content-Length');
   if (header === null) return false;
-  const length = Number(header);
-  return Number.isFinite(length) && length > maxBytes;
+  const length = parseContentLength(header);
+  return length !== null && length > maxBytes;
 };
 
 const BODY_BEARING_METHODS = new Set(['DELETE', 'PATCH', 'POST', 'PUT']);
@@ -39,6 +48,6 @@ export const violatesServerFnBodyLimit = (
   const header = request.headers.get('Content-Length');
   if (header === null) return true;
 
-  const length = Number(header);
-  return !Number.isFinite(length) || length < 0 || length > maxBytes;
+  const length = parseContentLength(header);
+  return length === null || length > maxBytes;
 };

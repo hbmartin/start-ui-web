@@ -159,10 +159,7 @@ rules:
     severity: ERROR
     languages:
       - typescript
-    pattern: |
-      if (handlerType === 'serverFn' && exceedsDeclaredBodyLimit($REQUEST)) {
-        ...
-      }
+    pattern: exceedsDeclaredBodyLimit(...)
     paths:
       include:
         - src/start.ts
