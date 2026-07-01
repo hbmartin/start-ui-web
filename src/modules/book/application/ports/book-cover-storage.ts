@@ -1,5 +1,8 @@
-import type { ApplicationResult } from '@/modules/kernel/application/result';
-import type { BookCoverObjectKey, UserId } from '@/modules/kernel/domain/ids';
+import type {
+  ApplicationResult,
+  BookCoverObjectKey,
+  UserId,
+} from '@/modules/kernel';
 
 export type CoverUploadRememberOutcome = { type: 'cover_upload_remembered' };
 

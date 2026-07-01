@@ -8,6 +8,7 @@ import {
   toSessionId,
   toUserId,
 } from '@/modules/kernel/domain/ids';
+import { USER_NAME_MAX_LENGTH } from '@/modules/user/domain/user-policy';
 import {
   createUserHandlers,
   zGetAllInput,
@@ -85,6 +86,18 @@ describe('user HTTP transport handlers', () => {
       cursor: toSessionId('session-2'),
       limit: 5,
     });
+  });
+
+  it('trims names before enforcing max length', () => {
+    const name = 'U'.repeat(USER_NAME_MAX_LENGTH);
+
+    expect(
+      zUpdateByIdInput().parse({
+        id: 'user-2',
+        name: ` ${name} `,
+        email: 'ada@example.com',
+      }).name
+    ).toBe(name);
   });
 
   test.prop([validPaginationLimit, fc.boolean()], PROPERTY_DEFAULTS)(

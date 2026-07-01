@@ -20,7 +20,7 @@ import {
 } from '@/platform/http/browser-mutation-protection';
 import { replaceCspNoncePlaceholderInHtmlResponse } from '@/platform/http/csp-nonce';
 import { createCspNonce } from '@/platform/http/csp-nonce-server';
-import { exceedsDeclaredBodyLimit } from '@/platform/http/request-body-limit';
+import { violatesServerFnBodyLimit } from '@/platform/http/request-body-limit';
 import { applySecurityHeaders } from '@/platform/http/security-headers';
 import { createNoOpTelemetry } from '@/platform/telemetry';
 
@@ -212,7 +212,7 @@ export const browserMutationGuardMiddleware = createMiddleware({
 export const serverFnBodyLimitMiddleware = createMiddleware({
   type: 'request',
 }).server(({ context, request, handlerType, next }) => {
-  if (handlerType === 'serverFn' && exceedsDeclaredBodyLimit(request)) {
+  if (handlerType === 'serverFn' && violatesServerFnBodyLimit(request)) {
     return applyAppSecurityHeaders(
       new Response('Payload Too Large', { status: 413 }),
       context

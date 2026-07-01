@@ -111,6 +111,7 @@ describe('BookRepositoryDrizzle integration', () => {
     expect(updated.type).toBe('book_updated');
     expect(updated).toMatchObject({
       book: { genre: { id: 'genre-2', name: 'Two' } },
+      replacedCoverId: 'old-cover-id',
     });
 
     const persisted = await database.db.query.book.findFirst({

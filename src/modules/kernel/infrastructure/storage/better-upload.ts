@@ -18,6 +18,8 @@ import type { ApplicationResult } from '@/modules/kernel/application/result';
 import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import { getStorageConfig } from '@/modules/kernel/infrastructure/config/storage';
 
+const OBJECT_DELETE_TIMEOUT_MS = 5_000;
+
 const createUploadClient = () => {
   const config = getStorageConfig();
   return custom({
@@ -86,9 +88,17 @@ export class BetterUploadObjectStorage implements ObjectStoragePort {
     const config = getStorageConfig();
     const client = createUploadClient();
     const objectUrl = `${client.buildBucketUrl(config.bucketName)}/${objectKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      OBJECT_DELETE_TIMEOUT_MS
+    );
 
     try {
-      const response = await client.s3.fetch(objectUrl, { method: 'DELETE' });
+      const response = await client.s3.fetch(objectUrl, {
+        method: 'DELETE',
+        signal: controller.signal,
+      });
       if (response.ok || response.status === 404) {
         return Result.Ok({ type: 'object_deleted' });
       }
@@ -110,6 +120,8 @@ export class BetterUploadObjectStorage implements ObjectStoragePort {
           cause: error,
         })
       );
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }

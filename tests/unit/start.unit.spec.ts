@@ -192,6 +192,27 @@ describe('TanStack Start instance', () => {
     );
   });
 
+  it('rejects server-function writes without Content-Length', async () => {
+    const { serverFnBodyLimitMiddleware } = await import('@/start');
+    const next = vi.fn();
+
+    const response = await (serverFnBodyLimitMiddleware as ExplicitAny).handler(
+      {
+        context: {},
+        handlerType: 'serverFn',
+        next,
+        request: new Request('https://app.example/_server', {
+          body: '{}',
+          method: 'POST',
+        }),
+      }
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toBe(413);
+    expect(response.headers.get('X-Frame-Options')).toBe('DENY');
+  });
+
   it('rejects untrusted browser mutations even when guard logger initialization fails', async () => {
     vi.resetModules();
     vi.doMock('@/modules/kernel/infrastructure/logger/telemetry', () => ({

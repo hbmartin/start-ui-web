@@ -154,6 +154,19 @@ rules:
         - '**/*.unit.spec.ts'
         - '**/*.test.ts'
 
+  - id: no-server-fn-declared-body-limit-only
+    message: Server-function body limits must use the fail-closed body-limit helper, not the advisory Content-Length helper alone.
+    severity: ERROR
+    languages:
+      - typescript
+    pattern: |
+      if (handlerType === 'serverFn' && exceedsDeclaredBodyLimit($REQUEST)) {
+        ...
+      }
+    paths:
+      include:
+        - src/start.ts
+
   - id: no-auth-token-browser-storage
     message: Do not store auth, session, JWT, or token values in localStorage/sessionStorage; keep provider tokens server-side.
     severity: ERROR

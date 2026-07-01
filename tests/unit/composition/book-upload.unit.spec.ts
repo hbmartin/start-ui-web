@@ -42,7 +42,7 @@ vi.mock('@/modules/book/transport/upload/book-cover', () => ({
     bookUploadMocks.bookCoverUploadRouteDefinition,
 }));
 
-vi.mock('@/modules/kernel/infrastructure/storage/better-upload', () => ({
+vi.mock('@/modules/kernel/backend', () => ({
   BetterUploadObjectStorage: class {
     createUploadRequestHandler = bookUploadMocks.createUploadRequestHandler;
   },

@@ -6,7 +6,6 @@ import type { UserId } from '@/modules/kernel/domain/ids';
 import type { UserResult, UserUpdateOutcome, UserUseCaseDeps } from './types';
 import type { UserUpdateInput } from '../../domain/user';
 import { shouldUnverifyEmail } from '../../domain/user';
-import { canChangeRole } from '../../domain/user-policy';
 
 export type UpdateUserInput = {
   currentUserId: UserId;
@@ -60,14 +59,10 @@ export async function updateUser(
       ? undefined
       : (input.user.role ?? undefined);
 
-  const roleChanged = canChangeRole({
-    currentUserId: input.currentUserId,
-    userId: input.id,
-    nextRole,
-    currentRole: current.role,
-  });
+  const roleWriteRequested =
+    input.currentUserId !== input.id && nextRole !== undefined;
 
-  if (roleChanged) {
+  if (roleWriteRequested) {
     const canSetRole = await deps.permissionChecker.hasPermission(
       input.currentUserId,
       { user: ['set-role'] }
@@ -98,13 +93,14 @@ export async function updateUser(
     ...update,
   });
   if (result.isError()) return Result.Error(result.getError());
+  const updated = result.get();
 
-  // A privilege change must evict the target's existing sessions. The session
+  // A privilege write must evict the target's existing sessions. The session
   // store caches the user's role/ban snapshot at sign-in time, so without an
-  // explicit revoke a demoted (or banned) user keeps presenting their old role
-  // on every live session until it expires. Revoking forces re-authentication,
-  // which mints a fresh session carrying the new role. (CWE-613 / CWE-269.)
-  if (roleChanged) {
+  // explicit revoke a retried role write can leave stale sessions presenting
+  // the previous role until expiry. Revoking forces re-authentication, which
+  // mints a fresh session carrying the current role. (CWE-613 / CWE-269.)
+  if (roleWriteRequested && updated.type === 'user_updated') {
     const revoked = await deps.userAuthGateway.revokeUserSessions(input.id);
     if (revoked.isError()) return Result.Error(revoked.getError());
     deps.logger.warn({
@@ -118,5 +114,5 @@ export async function updateUser(
     });
   }
 
-  return Result.Ok(result.get());
+  return Result.Ok(updated);
 }

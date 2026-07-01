@@ -28,9 +28,9 @@ export async function updateBook(
 
   const book = normalizeBookWriteInput(input.book);
 
-  // Resolve the existing cover so we can (a) require an ownership-checked upload
-  // token only when the cover actually changes, and (b) reclaim the superseded
-  // object after the write.
+  // Resolve the existing cover so an unchanged cover can be resubmitted without
+  // requiring a fresh upload token. Superseded-cover cleanup uses the
+  // repository update result so it reflects the write boundary.
   const currentResult = await deps.bookRepository.getById(input.id);
   if (currentResult.isError()) return Result.Error(currentResult.getError());
   const currentOutcome = currentResult.get();
@@ -39,6 +39,7 @@ export async function updateBook(
   }
   const previousCoverId = currentOutcome.book.coverId;
   const coverChanged = book.coverId !== previousCoverId;
+  let consumedCoverId: typeof book.coverId = null;
 
   if (coverChanged && book.coverId) {
     const consumed = await deps.coverStorage.consumeUpload(
@@ -49,6 +50,7 @@ export async function updateBook(
     if (consumed.get().type === 'cover_upload_unowned') {
       return Result.Ok({ type: 'book_cover_unowned' });
     }
+    consumedCoverId = book.coverId;
   }
 
   try {
@@ -62,14 +64,30 @@ export async function updateBook(
     if (result.isError()) return Result.Error(result.getError());
     const updated = result.get();
 
-    // Reclaim the superseded cover object. Best-effort: a delete failure is
-    // logged but does not fail the update — the book has already changed.
-    if (updated.type === 'book_updated' && coverChanged && previousCoverId) {
-      const deleted = await deps.coverStorage.deleteObject(previousCoverId);
+    if (updated.type !== 'book_updated' && consumedCoverId) {
+      const deleted = await deps.coverStorage.deleteObject(consumedCoverId);
       if (deleted.isError()) {
         deps.logger.warn({
           event: 'book.cover_object.delete_failed',
-          details: { bookId: input.id, objectKey: previousCoverId },
+          details: { bookId: input.id, objectKey: consumedCoverId },
+        });
+      }
+    }
+
+    // Reclaim the superseded cover object. Best-effort: a delete failure is
+    // logged but does not fail the update — the book has already changed.
+    const replacedCoverId =
+      updated.type === 'book_updated' ? updated.replacedCoverId : null;
+    if (
+      updated.type === 'book_updated' &&
+      replacedCoverId &&
+      replacedCoverId !== book.coverId
+    ) {
+      const deleted = await deps.coverStorage.deleteObject(replacedCoverId);
+      if (deleted.isError()) {
+        deps.logger.warn({
+          event: 'book.cover_object.delete_failed',
+          details: { bookId: input.id, objectKey: replacedCoverId },
         });
       }
     }

@@ -27,6 +27,18 @@ vi.mock('@/modules/kernel/infrastructure/config/auth', () => ({
   getBetterAuthConfig: () => mocks.authConfig,
 }));
 
+vi.mock('@/modules/kernel/backend', () => ({
+  createTelemetryLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  })),
+  getAuthProviderConfig: () => ({ provider: 'better-auth' }),
+  getBetterAuthConfig: () => mocks.authConfig,
+  getRedisConfig: () => undefined,
+}));
+
 vi.mock('@/modules/auth/infrastructure/better-auth/auth', () => ({
   createAuth: mocks.createAuth,
 }));

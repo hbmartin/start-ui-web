@@ -35,6 +35,14 @@ type UpstashCommand = (string | number)[];
 type CommandOutcome = BoxedResult<unknown, AppError>;
 
 const DEFAULT_TIMEOUT_MS = 2_000;
+const TAKE_IF_MATCHES_SCRIPT = `
+local value = redis.call("GET", KEYS[1])
+if value == ARGV[1] then
+  redis.call("DEL", KEYS[1])
+  return value
+end
+return nil
+`;
 
 export type UpstashSecondaryStoreOptions = {
   /** Injected telemetry sink used to report best-effort transport failures. */
@@ -150,6 +158,27 @@ export class UpstashSecondaryStore implements SecondaryStore {
       return Result.Error(outcome.getError());
     }
     return Result.Ok({ type: 'secondary_store_set' });
+  }
+
+  async take(
+    key: string,
+    expectedValue: string
+  ): ReturnType<SecondaryStore['take']> {
+    const outcome = await this.command([
+      'EVAL',
+      TAKE_IF_MATCHES_SCRIPT,
+      1,
+      key,
+      expectedValue,
+    ]);
+    if (outcome.isError()) {
+      this.reportFailure('take', outcome.getError());
+      return Result.Error(outcome.getError());
+    }
+    const value = outcome.get();
+    return typeof value === 'string'
+      ? Result.Ok({ type: 'secondary_store_taken', value })
+      : Result.Ok({ type: 'secondary_store_miss' });
   }
 
   async delete(key: string): ReturnType<SecondaryStore['delete']> {

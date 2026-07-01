@@ -7,10 +7,13 @@ import {
   createBookUseCases,
 } from '@/modules/book';
 import { createBookRepository as createBookRepositoryDrizzle } from '@/modules/book/infrastructure/drizzle/book-repository-drizzle';
-import type { TransactionRunner } from '@/modules/kernel';
-import type { BookCoverObjectKey, UserId } from '@/modules/kernel/domain/ids';
+import type {
+  BookCoverObjectKey,
+  TransactionRunner,
+  UserId,
+} from '@/modules/kernel';
+import { BetterUploadObjectStorage } from '@/modules/kernel/backend';
 import type { DbLike } from '@/modules/kernel/infrastructure/db/types';
-import { BetterUploadObjectStorage } from '@/modules/kernel/infrastructure/storage/better-upload';
 
 import { getSecondaryStore } from './auth';
 import { getKernel, type Kernel } from './kernel';
@@ -51,14 +54,11 @@ const createBookCoverStorage = (): BookCoverStorage => {
       return Result.Ok({ type: 'cover_upload_remembered' as const });
     },
     async consumeUpload(objectKey: BookCoverObjectKey, userId: UserId) {
-      const found = await secondaryStore.get(bindingKey(objectKey));
-      if (found.isError()) return Result.Error(found.getError());
-      const outcome = found.get();
-      if (outcome.type === 'secondary_store_miss' || outcome.value !== userId) {
+      const taken = await secondaryStore.take(bindingKey(objectKey), userId);
+      if (taken.isError()) return Result.Error(taken.getError());
+      if (taken.get().type === 'secondary_store_miss') {
         return Result.Ok({ type: 'cover_upload_unowned' as const });
       }
-      const removed = await secondaryStore.delete(bindingKey(objectKey));
-      if (removed.isError()) return Result.Error(removed.getError());
       return Result.Ok({ type: 'cover_upload_consumed' as const });
     },
     async deleteObject(objectKey: BookCoverObjectKey) {

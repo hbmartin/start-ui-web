@@ -48,7 +48,7 @@ const zBookWriteInput = () =>
     title: z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH),
     author: z.string().trim().min(1).max(BOOK_AUTHOR_MAX_LENGTH),
     genreId: zGenreId(),
-    publisher: z.string().max(BOOK_PUBLISHER_MAX_LENGTH).nullish(),
+    publisher: z.string().trim().max(BOOK_PUBLISHER_MAX_LENGTH).nullish(),
     coverId: zBookCoverInput(),
   });
 

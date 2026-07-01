@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   exceedsDeclaredBodyLimit,
   MAX_SERVER_FN_BODY_BYTES,
+  violatesServerFnBodyLimit,
 } from '@/platform/http/request-body-limit';
 
 const requestWithContentLength = (value: string | null) =>
@@ -31,7 +32,7 @@ describe('exceedsDeclaredBodyLimit', () => {
     );
   });
 
-  it('does not flag a missing or unparseable Content-Length (advisory only)', () => {
+  it('does not flag a missing or unparseable Content-Length by itself', () => {
     expect(exceedsDeclaredBodyLimit(requestWithContentLength(null))).toBe(
       false
     );
@@ -43,6 +44,34 @@ describe('exceedsDeclaredBodyLimit', () => {
   it('honours an explicit lower bound', () => {
     expect(exceedsDeclaredBodyLimit(requestWithContentLength('100'), 50)).toBe(
       true
+    );
+  });
+});
+
+describe('violatesServerFnBodyLimit', () => {
+  it('fails closed for POST requests without Content-Length', () => {
+    expect(violatesServerFnBodyLimit(requestWithContentLength(null))).toBe(
+      true
+    );
+  });
+
+  it('fails closed for invalid Content-Length values', () => {
+    expect(
+      violatesServerFnBodyLimit(requestWithContentLength('not-a-number'))
+    ).toBe(true);
+  });
+
+  it('allows safe methods without Content-Length', () => {
+    expect(
+      violatesServerFnBodyLimit(
+        new Request('https://app.example/_server', { method: 'GET' })
+      )
+    ).toBe(false);
+  });
+
+  it('allows declared POST bodies at the limit', () => {
+    expect(violatesServerFnBodyLimit(requestWithContentLength('50'), 50)).toBe(
+      false
     );
   });
 });

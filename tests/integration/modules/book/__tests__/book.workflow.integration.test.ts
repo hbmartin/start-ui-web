@@ -116,15 +116,22 @@ class InMemoryBookRepository implements BookRepository {
 
     const book = this.#toBook(id, input, existing.createdAt);
     this.books.set(id, book);
-    return Result.Ok({ type: 'book_updated' as const, book });
+    return Result.Ok({
+      type: 'book_updated' as const,
+      book,
+      replacedCoverId: existing.coverId,
+    });
   }
 
   async delete(id: BookId) {
-    return Result.Ok(
-      this.books.delete(id)
-        ? { type: 'book_deleted' as const }
-        : { type: 'book_not_found' as const }
-    );
+    const existing = this.books.get(id);
+    if (!existing) return Result.Ok({ type: 'book_not_found' as const });
+
+    this.books.delete(id);
+    return Result.Ok({
+      type: 'book_deleted' as const,
+      deletedCoverId: existing.coverId,
+    });
   }
 
   #toBook(id: BookId, input: BookWriteInput, createdAt = now): Book {
@@ -237,7 +244,10 @@ describe('book public workflow integration', () => {
     expect(getOk(duplicate)).toEqual({ type: 'book_duplicate' });
 
     const deleted = await useCases.delete({ currentUserId, id: createdId });
-    expect(getOk(deleted)).toEqual({ type: 'book_deleted' });
+    expect(getOk(deleted)).toEqual({
+      type: 'book_deleted',
+      deletedCoverId: null,
+    });
     const missing = await useCases.get({ currentUserId, id: createdId });
     expect(getOk(missing)).toEqual({ type: 'book_not_found' });
   });
