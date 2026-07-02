@@ -85,7 +85,7 @@ digraph ModuleLayerDependencies {
   }
 
   "account/application" -> "account/domain" [style="solid"];
-  "account/domain" -> "kernel/domain" [style="solid"];
+  "account/domain" -> "kernel/public" [style="solid"];
   "account/presentation" -> "account/domain" [style="solid"];
   "account/presentation" -> "account/public" [style="solid"];
   "account/presentation" -> "auth/public" [style="solid"];
@@ -121,6 +121,7 @@ digraph ModuleLayerDependencies {
   "book/application" -> "book/domain" [style="solid"];
   "book/application" -> "kernel/domain" [style="solid"];
   "book/domain" -> "kernel/domain" [style="solid"];
+  "book/domain" -> "kernel/public" [style="solid"];
   "book/infrastructure" -> "book/domain" [style="solid"];
   "book/infrastructure" -> "genre/infrastructure" [style="solid"];
   "book/infrastructure" -> "genre/public" [style="solid"];
@@ -158,7 +159,7 @@ digraph ModuleLayerDependencies {
   "email/transport" -> "email/public" [style="solid"];
   "email/transport" -> "kernel/domain" [style="solid"];
   "genre/application" -> "genre/domain" [style="solid"];
-  "genre/domain" -> "kernel/domain" [style="solid"];
+  "genre/domain" -> "kernel/public" [style="solid"];
   "genre/infrastructure" -> "genre/domain" [style="solid"];
   "genre/infrastructure" -> "kernel/domain" [style="solid"];
   "genre/infrastructure" -> "kernel/infrastructure" [style="solid"];

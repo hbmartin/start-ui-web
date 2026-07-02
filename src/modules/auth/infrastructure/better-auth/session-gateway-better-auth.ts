@@ -1,15 +1,15 @@
 import { Option, Result } from '@bloodyowl/boxed';
 import { and, eq } from 'drizzle-orm';
 
-import type { Clock } from '@/modules/kernel/application/ports/clock';
-import type { ApplicationResult } from '@/modules/kernel/application/result';
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
+  AppError,
+  type ApplicationResult,
+  type Clock,
   toEmailAddress,
   toSessionId,
   toUserId,
   type UserId,
-} from '@/modules/kernel/domain/ids';
+} from '@/modules/kernel';
 import { systemClock } from '@/modules/kernel/infrastructure/clock/system-clock';
 import { getBetterAuthConfig } from '@/modules/kernel/infrastructure/config/auth';
 import {

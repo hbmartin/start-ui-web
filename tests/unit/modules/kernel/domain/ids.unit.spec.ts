@@ -81,10 +81,15 @@ describe('kernel domain ids', () => {
   it('returns first-class ID validation errors for blank IDs', () => {
     const result = toUserId('  ');
     expect(result.isError()).toBe(true);
-    if (result.isOk()) throw new Error('Expected parser to fail.');
+    const error = result.match({
+      Ok: () => {
+        throw new Error('Expected parser to fail.');
+      },
+      Error: (value) => value,
+    });
 
-    expect(result.getError()).toBeInstanceOf(IdValidationError);
-    expect(result.getError()).toMatchObject({
+    expect(error).toBeInstanceOf(IdValidationError);
+    expect(error).toMatchObject({
       name: 'IdValidationError',
       code: 'INVALID_ID',
       details: {
@@ -99,9 +104,14 @@ describe('kernel domain ids', () => {
 
     const result = toEmailAddress(invalidValue);
     expect(result.isError()).toBe(true);
-    if (result.isOk()) throw new Error('Expected parser to fail.');
+    const error = result.match({
+      Ok: () => {
+        throw new Error('Expected parser to fail.');
+      },
+      Error: (value) => value,
+    });
 
-    expect(result.getError()).toMatchObject({
+    expect(error).toMatchObject({
       details: {
         typeName: 'EmailAddress',
         value: 'xxxxxxxxxxxxxxxxxxxxxxxx...<truncated:80>',

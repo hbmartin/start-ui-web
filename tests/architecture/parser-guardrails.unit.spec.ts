@@ -10,6 +10,9 @@ const forbiddenValidationHelpers = [
   'isTrackedEmailEvent',
 ] as const;
 
+const identifierPattern = (identifier: string) =>
+  new RegExp(`\\b${identifier}\\b`, 'u');
+
 function listSourceFiles(dir: string): string[] {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   return entries.flatMap((entry) => {
@@ -25,7 +28,7 @@ describe('parser guardrails', () => {
       (file) => {
         const source = fs.readFileSync(file, 'utf8');
         return forbiddenValidationHelpers
-          .filter((helper) => source.includes(helper))
+          .filter((helper) => identifierPattern(helper).test(source))
           .map((helper) => `${path.relative(root, file)}:${helper}`);
       }
     );

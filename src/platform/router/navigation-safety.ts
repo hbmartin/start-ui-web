@@ -12,7 +12,7 @@ const stripTrailingSlashes = (pathname: string) => {
   return pathname.slice(0, end);
 };
 
-const localNavigationUrlBase = 'https://local.navigation';
+export const localNavigationUrlBase = 'https://local.navigation';
 
 export const normalizeNavigationPathname = (value: string) => {
   const trimmed = value.trim();

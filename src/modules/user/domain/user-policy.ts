@@ -1,4 +1,4 @@
-import type { UserId } from '@/modules/kernel/domain/ids';
+import type { UserId } from '@/modules/kernel';
 
 import type { UserRole } from './user';
 

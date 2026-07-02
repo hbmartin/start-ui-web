@@ -14,6 +14,7 @@ import {
   toBookId,
   toGenreId,
 } from '@/modules/kernel';
+import { isRootDatabase } from '@/modules/kernel/backend';
 import {
   getConstraintName,
   isUniqueConstraintViolation,
@@ -29,7 +30,6 @@ import type {
   DbLike,
   RunInTransaction,
 } from '@/modules/kernel/infrastructure/db/types';
-import { isRootDatabase } from '@/modules/kernel/infrastructure/db/types';
 
 import type { BookRepository } from '../../application/ports/book-repository';
 import type { Book, BookGenreSummary, BookWriteInput } from '../../domain/book';
@@ -64,6 +64,37 @@ function parseBookRowValue<TValue>(
     : Result.Ok(result.get());
 }
 
+function parseNullableBookRowValue<TValue>(
+  value: string | null,
+  parser: (value: string) => ParseResult<TValue>
+): ApplicationResult<TValue | null> {
+  if (value === null) return Result.Ok(null);
+  return parseBookRowValue(parser(value));
+}
+
+function parseGenreSummary(
+  genre: BookRow['genre']
+): ApplicationResult<BookGenreSummary | null> {
+  if (!genre) return Result.Ok(null);
+
+  const id = parseBookRowValue(toGenreId(genre.id));
+  if (id.isError()) return Result.Error(id.getError());
+
+  const name = parseBookRowValue(toGenreName(genre.name));
+  if (name.isError()) return Result.Error(name.getError());
+
+  const color = parseBookRowValue(toGenreColor(genre.color));
+  if (color.isError()) return Result.Error(color.getError());
+
+  return Result.Ok({
+    id: id.get(),
+    name: name.get(),
+    color: color.get(),
+    createdAt: genre.createdAt,
+    updatedAt: genre.updatedAt,
+  });
+}
+
 function toDomain(row: BookRow): ApplicationResult<Book> {
   const id = parseBookRowValue(toBookId(row.id));
   if (id.isError()) return Result.Error(id.getError());
@@ -77,52 +108,23 @@ function toDomain(row: BookRow): ApplicationResult<Book> {
   const author = parseBookRowValue(toBookAuthor(row.author));
   if (author.isError()) return Result.Error(author.getError());
 
-  let genre: BookGenreSummary | null = null;
-  if (row.genre) {
-    const summaryGenreId = parseBookRowValue(toGenreId(row.genre.id));
-    if (summaryGenreId.isError())
-      return Result.Error(summaryGenreId.getError());
-    const summaryGenreName = parseBookRowValue(toGenreName(row.genre.name));
-    if (summaryGenreName.isError()) {
-      return Result.Error(summaryGenreName.getError());
-    }
-    const summaryGenreColor = parseBookRowValue(toGenreColor(row.genre.color));
-    if (summaryGenreColor.isError()) {
-      return Result.Error(summaryGenreColor.getError());
-    }
-    genre = {
-      id: summaryGenreId.get(),
-      name: summaryGenreName.get(),
-      color: summaryGenreColor.get(),
-      createdAt: row.genre.createdAt,
-      updatedAt: row.genre.updatedAt,
-    };
-  }
+  const genre = parseGenreSummary(row.genre ?? null);
+  if (genre.isError()) return Result.Error(genre.getError());
 
-  let publisher: Book['publisher'] = null;
-  if (row.publisher) {
-    const parsedPublisher = parseBookRowValue(toPublisherName(row.publisher));
-    if (parsedPublisher.isError()) {
-      return Result.Error(parsedPublisher.getError());
-    }
-    publisher = parsedPublisher.get();
-  }
+  const publisher = parseNullableBookRowValue(row.publisher, toPublisherName);
+  if (publisher.isError()) return Result.Error(publisher.getError());
 
-  let coverId: BookCoverObjectKey | null = null;
-  if (row.coverId) {
-    const parsedCoverId = parseBookRowValue(toBookCoverObjectKey(row.coverId));
-    if (parsedCoverId.isError()) return Result.Error(parsedCoverId.getError());
-    coverId = parsedCoverId.get();
-  }
+  const coverId = parseNullableBookRowValue(row.coverId, toBookCoverObjectKey);
+  if (coverId.isError()) return Result.Error(coverId.getError());
 
   return Result.Ok({
     id: id.get(),
     title: title.get(),
     author: author.get(),
     genreId: genreId.get(),
-    genre,
-    publisher,
-    coverId,
+    genre: genre.get(),
+    publisher: publisher.get(),
+    coverId: coverId.get(),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -252,7 +254,7 @@ export class BookRepositoryDrizzle implements BookRepository {
     if (!parsedBook) return null;
 
     let replacedCoverId: BookCoverObjectKey | null = null;
-    if (current.coverId) {
+    if (current.coverId !== null) {
       const parsedReplacedCoverId = parseBookRowValue(
         toBookCoverObjectKey(current.coverId)
       );
@@ -467,7 +469,7 @@ export class BookRepositoryDrizzle implements BookRepository {
       if (!deleted) return Result.Ok({ type: 'book_not_found' as const });
 
       let deletedCoverId: BookCoverObjectKey | null = null;
-      if (deleted.coverId) {
+      if (deleted.coverId !== null) {
         const parsedDeletedCoverId = parseBookRowValue(
           toBookCoverObjectKey(deleted.coverId)
         );

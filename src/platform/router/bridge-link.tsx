@@ -4,6 +4,7 @@ import * as React from 'react';
 
 import {
   isProtectedNavigationPath,
+  localNavigationUrlBase,
   normalizeNavigationPathname,
 } from './navigation-safety';
 
@@ -31,13 +32,17 @@ const resolveNavigationPathname = (
   if (props.to.startsWith('//') || hasScheme(props.to)) return undefined;
 
   try {
+    if (!props.to.startsWith('/') && typeof props.from !== 'string') {
+      return undefined;
+    }
+
     const basePathname =
       typeof props.from === 'string'
         ? (normalizeNavigationPathname(props.from) ?? '/')
         : '/';
     return new URL(
       props.to,
-      `https://local.navigation${toDirectoryPath(basePathname)}`
+      `${localNavigationUrlBase}${toDirectoryPath(basePathname)}`
     ).pathname;
   } catch {
     return undefined;

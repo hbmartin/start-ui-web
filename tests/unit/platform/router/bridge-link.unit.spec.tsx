@@ -132,6 +132,19 @@ describe('BridgeLink', () => {
     expect(linkMocks.props).toEqual([]);
   });
 
+  it('does not resolve relative links against root when from is omitted', () => {
+    expect(() =>
+      renderToStaticMarkup(
+        <BridgeLink to={'../logout' as never}>Relative logout</BridgeLink>
+      )
+    ).not.toThrow();
+
+    expect(linkMocks.props).toHaveLength(1);
+    expect(linkMocks.props[0]).toMatchObject({
+      to: '../logout',
+    });
+  });
+
   it('does not allow explicit preloading to bypass a protected route block', () => {
     expect(() =>
       renderToStaticMarkup(

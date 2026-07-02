@@ -1,9 +1,11 @@
 import { Result } from '@bloodyowl/boxed';
 import { z } from 'zod';
 
-import { IdValidationError } from '@/modules/kernel/domain/errors/id-validation-error';
-import type { GenreId } from '@/modules/kernel/domain/ids';
-import type { ParseResult } from '@/modules/kernel/domain/ids';
+import {
+  type GenreId,
+  IdValidationError,
+  type ParseResult,
+} from '@/modules/kernel';
 
 import { GENRE_COLOR_PATTERN, GENRE_NAME_MAX_LENGTH } from './genre-policy';
 
@@ -17,6 +19,7 @@ export const zGenreColorSchema = z
   .string()
   .trim()
   .regex(GENRE_COLOR_PATTERN)
+  .transform((value) => value.toLowerCase())
   .brand<'GenreColor'>();
 
 export type GenreName = z.infer<typeof zGenreNameSchema>;

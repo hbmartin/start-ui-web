@@ -202,4 +202,28 @@ describe('BookRepositoryDrizzle integration', () => {
       status: 500,
     });
   });
+
+  it('rejects invalid non-null optional book row values', async () => {
+    const repository = createBookRepository({ db: database.db });
+    await database.db
+      .insert(genreTable)
+      .values(makeGenreRow({ id: 'genre-1', name: 'One' }));
+    await database.db.insert(bookTable).values(
+      makeBookRow({
+        id: 'book-1',
+        title: testBookTitle('Dune'),
+        author: testBookAuthor('Frank Herbert'),
+        genreId: 'genre-1',
+        publisher: '',
+      })
+    );
+
+    expect(
+      getError(await repository.getById(unwrapParseResult(toBookId('book-1'))))
+    ).toMatchObject({
+      code: 'BOOK_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
+  });
 });

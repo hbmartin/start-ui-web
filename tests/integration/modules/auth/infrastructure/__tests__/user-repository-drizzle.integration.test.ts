@@ -193,4 +193,25 @@ describe('UserRepositoryDrizzle integration', () => {
       status: 500,
     });
   });
+
+  it('preserves persisted empty display names', async () => {
+    const repository = createUserRepository({ db: database.db });
+    await database.db.insert(userTable).values(
+      makeUserRow({
+        id: 'user-1',
+        name: '',
+        email: 'empty-name@example.com',
+      })
+    );
+
+    expect(
+      getOk(await repository.getById(unwrapParseResult(toUserId('user-1'))))
+    ).toMatchObject({
+      type: 'user_found',
+      user: {
+        id: 'user-1',
+        name: '',
+      },
+    });
+  });
 });

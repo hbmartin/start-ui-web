@@ -2,16 +2,16 @@ import { Result } from '@bloodyowl/boxed';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { match, P } from 'ts-pattern';
 
-import type { ApplicationResult } from '@/modules/kernel/application/result';
-import { AppError } from '@/modules/kernel/domain/errors/app-error';
 import {
+  AppError,
+  type ApplicationResult,
   type ParseResult,
   type SessionId,
   toEmailAddress,
   toSessionId,
   toUserId,
   type UserId,
-} from '@/modules/kernel/domain/ids';
+} from '@/modules/kernel';
 import {
   getConstraintName,
   isUniqueConstraintViolation,
@@ -62,16 +62,12 @@ function toDomainUser(
   const email = parseUserRowValue(toEmailAddress(row.email));
   if (email.isError()) return Result.Error(email.getError());
 
-  let name: User['name'] = null;
-  if (row.name) {
-    const parsedName = parseUserRowValue(toUserDisplayName(row.name));
-    if (parsedName.isError()) return Result.Error(parsedName.getError());
-    name = parsedName.get();
-  }
+  const name = parseUserRowValue(toUserDisplayName(row.name));
+  if (name.isError()) return Result.Error(name.getError());
 
   return Result.Ok({
     id: id.get(),
-    name,
+    name: name.get(),
     email: email.get(),
     emailVerified: row.emailVerified,
     role: row.role,

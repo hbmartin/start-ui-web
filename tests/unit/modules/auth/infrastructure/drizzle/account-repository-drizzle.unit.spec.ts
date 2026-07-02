@@ -88,4 +88,24 @@ describe('AccountRepositoryDrizzle', () => {
       status: 500,
     });
   });
+
+  it('maps invalid persisted onboarding rows to a system row error', async () => {
+    const repository = createAccountRepository({
+      db: makeReturningDb({ id: '' }),
+    });
+
+    const result = await repository.submitOnboarding(
+      unwrapParseResult(toUserId('user-1')),
+      {
+        name: testAccountName('User'),
+        onboardedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }
+    );
+
+    expect(getError(result)).toMatchObject({
+      code: 'ACCOUNT_ROW_INVALID',
+      category: 'system',
+      status: 500,
+    });
+  });
 });

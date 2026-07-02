@@ -16,6 +16,7 @@ export {
   getDefaultDbClient,
 } from './infrastructure/db/client';
 export { book, genre, user } from './infrastructure/db/schema';
+export { isRootDatabase } from './infrastructure/db/types';
 export { createTelemetryLogger } from './infrastructure/logger/telemetry';
 export { BetterUploadObjectStorage } from './infrastructure/storage/better-upload';
 export { appErrorToResponse } from './transport/http/error-mapper';
