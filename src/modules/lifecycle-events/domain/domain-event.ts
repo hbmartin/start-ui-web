@@ -41,6 +41,6 @@ export const parseDomainEventPayload = <TType extends DomainEventType>(
   if (!parsed.success) return { type: 'domain_event_payload_invalid' };
   return {
     type: 'domain_event_parsed',
-    payload: parsed.data as DomainEventPayload<TType>,
+    payload: parsed.data,
   };
 };
