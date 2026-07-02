@@ -1,5 +1,6 @@
 import { getAuthConfig } from './auth';
 import { getDatabaseConfig } from './database';
+import { getDeployTargetConfig } from './deploy-target';
 import { getEmailConfig } from './email';
 import { shouldSkipEnvValidation } from './env-schema';
 import { getHttpConfig } from './http';
@@ -13,6 +14,7 @@ export function validateServerConfig() {
 
   getAuthConfig();
   getDatabaseConfig();
+  getDeployTargetConfig();
   getEmailConfig();
   getHttpConfig();
   getLoggerConfig();

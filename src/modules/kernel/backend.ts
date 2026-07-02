@@ -2,6 +2,7 @@ export {
   getAuthProviderConfig,
   getBetterAuthConfig,
 } from './infrastructure/config/auth';
+export { getDeployTargetConfig } from './infrastructure/config/deploy-target';
 export { getEmailConfig } from './infrastructure/config/email';
 export {
   getSeedAccountEmails,
