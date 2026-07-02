@@ -5,6 +5,7 @@ import { getEmailConfig } from './email';
 import { shouldSkipEnvValidation } from './env-schema';
 import { getHttpConfig } from './http';
 import { getLoggerConfig } from './logger';
+import { getOutboxConfig } from './outbox';
 import { getRedisConfig } from './redis';
 import { getStorageConfig } from './storage';
 import { getTelemetryConfig } from './telemetry';
@@ -18,6 +19,7 @@ export function validateServerConfig() {
   getEmailConfig();
   getHttpConfig();
   getLoggerConfig();
+  getOutboxConfig();
   getRedisConfig();
   getStorageConfig();
   getTelemetryConfig();
